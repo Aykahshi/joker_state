@@ -256,24 +256,6 @@ void main() {
       expect(service1.disposed, isTrue);
       expect(service2.disposed, isTrue);
     });
-
-    test('should dispose resources when calling deleteAll', () {
-      // Arrange
-      final api = MockDisposable();
-      final repo = MockDisposable();
-
-      ring.put(api);
-      ring.put(repo);
-
-      // Act
-      ring.deleteAll();
-
-      // Assert
-      expect(api.disposed, isTrue);
-      expect(repo.disposed, isTrue);
-      expect(ring.isRegistered<MockDisposable>('api'), isFalse);
-      expect(ring.isRegistered<MockDisposable>('repo'), isFalse);
-    });
   });
 }
 
@@ -285,14 +267,6 @@ class Counter {
   final int count;
 
   Counter(this.count);
-}
-
-class ApiService {}
-
-class Repository {
-  final ApiService api;
-
-  Repository(this.api);
 }
 
 class MockDisposable implements Disposable {

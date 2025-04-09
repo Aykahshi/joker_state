@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
+import 'package:joker_state/src/state_management/joker_card/joker_card_extension.dart';
 
+import '../../di/circus_ring/circus_ring.dart';
 import '../joker_card/joker_card.dart';
 
 typedef JokerDeckBuilder = Widget Function(
@@ -10,16 +12,18 @@ typedef JokerDeckBuilder = Widget Function(
 
 /// JokerDeck - A widget that listens to multiple JokerCards and rebuilds when any of them change
 class JokerDeck extends StatefulWidget {
-  final List<JokerCard> cards;
-  final JokerDeckBuilder builder;
-  final Widget? child;
-
   const JokerDeck({
     super.key,
     required this.cards,
     required this.builder,
+    this.autoDispose = true,
     this.child,
   });
+
+  final List<JokerCard> cards;
+  final JokerDeckBuilder builder;
+  final bool autoDispose;
+  final Widget? child;
 
   @override
   _JokerDeckState createState() => _JokerDeckState();
@@ -28,48 +32,83 @@ class JokerDeck extends StatefulWidget {
 class _JokerDeckState extends State<JokerDeck> {
   late List<dynamic> _values;
 
+  // Keep track of listener functions to correctly remove them
+  final Map<JokerCard, VoidCallback> _listeners = {};
+
   @override
   void initState() {
     super.initState();
-    _values = widget.cards.map((card) => card.value).toList();
+    _values = List.from(widget.cards.map((JokerCard card) => card.value));
     _addListeners();
   }
 
   void _addListeners() {
     for (int i = 0; i < widget.cards.length; i++) {
-      final JokerCard card = widget.cards[i];
-      card.addListener(() => _updateCard(i, card));
+      final card = widget.cards[i];
+      final int index = i; // Capture the current index
+
+      // Create and store the listener function
+      final listener = () {
+        if (mounted) {
+          setState(() {
+            if (index < _values.length) {
+              _values[index] = card.value;
+            }
+          });
+        }
+      };
+
+      // Store reference to the listener
+      _listeners[card] = listener;
+      card.addListener(listener);
     }
   }
 
-  void _updateCard(int index, JokerCard card) {
-    setState(() {
-      _values[index] = card.value;
-    });
+  void _removeListeners() {
+    // Remove using the stored references
+    for (final entry in _listeners.entries) {
+      entry.key.removeListener(entry.value);
+    }
+    _listeners.clear();
   }
 
   @override
   void didUpdateWidget(JokerDeck oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    // Check if the card list changed
     if (widget.cards.length != oldWidget.cards.length ||
         !widget.cards.every((card) => oldWidget.cards.contains(card))) {
-      // If the number of cards has changed or if any of the cards have been added or removed,
-      // we need to update the listeners
-      for (final JokerCard card in oldWidget.cards) {
-        card.removeListener(() {});
-      }
+      // Remove old listeners
+      _removeListeners();
 
-      _values = widget.cards.map((card) => card.value).toList();
+      // Update values and add new listeners
+      _values = List.from(widget.cards.map((card) => card.value));
       _addListeners();
     }
   }
 
   @override
   void dispose() {
-    for (final card in widget.cards) {
-      card.removeListener(() {});
+    _removeListeners();
+
+    // Handle auto disposal if needed
+    if (widget.autoDispose) {
+      for (final card in widget.cards) {
+        final tag = card.tag;
+        if (tag != null && tag.isNotEmpty) {
+          final joker = Circus.tryDrawCard(tag: tag);
+          if (joker == null) {
+            card.dispose();
+          } else {
+            Circus.discard(tag: tag);
+          }
+        } else {
+          card.dispose();
+        }
+      }
     }
+
     super.dispose();
   }
 
