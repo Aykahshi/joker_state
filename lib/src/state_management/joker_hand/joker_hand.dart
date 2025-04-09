@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 
+import '../../di/circus_ring/circus_ring.dart';
 import '../joker_card/joker_card.dart';
+import '../joker_card/joker_card_extension.dart';
 
 typedef JokerHandBuilder<T> = Widget Function(
   BuildContext context,
@@ -12,7 +14,7 @@ class JokerHand<T> extends StatefulWidget {
   const JokerHand({
     super.key,
     required this.joker,
-    this.autoDispose = false,
+    this.autoDispose = true,
     required this.builder,
     this.child,
   });
@@ -30,7 +32,12 @@ class _JokerHandState<T> extends State<JokerHand<T>> {
   @override
   void dispose() {
     if (widget.autoDispose) {
-      widget.joker.dispose();
+      var joker = Circus.tryDrawCard<T>(tag: widget.joker.tag ?? '');
+      if (joker == null) {
+        widget.joker.dispose();
+      } else {
+        Circus.discard<T>(tag: widget.joker.tag ?? '');
+      }
     }
     super.dispose();
   }
