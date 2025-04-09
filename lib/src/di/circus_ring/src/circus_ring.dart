@@ -13,7 +13,9 @@ CircusRing get Circus => CircusRing.instance;
 class CircusRing {
   // Singleton pattern
   CircusRing._internal();
+
   static final CircusRing _instance = CircusRing._internal();
+
   factory CircusRing() => _instance;
 
   // Direct access to instance shorthand
@@ -30,9 +32,6 @@ class CircusRing {
 
   // Container for storing lazy async factory methods
   final _lazyAsyncSingleton = <String, AsyncFactoryFunc>{};
-
-  // Dependency relationship list, used for resource release
-  final _dependencies = <String, List<String>>{};
 
   // Whether to enable debug logs
   bool _enableLogs = false;
@@ -134,18 +133,6 @@ extension CircusRingInjection on CircusRing {
   T create<T>({required FactoryFunc<T> builder, String? tag}) {
     _log('Creating new instance: ${_getKey(T, tag)}');
     return builder();
-  }
-
-  /// Register dependency relationship
-  void registerDependency<T, D>({String? tag, String? dependentTag}) {
-    final key = _getKey(T, tag);
-    final dependentKey = _getKey(D, dependentTag);
-
-    _dependencies[key] = _dependencies[key] ?? [];
-    if (!_dependencies[key]!.contains(dependentKey)) {
-      _dependencies[key]!.add(dependentKey);
-      _log('Dependency registered: $key -> $dependentKey');
-    }
   }
 
   /// Delete a single instance
@@ -285,115 +272,54 @@ extension CircusRingFind on CircusRing {
   }
 
   /// Delete an instance
-  bool delete<T>({String? tag, bool force = false}) {
+  bool delete<T>({String? tag}) {
     final key = _getKey(T, tag);
 
-    if (force ||
-        !_dependencies.containsKey(key) ||
-        _dependencies[key]!.isEmpty) {
-      return _deleteSingle<T>(key: key);
-    } else {
-      _log('Cannot delete $key: dependencies exist');
-      return false;
-    }
+    return _deleteSingle<T>(key: key);
   }
 
   /// Delete an instance asynchronously
-  Future<bool> deleteAsync<T>({String? tag, bool force = false}) async {
+  Future<bool> deleteAsync<T>({String? tag}) async {
     final key = _getKey(T, tag);
 
-    if (force ||
-        !_dependencies.containsKey(key) ||
-        _dependencies[key]!.isEmpty) {
-      return await _deleteSingleAsync<T>(key: key);
-    } else {
-      _log('Cannot delete $key: dependencies exist');
-      return false;
-    }
+    return await _deleteSingleAsync<T>(key: key);
   }
 
   /// Delete all instances
-  void deleteAll({bool force = false}) {
-    if (force) {
-      // Release all disposable resources
-      for (final key in _instances.keys) {
-        final instance = _instances[key];
-        if (instance is Disposable) {
-          instance.dispose();
-        }
+  void deleteAll() {
+    for (final key in _instances.keys.toList()) {
+      final instance = _instances[key];
+      if (instance is ValueNotifier) {
+        instance.dispose();
       }
-      _instances.clear();
-      _factories.clear();
-      _lazyFactories.clear();
-      _lazyAsyncSingleton.clear();
-      _dependencies.clear();
-      _log('Force deleted all instances and factories');
-    } else {
-      // Release resources according to dependency order
-      final List<String> keysToRemove = [];
-
-      // Find instances with no dependencies to remove first
-      for (final key in _instances.keys) {
-        if (!_dependencies.containsKey(key) || _dependencies[key]!.isEmpty) {
-          final instance = _instances[key];
-          if (instance is Disposable) {
-            instance.dispose();
-          }
-          keysToRemove.add(key);
-        }
+      if (instance is Disposable) {
+        instance.dispose();
       }
-
-      // Remove instances
-      for (final key in keysToRemove) {
-        _instances.remove(key);
-      }
-
-      _log('Deleted ${keysToRemove.length} instances without dependencies');
     }
+    _instances.clear();
+    _factories.clear();
+    _lazyFactories.clear();
+    _lazyAsyncSingleton.clear();
+    _log('Force deleted all instances and factories');
   }
 
   /// Delete all instances asynchronously
-  Future<void> deleteAllAsync({bool force = false}) async {
-    if (force) {
-      // Release all disposable resources
-      for (final key in _instances.keys) {
-        final instance = _instances[key];
-        if (instance is AsyncDisposable) {
-          await instance.dispose();
-        } else if (instance is Disposable) {
-          instance.dispose();
-        }
+  Future<void> deleteAllAsync() async {
+    for (final key in _instances.keys) {
+      final instance = _instances[key];
+      if (instance is ValueNotifier) {
+        instance.dispose();
       }
-      _instances.clear();
-      _factories.clear();
-      _lazyFactories.clear();
-      _lazyAsyncSingleton.clear();
-      _dependencies.clear();
-      _log('Force deleted all instances and factories asynchronously');
-    } else {
-      // Release resources according to dependency order
-      final List<String> keysToRemove = [];
-
-      // Find instances with no dependencies to remove first
-      for (final key in _instances.keys) {
-        if (!_dependencies.containsKey(key) || _dependencies[key]!.isEmpty) {
-          final instance = _instances[key];
-          if (instance is AsyncDisposable) {
-            await instance.dispose();
-          } else if (instance is Disposable) {
-            instance.dispose();
-          }
-          keysToRemove.add(key);
-        }
+      if (instance is AsyncDisposable) {
+        await instance.dispose();
+      } else if (instance is Disposable) {
+        instance.dispose();
       }
-
-      // Remove instances
-      for (final key in keysToRemove) {
-        _instances.remove(key);
-      }
-
-      _log(
-          'Deleted ${keysToRemove.length} instances without dependencies asynchronously');
     }
+    _instances.clear();
+    _factories.clear();
+    _lazyFactories.clear();
+    _lazyAsyncSingleton.clear();
+    _log('Force deleted all instances and factories asynchronously');
   }
 }
