@@ -4,7 +4,7 @@ import '../joker_exception.dart';
 
 /// Joker - a reactive state container based on ChangeNotifier
 ///
-/// A lightweight state management solution that wraps a value with change
+/// A lightweight state management solution that wraps a state with change
 /// notification capabilities. It can operate in automatic or manual
 /// notification modes.
 
@@ -15,31 +15,31 @@ import '../joker_exception.dart';
 /// // Create a counter Joker
 /// final counter = Joker<int>(0);
 ///
-/// // Read the value
-/// print(counter.value); // Output: 0
+/// // Read the state
+/// print(counter.state); // Output: 0
 ///
-/// // Update value and notify listeners (auto-notify mode)
+/// // Update state and notify listeners (auto-notify mode)
 /// counter.trick(1);
-/// print(counter.value); // Output: 1
-/// print(counter.previousValue); // Output: 0
+/// print(counter.state); // Output: 1
+/// print(counter.previousState); // Output: 0
 ///
-/// // Use a function to update the value
-/// counter.trickWith((value) => value + 1);
-/// print(counter.value); // Output: 2
+/// // Use a function to update the state
+/// counter.trickWith((state) => state + 1);
+/// print(counter.state); // Output: 2
 ///
 /// // Async update
-/// await counter.trickAsync((value) async {
+/// await counter.trickAsync((state) async {
 ///   await Future.delayed(Duration(seconds: 1));
-///   return value + 1;
+///   return state + 1;
 /// });
-/// print(counter.value); // Output: 3
+/// print(counter.state); // Output: 3
 ///
 /// // Batch updates (only one notification at the end)
 /// counter.batch()
-///   .apply((value) => value + 1)
-///   .apply((value) => value * 2)
+///   .apply((state) => state + 1)
+///   .apply((state) => state * 2)
 ///   .commit();
-/// print(counter.value); // Output: 8
+/// print(counter.state); // Output: 8
 /// ```
 ///
 /// Manual notification mode:
@@ -47,13 +47,13 @@ import '../joker_exception.dart';
 /// // Create a Joker with manual notifications
 /// final manualCounter = Joker<int>(0, autoNotify: false);
 ///
-/// // Update value without notification
+/// // Update state without notification
 /// manualCounter.whisper(1);
-/// print(manualCounter.value); // Output: 1
+/// print(manualCounter.state); // Output: 1
 ///
 /// // Update using a function without notification
-/// manualCounter.whisperWith((value) => value + 1);
-/// print(manualCounter.value); // Output: 2
+/// manualCounter.whisperWith((state) => state + 1);
+/// print(manualCounter.state); // Output: 2
 ///
 /// // Manually trigger notification
 /// manualCounter.yell();
@@ -81,17 +81,17 @@ import '../joker_exception.dart';
 /// ```
 
 class Joker<T> extends ChangeNotifier {
-  /// Creates a Joker with an initial value
+  /// Creates a Joker with an initial state
   ///
-  /// [initialValue]: The initial value to store
-  /// [autoNotify]: Whether to automatically notify listeners when the value changes
+  /// [initialState]: The initial state to store
+  /// [autoNotify]: Whether to automatically notify listeners when the state changes
   /// [tag]: Optional identifier for this Joker instance
   Joker(
-    T initialValue, {
+    T initialState, {
     this.autoNotify = true,
     this.tag,
-  })  : _value = initialValue,
-        _previousValue = initialValue;
+  })  : _state = initialState,
+        _previousState = initialState;
 
   /// Optional tag for identifying this Joker
   ///
@@ -104,98 +104,98 @@ class Joker<T> extends ChangeNotifier {
   /// When false, you must manually call [yell] to notify listeners
   final bool autoNotify;
 
-  /// Internal value storage
-  T _value;
+  /// Internal state storage
+  T _state;
 
-  /// Previous value before the last update
+  /// Previous state before the last update
   ///
   /// Useful for comparing changes or implementing undo functionality
-  T? _previousValue;
+  T? _previousState;
 
-  /// Get the current value
-  T get value => _value;
+  /// Get the current state
+  T get state => _state;
 
-  /// Get the previous value
+  /// Get the previous state
   ///
-  /// Returns null if the value has never been updated
-  T? get previousValue => _previousValue;
+  /// Returns null if the state has never been updated
+  T? get previousState => _previousState;
 
   // --------- Auto-notify methods ---------
 
-  /// Updates the value with notification
+  /// Updates the state with notification
   ///
   /// Only available when [autoNotify] is true
   /// Automatically notifies listeners after the update
-  void trick(T newValue) {
+  void trick(T newState) {
     if (!autoNotify) {
       throw JokerException(
           'trick() cannot be used on a manual Joker. Use whisper() and yell() instead.');
     }
-    _previousValue = _value;
-    _value = newValue;
+    _previousState = _state;
+    _state = newState;
     notifyListeners();
   }
 
-  /// Updates the value using a function with notification
+  /// Updates the state using a function with notification
   ///
   /// Only available when [autoNotify] is true
-  /// The [performer] function receives the current value and should return the new value
+  /// The [performer] function receives the current state and should return the new state
   /// Automatically notifies listeners after the update
-  void trickWith(T Function(T currentValue) performer) {
+  void trickWith(T Function(T currentState) performer) {
     if (!autoNotify) {
       throw JokerException(
           'trickWith() cannot be used on a manual Joker. Use whisperWith() and yell() instead.');
     }
-    _previousValue = _value;
-    _value = performer(_value);
+    _previousState = _state;
+    _state = performer(_state);
     notifyListeners();
   }
 
-  /// Updates the value using an async function with notification
+  /// Updates the state using an async function with notification
   ///
   /// Only available when [autoNotify] is true
-  /// The [performer] function receives the current value and should return a Future of the new value
+  /// The [performer] function receives the current state and should return a Future of the new state
   /// Automatically notifies listeners after the update completes
-  Future<void> trickAsync(Future<T> Function(T currentValue) performer) async {
+  Future<void> trickAsync(Future<T> Function(T currentState) performer) async {
     if (!autoNotify) {
       throw JokerException(
           'trickAsync() cannot be used on a manual Joker. Use whisperWith() and yell() instead.');
     }
-    _previousValue = _value;
-    _value = await performer(_value);
+    _previousState = _state;
+    _state = await performer(_state);
     notifyListeners();
   }
 
   // --------- Manual notification methods ---------
 
-  /// Silently update value without notification
+  /// Silently update state without notification
   ///
   /// Only available when [autoNotify] is false
-  /// Updates the value but doesn't notify listeners
-  /// Returns the new value for chaining
-  T whisper(T newValue) {
+  /// Updates the state but doesn't notify listeners
+  /// Returns the new state for chaining
+  T whisper(T newState) {
     if (autoNotify) {
       throw JokerException(
           'whisper() cannot be used on an automatic Joker. Use trick() instead.');
     }
-    _previousValue = _value;
-    _value = newValue;
-    return _value;
+    _previousState = _state;
+    _state = newState;
+    return _state;
   }
 
-  /// Silently update value using a function without notification
+  /// Silently update state using a function without notification
   ///
   /// Only available when [autoNotify] is false
-  /// The [updater] function receives the current value and should return the new value
-  /// Returns the new value for chaining
-  T whisperWith(T Function(T currentValue) updater) {
+  /// The [updater] function receives the current state and should return the new state
+  /// Returns the new state for chaining
+  T whisperWith(T Function(T currentState) updater) {
     if (autoNotify) {
       throw JokerException(
           'whisperWith() cannot be used on an automatic Joker. Use trickWith() instead.');
     }
-    _previousValue = _value;
-    _value = updater(_value);
-    return _value;
+    _previousState = _state;
+    _state = updater(_state);
+    return _state;
   }
 
   /// Force send notification to listeners
@@ -206,16 +206,16 @@ class Joker<T> extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Compare current and previous values
+  /// Compare current and previous states
   ///
-  /// Returns true if the values are different
-  bool isDifferent() => _value != _previousValue;
+  /// Returns true if the states are different
+  bool isDifferent() => _state != _previousState;
 
-  /// Execute a callback with current and previous values
+  /// Execute a callback with current and previous states
   ///
-  /// Useful for handling side effects based on value changes
-  void peek(void Function(T? previousValue, T currentValue) callback) {
-    callback(_previousValue, _value);
+  /// Useful for handling side effects based on state changes
+  void peek(void Function(T? previousState, T currentState) callback) {
+    callback(_previousState, _state);
   }
 
   /// Start a batch of updates
@@ -233,23 +233,23 @@ class Joker<T> extends ChangeNotifier {
 /// until all changes are ready to be committed
 class JokerBatch<T> {
   final Joker<T> _joker;
-  final T _originalValue;
+  final T _originalState;
   final bool _isAutoNotify;
 
   /// Creates a batch operation for the given Joker
   JokerBatch(this._joker)
-      : _originalValue = _joker.value,
+      : _originalState = _joker.state,
         _isAutoNotify = _joker.autoNotify;
 
   /// Apply multiple updates without notifications
   ///
-  /// The [updater] function receives the current value and should return the new value
+  /// The [updater] function receives the current state and should return the new state
   /// Returns this batch instance for chaining multiple updates
-  JokerBatch<T> apply(T Function(T value) updater) {
+  JokerBatch<T> apply(T Function(T state) updater) {
     if (_isAutoNotify) {
-      final currentValue = _joker.value;
-      final newValue = updater(currentValue);
-      (_joker as dynamic)._value = newValue;
+      final currentState = _joker.state;
+      final newState = updater(currentState);
+      (_joker as dynamic)._state = newState;
     } else {
       _joker.whisperWith(updater);
     }
@@ -258,21 +258,21 @@ class JokerBatch<T> {
 
   /// Commit the batch changes and notify if there were changes
   ///
-  /// Notifies listeners only if the value has changed from the original
+  /// Notifies listeners only if the state has changed from the original
   void commit() {
-    if (_joker.value != _originalValue) {
+    if (_joker.state != _originalState) {
       _joker.yell();
     }
   }
 
-  /// Discard changes and revert to original value
+  /// Discard changes and revert to original state
   ///
-  /// Restores the value to what it was when the batch was started
+  /// Restores the state to what it was when the batch was started
   void discard() {
     if (_isAutoNotify) {
-      (_joker as dynamic)._value = _originalValue;
+      (_joker as dynamic)._state = _originalState;
     } else {
-      _joker.whisper(_originalValue);
+      _joker.whisper(_originalState);
     }
   }
 }

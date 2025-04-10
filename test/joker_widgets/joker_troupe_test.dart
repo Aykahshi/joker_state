@@ -183,8 +183,8 @@ void main() {
       joker1.trick(100);
       joker2.trick('updated');
 
-      expect(joker1.value, equals(100));
-      expect(joker2.value, equals('updated'));
+      expect(joker1.state, equals(100));
+      expect(joker2.state, equals('updated'));
     });
 
     testWidgets('should correctly handle joker list changes',

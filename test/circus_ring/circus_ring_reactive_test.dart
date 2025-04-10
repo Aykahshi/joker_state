@@ -23,7 +23,7 @@ void main() {
 
       // Assert - retrieved joker should have updated value
       final retrievedJoker = circus.find<Joker<int>>('counter');
-      expect(retrievedJoker.value, equals(100));
+      expect(retrievedJoker.state, equals(100));
       expect(retrievedJoker, equals(joker)); // Same instance
     });
 
@@ -84,7 +84,7 @@ void main() {
 
       // The listener should be called again
       expect(callCount, equals(2));
-      expect(joker.value, equals(20));
+      expect(joker.state, equals(20));
     });
 
     test('should notify correctly with auto jokers', () {
@@ -97,14 +97,14 @@ void main() {
       joker.trick(10);
 
       // Assert - should have notified once
-      expect(joker.value, equals(10));
+      expect(joker.state, equals(10));
       expect(countNotified, equals(1));
 
       // Act - update with function
       joker.trickWith((val) => val * 2);
 
       // Assert - should have notified again
-      expect(joker.value, equals(20));
+      expect(joker.state, equals(20));
       expect(countNotified, equals(2));
     });
 
@@ -118,7 +118,7 @@ void main() {
       joker.whisper(10);
 
       // Assert - should not have notified
-      expect(joker.value, equals(10));
+      expect(joker.state, equals(10));
       expect(countNotified, equals(0));
 
       // Act - call yell to notify
@@ -143,7 +143,7 @@ void main() {
           .commit();
 
       // Assert
-      expect(joker.value, equals(5)); // Final value
+      expect(joker.state, equals(5)); // Final value
       expect(countNotified, equals(1)); // Only notified once at commit
     });
 
@@ -155,7 +155,7 @@ void main() {
       joker.batch().apply((val) => val * 2).apply((val) => val + 5).discard();
 
       // Assert - value should remain unchanged
-      expect(joker.value, equals(10));
+      expect(joker.state, equals(10));
     });
 
     test('should summon and spotlight Jokers through CircusRing extension', () {
@@ -171,7 +171,7 @@ void main() {
 
       // Spotlight should retrieve the updated joker
       final spotlightedJoker = circus.spotlight<int>(tag: 'answer');
-      expect(spotlightedJoker.value, equals(100));
+      expect(spotlightedJoker.state, equals(100));
 
       // Vanish should remove the joker
       circus.vanish<int>(tag: 'answer');

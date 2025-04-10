@@ -5,23 +5,23 @@ import '../joker/joker.dart';
 
 /// Builder function for JokerTroupe
 ///
-/// Takes a BuildContext and the strongly typed record values, and returns a Widget
+/// Takes a BuildContext and the strongly typed record states, and returns a Widget
 typedef JokerTroupeBuilder<T> = Widget Function(
   BuildContext context,
-  T values,
+  T states,
 );
 
 /// Converter function for JokerTroupe
 ///
-/// Takes a list of dynamic values and converts them to a strongly typed record
-typedef JokerTroupeConverter<T> = T Function(List values);
+/// Takes a list of dynamic states and converts them to a strongly typed record
+typedef JokerTroupeConverter<T> = T Function(List states);
 
 /// JokerTroupe - A widget that observes multiple Joker instances with strong typing
 ///
 /// Uses Dart Records to provide type-safe access to multiple reactive states.
 /// This widget automatically rebuilds when any of the observed Jokers change.
 
-/// JokerTroupe is a widget that observes multiple Jokers and combines their values
+/// JokerTroupe is a widget that observes multiple Jokers and combines their states
 /// using Dart Records for type safety
 ///
 /// Usage examples:
@@ -41,7 +41,7 @@ typedef JokerTroupeConverter<T> = T Function(List values);
 /// Widget build(BuildContext context) {
 ///   return JokerTroupe<UserRecord>(
 ///     jokers: [nameJoker, ageJoker, activeJoker],
-///     converter: (values) => (values[0], values[1], values[2]),
+///     converter: (states) => (states[0], states[1], states[2]),
 ///     builder: (context, record) {
 ///       final (name, age, active) = record;
 ///       return Card(
@@ -75,7 +75,7 @@ typedef JokerTroupeConverter<T> = T Function(List values);
 /// @override
 /// Widget build(BuildContext context) {
 ///   return [nameJoker, ageJoker, activeJoker].assemble<UserRecord>(
-///     converter: (values) => (values[0], values[1], values[2]),
+///     converter: (states) => (states[0], states[1], states[2]),
 ///     builder: (context, record) {
 ///       final (name, age, active) = record;
 ///       return Card(
@@ -107,7 +107,7 @@ typedef JokerTroupeConverter<T> = T Function(List values);
 ///   typedef UserRecord = (String name, int age, bool active);
 ///
 ///   return [name, age, active].assemble<UserRecord>(
-///     converter: (values) => (values[0], values[1], values[2]),
+///     converter: (states) => (states[0], states[1], states[2]),
 ///     builder: (context, record) {
 ///       final (name, age, active) = record;
 ///       return Card(
@@ -146,16 +146,16 @@ class JokerTroupe<T extends Record> extends StatefulWidget {
   /// The list of Joker instances to observe
   final List<Joker> jokers;
 
-  /// Function that converts raw Joker values to a strongly typed Record
+  /// Function that converts raw Joker states to a strongly typed Record
   ///
-  /// This converter transforms the raw values into the specified record type T,
+  /// This converter transforms the raw states into the specified record type T,
   /// allowing for type-safe access in the builder function
   final JokerTroupeConverter converter;
 
-  /// UI builder function that receives the strongly typed values
+  /// UI builder function that receives the strongly typed states
   ///
-  /// Called whenever any of the Joker values change, providing the latest
-  /// values in a strongly typed Record T
+  /// Called whenever any of the Joker states change, providing the latest
+  /// states in a strongly typed Record T
   final JokerTroupeBuilder<T> builder;
 
   /// Whether to automatically dispose Jokers when the widget is removed
@@ -167,8 +167,8 @@ class JokerTroupe<T extends Record> extends StatefulWidget {
   /// Creates a JokerTroupe widget
   ///
   /// [jokers]: List of Joker instances to observe
-  /// [converter]: Function to convert raw values to Record type T
-  /// [builder]: UI builder function called when values change
+  /// [converter]: Function to convert raw states to Record type T
+  /// [builder]: UI builder function called when states change
   /// [autoDispose]: Whether to dispose Jokers when widget is disposed
   const JokerTroupe({
     super.key,
@@ -184,8 +184,8 @@ class JokerTroupe<T extends Record> extends StatefulWidget {
 
 /// State for JokerTroupe widget
 class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
-  /// Stores the current values of all observed Jokers
-  late List<dynamic> _values;
+  /// Stores the current states of all observed Jokers
+  late List<dynamic> _states;
 
   /// Maps each Joker to its listener callback for clean removal
   final Map<Joker, VoidCallback> _listeners = {};
@@ -193,13 +193,13 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
   @override
   void initState() {
     super.initState();
-    _initValues();
+    _initStates();
     _addListeners();
   }
 
-  /// Initialize the values list with current Joker values
-  void _initValues() {
-    _values = List.from(widget.jokers.map((joker) => joker.value));
+  /// Initialize the states list with current Joker states
+  void _initStates() {
+    _states = List.from(widget.jokers.map((joker) => joker.state));
   }
 
   /// Add listeners to all Jokers
@@ -210,8 +210,8 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
       final listener = () {
         if (mounted) {
           setState(() {
-            if (index < _values.length) {
-              _values[index] = joker.value;
+            if (index < _states.length) {
+              _states[index] = joker.state;
             }
           });
         }
@@ -233,11 +233,11 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
   void didUpdateWidget(JokerTroupe<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // If the Jokers list changed, update listeners and values
+    // If the Jokers list changed, update listeners and states
     if (widget.jokers.length != oldWidget.jokers.length ||
         !_areJokersEqual(widget.jokers, oldWidget.jokers)) {
       _removeListeners();
-      _initValues();
+      _initStates();
       _addListeners();
     }
   }
@@ -279,8 +279,8 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
 
   @override
   Widget build(BuildContext context) {
-    // Convert raw values to typed record and pass to builder
-    final typedValues = widget.converter(_values);
-    return widget.builder(context, typedValues);
+    // Convert raw states to typed record and pass to builder
+    final typedStates = widget.converter(_states);
+    return widget.builder(context, typedStates);
   }
 }

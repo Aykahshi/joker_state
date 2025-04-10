@@ -98,7 +98,7 @@ void main() {
       await tester.pumpWidget(Container()); // Remove widget
 
       // Assert
-      expect(joker.value, 42);
+      expect(joker.state, 42);
     });
 
     testWidgets('should handle CircusRing integrated jokers',

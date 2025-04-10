@@ -69,7 +69,7 @@ void main() {
 
       // Assert joker still works
       joker.trick(100);
-      expect(joker.value, 100); // Should not throw if not disposed
+      expect(joker.state, 100); // Should not throw if not disposed
     });
   });
 
@@ -276,7 +276,7 @@ void main() {
 
       // Assert
       expect(joker, isA<Joker<int>>());
-      expect(joker.value, equals(42));
+      expect(joker.state, equals(42));
       expect(circus.isHired<Joker<int>>('counter'), isTrue);
     });
 
@@ -294,7 +294,7 @@ void main() {
       joker.trick(100);
 
       // Assert
-      expect(joker.value, equals(100)); // Value should be updated
+      expect(joker.state, equals(100)); // Value should be updated
       expect(listenerCalled, isTrue); // Listener should be called too
     });
 
@@ -312,7 +312,7 @@ void main() {
       joker.whisper(100);
 
       // Assert
-      expect(joker.value, equals(100)); // Value should be updated
+      expect(joker.state, equals(100)); // Value should be updated
       expect(listenerCalled, isFalse); // But listener shouldn't be called
     });
 
@@ -325,7 +325,7 @@ void main() {
 
       // Assert
       expect(foundJoker, isA<Joker<String>>());
-      expect(foundJoker.value, equals('hello'));
+      expect(foundJoker.state, equals('hello'));
       expect(foundJoker, equals(joker)); // Should be the same instance
     });
 
@@ -351,7 +351,7 @@ void main() {
 
       // Assert
       expect(foundJoker, isNotNull);
-      expect(foundJoker!.value, isTrue);
+      expect(foundJoker!.state, isTrue);
       expect(foundJoker, equals(card)); // Should be the same instance
     });
 

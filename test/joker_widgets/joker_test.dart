@@ -10,8 +10,8 @@ void main() {
         final joker = Joker<int>(42, tag: 'test-tag');
 
         // Assert
-        expect(joker.value, equals(42));
-        expect(joker.previousValue, equals(42));
+        expect(joker.state, equals(42));
+        expect(joker.previousState, equals(42));
         expect(joker.tag, equals('test-tag'));
         expect(joker.autoNotify, isTrue);
       });
@@ -26,7 +26,7 @@ void main() {
         joker.trick(10);
 
         // Assert
-        expect(joker.value, equals(10));
+        expect(joker.state, equals(10));
         expect(notificationCount, equals(1));
       });
 
@@ -40,8 +40,8 @@ void main() {
         joker.trick(15);
 
         // Assert
-        expect(joker.value, equals(15));
-        expect(joker.previousValue, equals(5));
+        expect(joker.state, equals(15));
+        expect(joker.previousState, equals(5));
         expect(notificationCount, equals(1));
       });
 
@@ -55,8 +55,8 @@ void main() {
         joker.trickWith((val) => val * 2);
 
         // Assert
-        expect(joker.value, equals(20));
-        expect(joker.previousValue, equals(10));
+        expect(joker.state, equals(20));
+        expect(joker.previousState, equals(10));
         expect(notificationCount, equals(1));
       });
 
@@ -74,8 +74,8 @@ void main() {
         });
 
         // Assert
-        expect(joker.value, equals(20));
-        expect(joker.previousValue, equals(5));
+        expect(joker.state, equals(20));
+        expect(joker.previousState, equals(5));
         expect(notificationCount, equals(1));
       });
 
@@ -99,15 +99,15 @@ void main() {
         joker.trick(10);
 
         // Assert
-        expect(joker.previousValue, equals(5));
-        expect(joker.value, equals(10));
+        expect(joker.previousState, equals(5));
+        expect(joker.state, equals(10));
 
         // Act again
         joker.trick(15);
 
         // Assert
-        expect(joker.previousValue, equals(10));
-        expect(joker.value, equals(15));
+        expect(joker.previousState, equals(10));
+        expect(joker.state, equals(15));
       });
     });
 
@@ -117,8 +117,8 @@ void main() {
         final joker = Joker<int>(42, autoNotify: false, tag: 'manual');
 
         // Assert
-        expect(joker.value, equals(42));
-        expect(joker.previousValue, equals(42));
+        expect(joker.state, equals(42));
+        expect(joker.previousState, equals(42));
         expect(joker.tag, equals('manual'));
         expect(joker.autoNotify, isFalse);
       });
@@ -133,7 +133,7 @@ void main() {
         joker.whisper(10);
 
         // Assert
-        expect(joker.value, equals(10));
+        expect(joker.state, equals(10));
         expect(notificationCount, equals(0));
       });
 
@@ -147,8 +147,8 @@ void main() {
         joker.whisper(15);
 
         // Assert
-        expect(joker.value, equals(15));
-        expect(joker.previousValue, equals(5));
+        expect(joker.state, equals(15));
+        expect(joker.previousState, equals(5));
         expect(notificationCount, equals(0));
       });
 
@@ -162,8 +162,8 @@ void main() {
         joker.whisperWith((val) => val * 2);
 
         // Assert
-        expect(joker.value, equals(20));
-        expect(joker.previousValue, equals(10));
+        expect(joker.state, equals(20));
+        expect(joker.previousState, equals(10));
         expect(notificationCount, equals(0));
       });
 
@@ -214,7 +214,7 @@ void main() {
             .commit();
 
         // Assert
-        expect(joker.value, equals(10));
+        expect(joker.state, equals(10));
         expect(notificationCount, equals(1)); // Only one notification
       });
 
@@ -233,7 +233,7 @@ void main() {
             .commit();
 
         // Assert
-        expect(joker.value, equals(10));
+        expect(joker.state, equals(10));
         expect(notificationCount, equals(1)); // Notified on commit
       });
 
@@ -251,7 +251,7 @@ void main() {
             .commit();
 
         // Assert
-        expect(joker.value, equals(10));
+        expect(joker.state, equals(10));
         expect(notificationCount, equals(0)); // No notification needed
       });
 
@@ -267,7 +267,7 @@ void main() {
             .discard();
 
         // Assert
-        expect(joker.value, equals(5)); // Original value preserved
+        expect(joker.state, equals(5)); // Original value preserved
       });
     });
   });

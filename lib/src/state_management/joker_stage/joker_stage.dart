@@ -6,18 +6,18 @@ import '../joker/joker_trickx.dart';
 
 /// Builder function for the JokerStage widget
 ///
-/// Takes a BuildContext and the current value of the Joker, and returns a Widget
+/// Takes a BuildContext and the current state of the Joker, and returns a Widget
 typedef JokerStageBuilder<T> = Widget Function(
   BuildContext context,
-  T value,
+  T state,
 );
 
-/// A widget that observes a single Joker instance and rebuilds when its value changes
+/// A widget that observes a single Joker instance and rebuilds when its state changes
 ///
 /// JokerStage is a reactive widget that automatically rebuilds its UI whenever
-/// the observed Joker's value changes, making it easy to create reactive UIs.
+/// the observed Joker's state changes, making it easy to create reactive UIs.
 
-/// JokerStage is a widget that observes a Joker and rebuilds when its value changes
+/// JokerStage is a widget that observes a Joker and rebuilds when its state changes
 ///
 /// Usage examples:
 ///
@@ -26,20 +26,20 @@ typedef JokerStageBuilder<T> = Widget Function(
 /// // Create a Joker
 /// final counter = Joker<int>(0);
 ///
-/// // Use JokerStage to build UI based on the Joker's value
+/// // Use JokerStage to build UI based on the Joker's state
 /// @override
 /// Widget build(BuildContext context) {
 ///   return JokerStage<int>(
 ///     joker: counter,
-///     builder: (context, value) {
-///       return Text('Count: $value');
+///     builder: (context, state) {
+///       return Text('Count: $state');
 ///     },
 ///   );
 /// }
 ///
-/// // Later, update the Joker's value
-/// counter.trick(counter.value + 1);
-/// // The JokerStage will automatically rebuild with the new value
+/// // Later, update the Joker's state
+/// counter.trick(counter.state + 1);
+/// // The JokerStage will automatically rebuild with the new state
 /// ```
 ///
 /// Using extension method:
@@ -50,8 +50,8 @@ typedef JokerStageBuilder<T> = Widget Function(
 /// // Use the perform extension for a cleaner API
 /// @override
 /// Widget build(BuildContext context) {
-///   return counter.perform((context, value) {
-///     return Text('Count: $value');
+///   return counter.perform((context, state) {
+///     return Text('Count: $state');
 ///   });
 /// }
 /// ```
@@ -65,12 +65,12 @@ typedef JokerStageBuilder<T> = Widget Function(
 /// @override
 /// Widget build(BuildContext context) {
 ///   final counter = Circus.spotlight<int>(tag: 'counter');
-///   return counter.perform((context, value) {
+///   return counter.perform((context, state) {
 ///     return Column(
 ///       children: [
-///         Text('Count: $value'),
+///         Text('Count: $state'),
 ///         ElevatedButton(
-///           onPressed: () => counter.trick(value + 1),
+///           onPressed: () => counter.trick(state + 1),
 ///           child: Text('Increment'),
 ///         ),
 ///       ],
@@ -83,7 +83,7 @@ class JokerStage<T> extends StatefulWidget {
   /// Creates a JokerStage widget
   ///
   /// [joker]: The Joker instance to observe
-  /// [builder]: Function that builds UI based on the current value
+  /// [builder]: Function that builds UI based on the current state
   /// [autoDispose]: Whether to automatically dispose the Joker when this widget is disposed
   const JokerStage({
     super.key,
@@ -94,12 +94,12 @@ class JokerStage<T> extends StatefulWidget {
 
   /// The Joker instance being observed
   ///
-  /// Changes to this Joker's value will trigger rebuilds of the widget
+  /// Changes to this Joker's state will trigger rebuilds of the widget
   final Joker<T> joker;
 
-  /// UI builder function that receives the current Joker value
+  /// UI builder function that receives the current Joker state
   ///
-  /// Called whenever the Joker's value changes
+  /// Called whenever the Joker's state changes
   final JokerStageBuilder<T> builder;
 
   /// Whether to automatically dispose the Joker when this widget is disposed
@@ -114,23 +114,23 @@ class JokerStage<T> extends StatefulWidget {
 
 /// State for JokerStage widget
 class _JokerStageState<T> extends State<JokerStage<T>> {
-  /// Current value of the observed Joker
-  late T _value;
+  /// Current state of the observed Joker
+  late T _state;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with current value
-    _value = widget.joker.value;
+    // Initialize with current state
+    _state = widget.joker.state;
     // Start listening for changes
     widget.joker.addListener(_updateState);
   }
 
-  /// Update state when Joker value changes
+  /// Update state when Joker state changes
   void _updateState() {
     if (mounted) {
       setState(() {
-        _value = widget.joker.value;
+        _state = widget.joker.state;
       });
     }
   }
@@ -139,10 +139,10 @@ class _JokerStageState<T> extends State<JokerStage<T>> {
   void didUpdateWidget(JokerStage<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // If the Joker instance changed, update listeners and values
+    // If the Joker instance changed, update listeners and states
     if (widget.joker != oldWidget.joker) {
       oldWidget.joker.removeListener(_updateState);
-      _value = widget.joker.value;
+      _state = widget.joker.state;
       widget.joker.addListener(_updateState);
     }
   }
@@ -182,7 +182,7 @@ class _JokerStageState<T> extends State<JokerStage<T>> {
 
   @override
   Widget build(BuildContext context) {
-    // Pass the current value to the builder function
-    return widget.builder(context, _value);
+    // Pass the current state to the builder function
+    return widget.builder(context, _state);
   }
 }
