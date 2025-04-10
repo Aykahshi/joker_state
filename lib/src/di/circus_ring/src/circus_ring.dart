@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/widgets.dart';
 
+import '../../../state_management/joker/joker.dart';
 import 'circus_ring_exception.dart';
 import 'disposable.dart';
 
@@ -53,9 +54,17 @@ class CircusRing {
   }
 }
 
-extension CircusRingInjection on CircusRing {
+extension CircusRingHiring on CircusRing {
   /// Register a synchronous singleton
-  T put<T>(T instance, {String? tag, bool permanent = true}) {
+  T hire<T>(T instance, {String? tag, bool permanent = true}) {
+    // Verify that Joker instances must use summon or provide a tag
+    if (instance is Joker && (tag == null || tag.isEmpty)) {
+      throw CircusRingException(
+        'Joker instances must be registered using summon() or provide a non-empty tag. ' +
+            'Use: Circus.summon<T>(tag: "unique_tag") or Circus.hire<Joker<T>>(joker, tag: "unique_tag")',
+      );
+    }
+
     final key = _getKey(T, tag);
 
     if (_instances.containsKey(key)) {
@@ -70,7 +79,7 @@ extension CircusRingInjection on CircusRing {
   }
 
   /// Register an asynchronous singleton
-  Future<T> putAsync<T>(AsyncFactoryFunc<T> asyncBuilder,
+  Future<T> hireAsync<T>(AsyncFactoryFunc<T> asyncBuilder,
       {String? tag, bool permanent = true}) async {
     final key = _getKey(T, tag);
 
@@ -88,7 +97,8 @@ extension CircusRingInjection on CircusRing {
   }
 
   /// Register a lazy-loaded singleton
-  void lazyPut<T>(FactoryFunc<T> builder, {String? tag, bool fenix = false}) {
+  void hireLazily<T>(FactoryFunc<T> builder,
+      {String? tag, bool fenix = false}) {
     final key = _getKey(T, tag);
 
     if (_lazyFactories.containsKey(key) || _instances.containsKey(key)) {
@@ -101,7 +111,7 @@ extension CircusRingInjection on CircusRing {
   }
 
   /// Register an async lazy-loaded singleton
-  void lazyPutAsync<T>(AsyncFactoryFunc<T> asyncBuilder,
+  void hireLazilyAsync<T>(AsyncFactoryFunc<T> asyncBuilder,
       {String? tag, bool fenix = false}) {
     final key = _getKey(T, tag);
 
@@ -115,7 +125,7 @@ extension CircusRingInjection on CircusRing {
   }
 
   /// Register a factory that creates a new instance on each call
-  void factory<T>(FactoryFunc<T> builder, {String? tag}) {
+  void contract<T>(FactoryFunc<T> builder, {String? tag}) {
     final key = _getKey(T, tag);
 
     if (_factories.containsKey(key) || _instances.containsKey(key)) {
@@ -127,10 +137,10 @@ extension CircusRingInjection on CircusRing {
   }
 
   /// Register a singleton instance
-  T singleton<T>(T instance, {String? tag}) => put<T>(instance, tag: tag);
+  T appoint<T>(T instance, {String? tag}) => hire<T>(instance, tag: tag);
 
   /// Create a new instance directly without storing it
-  T create<T>({required FactoryFunc<T> builder, String? tag}) {
+  T draft<T>({required FactoryFunc<T> builder, String? tag}) {
     _log('Creating new instance: ${_getKey(T, tag)}');
     return builder();
   }
@@ -263,7 +273,7 @@ extension CircusRingFind on CircusRing {
   }
 
   /// Check if a type is properly registered
-  bool isRegistered<T>([String? tag]) {
+  bool isHired<T>([String? tag]) {
     final key = _getKey(T, tag);
     return _instances.containsKey(key) ||
         _lazyFactories.containsKey(key) ||
@@ -272,21 +282,21 @@ extension CircusRingFind on CircusRing {
   }
 
   /// Delete an instance
-  bool delete<T>({String? tag}) {
+  bool fire<T>({String? tag}) {
     final key = _getKey(T, tag);
 
     return _deleteSingle<T>(key: key);
   }
 
   /// Delete an instance asynchronously
-  Future<bool> deleteAsync<T>({String? tag}) async {
+  Future<bool> fireAsync<T>({String? tag}) async {
     final key = _getKey(T, tag);
 
     return await _deleteSingleAsync<T>(key: key);
   }
 
   /// Delete all instances
-  void deleteAll() {
+  void fireAll() {
     for (final key in _instances.keys.toList()) {
       final instance = _instances[key];
       if (instance is ValueNotifier) {
@@ -304,7 +314,7 @@ extension CircusRingFind on CircusRing {
   }
 
   /// Delete all instances asynchronously
-  Future<void> deleteAllAsync() async {
+  Future<void> fireAllAsync() async {
     for (final key in _instances.keys) {
       final instance = _instances[key];
       if (instance is ValueNotifier) {

@@ -1,17 +1,17 @@
 import 'package:flutter/widgets.dart';
 
 import '../../di/circus_ring/circus_ring.dart';
-import '../joker_card/joker_card.dart';
-import '../joker_card/joker_card_extension.dart';
+import '../joker/joker.dart';
+import '../joker/joker_trickx.dart';
 
-typedef JokerHandBuilder<T> = Widget Function(
+typedef JokerStageBuilder<T> = Widget Function(
   BuildContext context,
   T value,
   Widget? child,
 );
 
-class JokerHand<T> extends StatefulWidget {
-  const JokerHand({
+class JokerStage<T> extends StatefulWidget {
+  const JokerStage({
     super.key,
     required this.joker,
     this.autoDispose = true,
@@ -19,24 +19,24 @@ class JokerHand<T> extends StatefulWidget {
     this.child,
   });
 
-  final JokerCard<T> joker;
-  final JokerHandBuilder<T> builder;
+  final Joker<T> joker;
+  final JokerStageBuilder<T> builder;
   final bool autoDispose;
   final Widget? child;
 
   @override
-  State<JokerHand<T>> createState() => _JokerHandState<T>();
+  State<JokerStage<T>> createState() => _JokerStageState<T>();
 }
 
-class _JokerHandState<T> extends State<JokerHand<T>> {
+class _JokerStageState<T> extends State<JokerStage<T>> {
   @override
   void dispose() {
     if (widget.autoDispose) {
-      var joker = Circus.tryDrawCard<T>(tag: widget.joker.tag ?? '');
+      var joker = Circus.trySpotlight<T>(tag: widget.joker.tag ?? '');
       if (joker == null) {
         widget.joker.dispose();
       } else {
-        Circus.discard<T>(tag: widget.joker.tag ?? '');
+        Circus.vanish<T>(tag: widget.joker.tag ?? '');
       }
     }
     super.dispose();

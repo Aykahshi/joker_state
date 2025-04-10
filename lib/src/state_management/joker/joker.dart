@@ -2,10 +2,10 @@ import 'package:flutter/foundation.dart';
 
 typedef PeekFunc<T> = void Function(T? oldValue, T newValue);
 
-/// JokerCard - a reactive state container that notifies listeners when its value changes
-class JokerCard<T> extends ValueNotifier<T> {
-  /// Creates a JokerCard with an initial value
-  JokerCard(
+/// Joker - a reactive state container that notifies listeners when its value changes
+class Joker<T> extends ValueNotifier<T> {
+  /// Creates a Joker with an initial value
+  Joker(
     T initialValue, {
     this.stopped = false,
     this.tag,
@@ -21,7 +21,7 @@ class JokerCard<T> extends ValueNotifier<T> {
   set value(T newValue) {
     _previousValue = value;
     if (stopped) {
-      // If the card is stopped, we don't notify listeners
+      // If joker is stopped, we don't notify listeners
       super.value = newValue;
     }
     super.value = newValue;
@@ -35,24 +35,24 @@ class JokerCard<T> extends ValueNotifier<T> {
   }
 
   /// Updates the value
-  void update(T newValue) {
+  void trick(T newValue) {
     value = newValue;
   }
 
   /// Updates the value using a function
-  void updateWith(T Function(T currentValue) updater) {
-    value = updater(value);
+  void trickWith(T Function(T currentValue) performer) {
+    value = performer(value);
   }
 
   /// Updates the value using an async function
-  Future<void> updateWithAsync(
-    Future<T> Function(T currentValue) updater,
+  Future<void> trickAsync(
+    Future<T> Function(T currentValue) performer,
   ) async {
-    value = await updater(value);
+    value = await performer(value);
   }
 
   /// Compare previous and current values
-  bool hasChanged() => value != _previousValue;
+  bool isDifferent() => value != _previousValue;
 
   /// Execute a callback with current and previous values
   void peek(

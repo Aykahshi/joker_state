@@ -3,13 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/src/di/circus_ring/circus_ring.dart';
 
 void main() {
-  late CircusRing ring;
+  late CircusRing circus;
 
   // reset CircusRing before each test
   setUp(() {
-    ring = CircusRing();
-    ring.deleteAll();
-    ring.config(enableLogs: true);
+    circus = CircusRing();
+    circus.fireAll();
+    circus.config(enableLogs: true);
   });
 
   group('CircusRing Basics', () {
@@ -27,12 +27,12 @@ void main() {
       final testInt = 42;
 
       // Act
-      ring.put<String>(testString);
-      ring.put<int>(testInt, tag: 'answer');
+      circus.hire<String>(testString);
+      circus.hire<int>(testInt, tag: 'answer');
 
       // Assert
-      expect(ring.find<String>(), equals(testString));
-      expect(ring.find<int>('answer'), equals(testInt));
+      expect(circus.find<String>(), equals(testString));
+      expect(circus.find<int>('answer'), equals(testInt));
     });
 
     test('should replace existing instances', () {
@@ -41,12 +41,12 @@ void main() {
       final secondString = 'Second';
 
       // Act
-      ring.put<String>(firstString);
-      expect(ring.find<String>(), equals(firstString));
-      ring.put<String>(secondString);
+      circus.hire<String>(firstString);
+      expect(circus.find<String>(), equals(firstString));
+      circus.hire<String>(secondString);
 
       // Assert
-      expect(ring.find<String>(), equals(secondString));
+      expect(circus.find<String>(), equals(secondString));
     });
 
     test('should lazy register and instantiate', () {
@@ -54,7 +54,7 @@ void main() {
       var factoryCalled = false;
 
       // Act
-      ring.lazyPut<String>(() {
+      circus.hireLazily<String>(() {
         factoryCalled = true;
         return 'Lazy String';
       });
@@ -63,7 +63,7 @@ void main() {
       expect(factoryCalled, isFalse);
 
       // Act - trigger lazy instantiation
-      final result = ring.find<String>();
+      final result = circus.find<String>();
 
       // Assert - factory was called and instance created
       expect(factoryCalled, isTrue);
@@ -71,7 +71,7 @@ void main() {
 
       // Check instance is now registered and factory not called again
       factoryCalled = false;
-      final secondResult = ring.find<String>();
+      final secondResult = circus.find<String>();
       expect(factoryCalled, isFalse); // Not called again
       expect(secondResult, equals('Lazy String'));
     });
@@ -81,10 +81,10 @@ void main() {
       final service = TestService();
 
       // Act
-      ring.singleton(service);
+      circus.appoint(service);
 
       // Assert
-      expect(ring.find<TestService>(), equals(service));
+      expect(circus.find<TestService>(), equals(service));
     });
 
     test('factory should create new instance each time', () {
@@ -92,15 +92,15 @@ void main() {
       int counter = 0;
 
       // Act
-      ring.factory<Counter>(() {
+      circus.contract<Counter>(() {
         counter++;
         return Counter(counter);
       });
 
       // Assert - each find should create new instance
-      expect(ring.find<Counter>().count, equals(1));
-      expect(ring.find<Counter>().count, equals(2));
-      expect(ring.find<Counter>().count, equals(3));
+      expect(circus.find<Counter>().count, equals(1));
+      expect(circus.find<Counter>().count, equals(2));
+      expect(circus.find<Counter>().count, equals(3));
     });
   });
 
@@ -110,7 +110,7 @@ void main() {
       var asyncInitCalled = false;
 
       // Act
-      await ring.putAsync<String>(() async {
+      await circus.hireAsync<String>(() async {
         await Future.delayed(Duration(milliseconds: 10));
         asyncInitCalled = true;
         return 'Async String';
@@ -118,7 +118,7 @@ void main() {
 
       // Assert
       expect(asyncInitCalled, isTrue);
-      expect(ring.find<String>(), equals('Async String'));
+      expect(circus.find<String>(), equals('Async String'));
     });
 
     test('should lazy register and instantiate async', () async {
@@ -126,7 +126,7 @@ void main() {
       var factoryCalled = false;
 
       // Act - register
-      ring.lazyPutAsync<String>(() async {
+      circus.hireLazilyAsync<String>(() async {
         await Future.delayed(Duration(milliseconds: 10));
         factoryCalled = true;
         return 'Lazy Async String';
@@ -136,7 +136,7 @@ void main() {
       expect(factoryCalled, isFalse);
 
       // Act - trigger lazy instantiation
-      final result = await ring.findAsync<String>();
+      final result = await circus.findAsync<String>();
 
       // Assert - factory was called and instance created
       expect(factoryCalled, isTrue);
@@ -144,7 +144,7 @@ void main() {
 
       // Check instance is now registered and factory not called again
       factoryCalled = false;
-      final secondResult = await ring.findAsync<String>();
+      final secondResult = await circus.findAsync<String>();
       expect(factoryCalled, isFalse); // Not called again
       expect(secondResult, equals('Lazy Async String'));
     });
@@ -152,24 +152,24 @@ void main() {
     test('should throw when accessing async registered instance synchronously',
         () {
       // Arrange
-      ring.lazyPutAsync<String>(() async {
+      circus.hireLazilyAsync<String>(() async {
         return 'Lazy Async String';
       });
 
       // Act & Assert
-      expect(() => ring.find<String>(), throwsA(isA<CircusRingException>()));
+      expect(() => circus.find<String>(), throwsA(isA<CircusRingException>()));
     });
   });
 
   group('Find and TryFind', () {
     test('should throw when instance not found', () {
       // Act & Assert
-      expect(() => ring.find<String>(), throwsA(isA<CircusRingException>()));
+      expect(() => circus.find<String>(), throwsA(isA<CircusRingException>()));
     });
 
     test('tryFind should return null when instance not found', () {
       // Act
-      final result = ring.tryFind<String>();
+      final result = circus.tryFind<String>();
 
       // Assert
       expect(result, isNull);
@@ -177,7 +177,7 @@ void main() {
 
     test('tryFindAsync should return null when instance not found', () async {
       // Act
-      final result = await ring.tryFindAsync<String>();
+      final result = await circus.tryFindAsync<String>();
 
       // Assert
       expect(result, isNull);
@@ -185,14 +185,14 @@ void main() {
 
     test('isRegistered should return correct status', () {
       // Arrange
-      ring.put('Test');
-      ring.lazyPut<int>(() => 42);
+      circus.hire('Test');
+      circus.hireLazily<int>(() => 42);
 
       // Assert
-      expect(ring.isRegistered<String>(), isTrue);
-      expect(ring.isRegistered<int>(), isTrue);
-      expect(ring.isRegistered<bool>(), isFalse);
-      expect(ring.isRegistered<String>('tagged'), isFalse);
+      expect(circus.isHired<String>(), isTrue);
+      expect(circus.isHired<int>(), isTrue);
+      expect(circus.isHired<bool>(), isFalse);
+      expect(circus.isHired<String>('tagged'), isFalse);
     });
   });
 
@@ -200,10 +200,10 @@ void main() {
     test('should dispose resources when deleting', () {
       // Arrange
       final service = MockDisposable();
-      ring.put(service);
+      circus.hire(service);
 
       // Act
-      ring.delete<MockDisposable>();
+      circus.fire<MockDisposable>();
 
       // Assert
       expect(service.disposed, isTrue);
@@ -212,10 +212,10 @@ void main() {
     test('should dispose async resources when deleting async', () async {
       // Arrange
       final service = MockAsyncDisposable();
-      ring.put(service);
+      circus.hire(service);
 
       // Act
-      await ring.deleteAsync<MockAsyncDisposable>();
+      await circus.fireAsync<MockAsyncDisposable>();
 
       // Assert
       expect(service.disposed, isTrue);
@@ -224,7 +224,7 @@ void main() {
     test('should dispose ValueNotifier when deleting', () {
       // Arrange
       final notifier = ValueNotifier<int>(42);
-      ring.put(notifier);
+      circus.hire(notifier);
 
       // Keep a weak reference to check if it's garbage collected
       var listenerCalled = false;
@@ -233,7 +233,7 @@ void main() {
       });
 
       // Act
-      ring.delete<ValueNotifier<int>>();
+      circus.fire<ValueNotifier<int>>();
 
       // Try to use the notifier (should throw if properly disposed)
       expect(() => notifier.value = 43, throwsFlutterError);
@@ -246,11 +246,11 @@ void main() {
       // Arrange
       final service1 = MockDisposable();
       final service2 = MockDisposable();
-      ring.put(service1, tag: '1');
-      ring.put(service2, tag: '2');
+      circus.hire(service1, tag: '1');
+      circus.hire(service2, tag: '2');
 
       // Act
-      ring.deleteAll();
+      circus.fireAll();
 
       // Assert
       expect(service1.disposed, isTrue);

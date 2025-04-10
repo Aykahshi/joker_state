@@ -1,27 +1,27 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/src/di/circus_ring/circus_ring.dart';
-import 'package:joker_state/src/state_management/joker_card/joker_card.dart';
-import 'package:joker_state/src/state_management/joker_hand/joker_hand.dart';
+import 'package:joker_state/src/state_management/joker/joker.dart';
+import 'package:joker_state/src/state_management/joker_stage/joker_stage.dart';
 
 void main() {
-  group('JokerHand Widget', () {
-    late JokerCard<int> card;
+  group('JokerStage Widget', () {
+    late Joker<int> joker;
 
     setUp(() {
-      card = JokerCard<int>(42);
-      Circus.deleteAll();
+      joker = Joker<int>(42);
+      Circus.fireAll();
     });
 
-    testWidgets('should display card value', (WidgetTester tester) async {
+    testWidgets('should display joker value', (WidgetTester tester) async {
       // Arrange
       bool builderCalled = false;
 
       // Act - build widget
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<int>(
-          joker: card,
+        child: JokerStage<int>(
+          joker: joker,
           builder: (context, value, child) {
             builderCalled = true;
             return Text('Value: $value');
@@ -34,13 +34,13 @@ void main() {
       expect(find.text('Value: 42'), findsOneWidget);
     });
 
-    testWidgets('should rebuild when card value changes',
+    testWidgets('should rebuild when joker value changes',
         (WidgetTester tester) async {
       // Arrange - build widget
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<int>(
-          joker: card,
+        child: JokerStage<int>(
+          joker: joker,
           builder: (context, value, child) {
             return Text('Value: $value');
           },
@@ -50,8 +50,8 @@ void main() {
       // Initial state
       expect(find.text('Value: 42'), findsOneWidget);
 
-      // Act - change card value
-      card.update(100);
+      // Act - change joker value
+      joker.trick(100);
       await tester.pump();
 
       // Assert
@@ -68,8 +68,8 @@ void main() {
       // Act - build widget
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<int>(
-          joker: card,
+        child: JokerStage<int>(
+          joker: joker,
           builder: (context, value, child) {
             passedChild = child;
             return Column(children: [
@@ -86,21 +86,21 @@ void main() {
       expect(find.byKey(Key('child')), findsOneWidget);
     });
 
-    testWidgets('should dispose card when autoDispose is true',
+    testWidgets('should dispose joker when autoDispose is true',
         (WidgetTester tester) async {
       // Arrange
-      final localCard = JokerCard<String>('test');
+      final localJoker = Joker<String>('test');
       bool listenerCalled = false;
 
-      localCard.addListener(() {
+      localJoker.addListener(() {
         listenerCalled = true;
       });
 
       // Act - build and dispose widget
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<String>(
-          joker: localCard,
+        child: JokerStage<String>(
+          joker: localJoker,
           autoDispose: true,
           builder: (context, value, _) => Text(value),
         ),
@@ -109,10 +109,10 @@ void main() {
       // Dispose widget
       await tester.pumpWidget(Container());
 
-      // Try to update card after disposal
+      // Try to update joker after disposal
       try {
-        localCard.update('updated');
-        fail('Card should be disposed and throw exception');
+        localJoker.trick('updated');
+        fail('Joker should be disposed and throw exception');
       } catch (e) {
         // Expected
       }
@@ -120,16 +120,16 @@ void main() {
       expect(listenerCalled, isFalse);
     });
 
-    testWidgets('should not dispose card when autoDispose is false',
+    testWidgets('should not dispose joker when autoDispose is false',
         (WidgetTester tester) async {
       // Arrange
-      final localCard = JokerCard<String>('test');
+      final localJoker = Joker<String>('test');
 
       // Act - build and dispose widget
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<String>(
-          joker: localCard,
+        child: JokerStage<String>(
+          joker: localJoker,
           autoDispose: false,
           builder: (context, value, _) => Text(value),
         ),
@@ -138,24 +138,24 @@ void main() {
       // Dispose widget
       await tester.pumpWidget(Container());
 
-      // Update card after widget disposal
-      localCard.update('updated');
+      // Update joker after widget disposal
+      localJoker.trick('updated');
 
-      // Assert - card should still work
-      expect(localCard.value, equals('updated'));
+      // Assert - joker should still work
+      expect(localJoker.value, equals('updated'));
     });
 
-    testWidgets('should handle CircusRing registered cards correctly',
+    testWidgets('should handle CircusRing registered jokers correctly',
         (WidgetTester tester) async {
-      // Arrange - register card in CircusRing
-      final taggedCard = JokerCard<int>(100, tag: 'counter');
-      Circus.put(taggedCard, tag: 'counter');
+      // Arrange - register joker in CircusRing
+      final taggedJoker = Joker<int>(100, tag: 'counter');
+      Circus.hire(taggedJoker, tag: 'counter');
 
-      // Act - build widget with registered card
+      // Act - build widget with registered joker
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<int>(
-          joker: taggedCard,
+        child: JokerStage<int>(
+          joker: taggedJoker,
           builder: (context, value, _) => Text('Value: $value'),
         ),
       ));
@@ -166,20 +166,20 @@ void main() {
       // Dispose widget
       await tester.pumpWidget(Container());
 
-      // Assert - card should be removed from CircusRing
-      expect(Circus.tryFind<JokerCard<int>>('counter'), isNull);
+      // Assert - joker should be removed from CircusRing
+      expect(Circus.tryFind<Joker<int>>('counter'), isNull);
     });
 
-    testWidgets('should handle card with null tag',
+    testWidgets('should handle joker with null tag',
         (WidgetTester tester) async {
-      // Arrange - card with null tag
-      final untaggedCard = JokerCard<int>(200);
+      // Arrange - joker with null tag
+      final untaggedJoker = Joker<int>(200);
 
-      // Act - build widget with untagged card
+      // Act - build widget with untagged joker
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<int>(
-          joker: untaggedCard,
+        child: JokerStage<int>(
+          joker: untaggedJoker,
           builder: (context, value, _) => Text('Value: $value'),
         ),
       ));
@@ -191,17 +191,17 @@ void main() {
       await tester.pumpWidget(Container());
     });
 
-    testWidgets('should not dispose CircusRing card if autoDispose is false',
+    testWidgets('should not dispose CircusRing joker if autoDispose is false',
         (WidgetTester tester) async {
-      // Arrange - register card in CircusRing
-      final taggedCard = JokerCard<int>(100, tag: 'persistent');
-      Circus.put(taggedCard, tag: 'persistent');
+      // Arrange - register joker in CircusRing
+      final taggedJoker = Joker<int>(100, tag: 'persistent');
+      Circus.hire(taggedJoker, tag: 'persistent');
 
       // Act - build widget with autoDispose = false
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<int>(
-          joker: taggedCard,
+        child: JokerStage<int>(
+          joker: taggedJoker,
           autoDispose: false,
           builder: (context, value, _) => Text('Value: $value'),
         ),
@@ -210,40 +210,40 @@ void main() {
       // Dispose widget
       await tester.pumpWidget(Container());
 
-      // Assert - card should still be in CircusRing
-      expect(Circus.isRegistered<JokerCard<int>>('persistent'), isTrue);
+      // Assert - joker should still be in CircusRing
+      expect(Circus.isHired<Joker<int>>('persistent'), isTrue);
 
       // Clean up
-      Circus.delete<JokerCard<int>>(tag: 'persistent');
+      Circus.fire<Joker<int>>(tag: 'persistent');
     });
 
     testWidgets('should handle edge case - using tag for CircusRing lookup',
         (WidgetTester tester) async {
       // This test ensures the dispose logic properly uses tag for CircusRing operations
 
-      // Arrange - register a card with a specific tag
+      // Arrange - register a joker with a specific tag
       final tag = 'special_tag';
-      final cardA = JokerCard<String>('Card A', tag: tag);
-      Circus.put(cardA, tag: tag);
+      final jokerA = Joker<String>('Joker A', tag: tag);
+      Circus.hire(jokerA, tag: tag);
 
-      // Act - create JokerHand with this card
+      // Act - create JokerWatcher with this joker
       await tester.pumpWidget(Directionality(
         textDirection: TextDirection.ltr,
-        child: JokerHand<String>(
-          joker: cardA,
+        child: JokerStage<String>(
+          joker: jokerA,
           builder: (context, value, _) => Text(value),
         ),
       ));
 
       // Verify initial state
-      expect(find.text('Card A'), findsOneWidget);
-      expect(Circus.isRegistered<JokerCard<String>>(tag), isTrue);
+      expect(find.text('Joker A'), findsOneWidget);
+      expect(Circus.isHired<Joker<String>>(tag), isTrue);
 
       // Dispose widget
       await tester.pumpWidget(Container());
 
-      // Assert - card should be removed from CircusRing using the correct tag
-      expect(Circus.isRegistered<JokerCard<String>>(tag), isFalse);
+      // Assert - joker should be removed from CircusRing using the correct tag
+      expect(Circus.isHired<Joker<String>>(tag), isFalse);
     });
   });
 }

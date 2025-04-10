@@ -1,201 +1,252 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:joker_state/src/di/circus_ring/circus_ring.dart';
-import 'package:joker_state/src/state_management/joker_card/joker_card.dart';
+import 'package:joker_state/src/di/circus_ring/src/circus_ring.dart';
+import 'package:joker_state/src/di/circus_ring/src/circus_ring_exception.dart';
+import 'package:joker_state/src/state_management/joker/joker.dart';
+import 'package:joker_state/src/state_management/joker/joker_trickx.dart';
 
 void main() {
-  group('CircusRing with Reactive Objects', () {
-    late CircusRing ring;
+  group('CircusRing with Reactive Jokers', () {
+    late CircusRing circus;
 
     setUp(() {
-      ring = CircusRing();
-      ring.deleteAll();
+      circus = CircusRing();
+      circus.fireAll(); // Clear all instances before each test
     });
 
-    test('should maintain reactivity of registered JokerCard', () {
-      // Arrange - create and register a JokerCard
-      final card = JokerCard<int>(42);
-      ring.put<JokerCard<int>>(card, tag: 'counter');
+    test('should maintain reactivity of registered Joker', () {
+      // Arrange - create and register a Joker with a proper tag
+      final joker = Joker<int>(42);
+      circus.hire<Joker<int>>(joker, tag: 'counter');
 
-      // Act - modify the card value
-      card.update(100);
+      // Act - modify the joker value
+      joker.trick(100);
 
-      // Assert - retrieved card should have updated value
-      final retrievedCard = ring.find<JokerCard<int>>('counter');
-      expect(retrievedCard.value, equals(100));
-      expect(retrievedCard, equals(card)); // Same instance
+      // Assert - retrieved joker should have updated value
+      final retrievedJoker = circus.find<Joker<int>>('counter');
+      expect(retrievedJoker.value, equals(100));
+      expect(retrievedJoker, equals(joker)); // Same instance
     });
 
-    test('should preserve listeners when accessing JokerCard multiple times',
-        () {
-      // Arrange - create a card with a listener
-      final card = JokerCard<int>(0);
+    test('should throw exception when registering Joker without tag', () {
+      // Arrange
+      final joker = Joker<int>(42);
+
+      // Act & Assert
+      expect(
+          () => circus.hire<Joker<int>>(joker), // No tag provided
+          throwsA(isA<CircusRingException>()));
+    });
+
+    test('should throw exception when registering Joker with empty tag', () {
+      // Arrange
+      final joker = Joker<int>(42);
+
+      // Act & Assert
+      expect(
+          () => circus.hire<Joker<int>>(joker, tag: ''), // Empty tag
+          throwsA(isA<CircusRingException>()));
+    });
+
+    test('should succeed when registering Joker with proper tag', () {
+      // Arrange
+      final joker = Joker<int>(42);
+
+      // Act & Assert - should not throw
+      expect(() => circus.hire<Joker<int>>(joker, tag: 'valid_tag'),
+          returnsNormally);
+    });
+
+    test('should preserve listeners when accessing Joker multiple times', () {
+      // Arrange - create a joker with a listener
+      final joker = Joker<int>(0);
       int callCount = 0;
 
-      card.addListener(() {
+      joker.addListener(() {
         callCount++;
       });
 
-      // Register the card
-      ring.put<JokerCard<int>>(card);
+      // Register the joker with a tag
+      circus.hire<Joker<int>>(joker, tag: 'counter');
 
-      // Act - retrieve the card multiple times and update it
-      final card1 = ring.find<JokerCard<int>>();
-      final card2 = ring.find<JokerCard<int>>();
+      // Act - retrieve the joker multiple times and update it
+      final joker1 = circus.find<Joker<int>>('counter');
+      final joker2 = circus.find<Joker<int>>('counter');
 
       // Each time we get the same instance
-      expect(card1, equals(card2));
-      expect(card1, equals(card));
+      expect(joker1, equals(joker2));
+      expect(joker1, equals(joker));
 
       // Update through retrieved reference
-      card1.update(10);
+      joker1.trick(10);
 
       // Assert - listener should be called
       expect(callCount, equals(1));
 
       // Update through another reference
-      card2.update(20);
+      joker2.trick(20);
 
       // The listener should be called again
       expect(callCount, equals(2));
-      expect(card.value, equals(20));
+      expect(joker.value, equals(20));
     });
 
-    test('should support JokerCard value changes through factory', () {
-      // Arrange - register a factory for JokerCard
+    test('should support Joker value changes through contract', () {
+      // Arrange - register a factory for Joker
       int counter = 0;
-      ring.factory<JokerCard<int>>(() {
+      circus.contract<Joker<int>>(() {
         counter++;
-        return JokerCard<int>(counter);
+        return Joker<int>(counter);
       });
 
       // Act - get instances and modify them
-      final card1 = ring.find<JokerCard<int>>();
-      final card2 = ring.find<JokerCard<int>>();
+      final joker1 = circus.find<Joker<int>>();
+      final joker2 = circus.find<Joker<int>>();
 
       // Assert - each factory call creates a new instance
-      expect(card1, isNot(equals(card2)));
-      expect(card1.value, equals(1));
-      expect(card2.value, equals(2));
+      expect(joker1, isNot(equals(joker2)));
+      expect(joker1.value, equals(1));
+      expect(joker2.value, equals(2));
 
       // Changing one doesn't affect the other
-      card1.update(100);
-      expect(card1.value, equals(100));
-      expect(card2.value, equals(2));
+      joker1.trick(100);
+      expect(joker1.value, equals(100));
+      expect(joker2.value, equals(2));
     });
 
-    test('should create JokerCard through lazyPut only when accessed', () {
+    test('should create Joker through hireLazily only when accessed', () {
       // Arrange - track if factory was called
       bool factoryCalled = false;
 
       // Register lazy factory
-      ring.lazyPut<JokerCard<String>>(() {
+      circus.hireLazily<Joker<String>>(() {
         factoryCalled = true;
-        return JokerCard<String>('created');
+        return Joker<String>('created');
       });
 
       // Assert - factory not yet called
       expect(factoryCalled, isFalse);
 
       // Act - access the lazy instance
-      final card = ring.find<JokerCard<String>>();
+      final joker = circus.find<Joker<String>>();
 
       // Assert - factory called and instance created
       expect(factoryCalled, isTrue);
-      expect(card.value, equals('created'));
+      expect(joker.value, equals('created'));
 
       // Modify the instance
-      card.update('modified');
+      joker.trick('modified');
 
       // Retrieve again - should be the same instance with updated value
-      final card2 = ring.find<JokerCard<String>>();
-      expect(card2.value, equals('modified'));
-      expect(card2, equals(card));
+      final joker2 = circus.find<Joker<String>>();
+      expect(joker2.value, equals('modified'));
+      expect(joker2, equals(joker));
     });
 
-    test('should support complex objects with JokerCard', () {
-      // Arrange - create a card with a complex object
+    test('should support complex objects with Joker', () {
+      // Arrange - create a joker with a complex object
       final user = User('John', 30);
-      final card = JokerCard<User>(user);
+      final joker = Joker<User>(user);
 
-      // Register the card
-      ring.put<JokerCard<User>>(card);
+      // Register the joker with a tag
+      circus.hire<Joker<User>>(joker, tag: 'user_joker');
 
       // Act - retrieve and modify the object
-      final retrievedCard = ring.find<JokerCard<User>>();
-      retrievedCard.update(User('John', 31)); // Update age
+      final retrievedJoker = circus.find<Joker<User>>('user_joker');
+      retrievedJoker.trick(User('John', 31)); // Update age
 
       // Assert - object should be updated
-      expect(retrievedCard.value.age, equals(31));
-      expect(retrievedCard.value.name, equals('John'));
+      expect(retrievedJoker.value.age, equals(31));
+      expect(retrievedJoker.value.name, equals('John'));
 
       // Original reference should reflect the change
-      expect(card.value.age, equals(31));
+      expect(joker.value.age, equals(31));
     });
 
-    test('should handle JokerCard with collections', () {
-      // Arrange - create a card with a list
-      final card = JokerCard<List<String>>(['item1', 'item2']);
-      ring.put<JokerCard<List<String>>>(card);
+    test('should handle Joker with collections', () {
+      // Arrange - create a joker with a list
+      final joker = Joker<List<String>>(['item1', 'item2']);
+      circus.hire<Joker<List<String>>>(joker, tag: 'list_joker');
 
       // Act - retrieve and modify the list
-      final retrievedCard = ring.find<JokerCard<List<String>>>();
+      final retrievedJoker = circus.find<Joker<List<String>>>('list_joker');
 
       // Modify list (immutable way - recommended)
-      retrievedCard.update([...retrievedCard.value, 'item3']);
+      retrievedJoker.trick([...retrievedJoker.value, 'item3']);
 
       // Assert
-      expect(retrievedCard.value.length, equals(3));
-      expect(retrievedCard.value, contains('item3'));
+      expect(retrievedJoker.value.length, equals(3));
+      expect(retrievedJoker.value, contains('item3'));
 
       // Original reference should reflect the change
-      expect(card.value.length, equals(3));
+      expect(joker.value.length, equals(3));
     });
 
-    test('should maintain reactivity through delete and re-register', () {
-      // Arrange - create and register a card
-      final card = JokerCard<int>(5);
-      ring.put<JokerCard<int>>(card, tag: 'counter');
-
-      // Delete the card
-      ring.delete<JokerCard<int>>(tag: 'counter');
-
-      // Re-register the same card
-      ring.put<JokerCard<int>>(card, tag: 'counter');
-
-      // Modify the original card
-      card.update(10);
-
-      // Assert - retrieved card should have the updated value
-      final retrievedCard = ring.find<JokerCard<int>>('counter');
-      expect(retrievedCard.value, equals(10));
-    });
-
-    test('should support asyncUpdate with JokerCard', () async {
-      // Arrange - create and register a card
-      final card = JokerCard<int>(0);
-      ring.put<JokerCard<int>>(card);
+    test('should support trickAsync with Joker', () async {
+      // Arrange - create and register a joker
+      final joker = Joker<int>(0);
+      circus.hire<Joker<int>>(joker, tag: 'async_joker');
 
       // Act - perform async update
-      await card.updateWithAsync((value) async {
+      await joker.trickAsync((value) async {
         await Future.delayed(Duration(milliseconds: 10));
         return value + 5;
       });
 
-      // Assert - retrieved card should have updated value
-      final retrievedCard = ring.find<JokerCard<int>>();
-      expect(retrievedCard.value, equals(5));
+      // Assert - retrieved joker should have updated value
+      final retrievedJoker = circus.find<Joker<int>>('async_joker');
+      expect(retrievedJoker.value, equals(5));
     });
 
-    test('should persist tag information when registering JokerCard', () {
-      // Arrange - create a card with a tag
-      final card = JokerCard<int>(42, tag: 'answer');
+    test('should maintain stopped flag when registered in CircusRing', () {
+      // Arrange - create a stopped joker
+      final joker = Joker<int>(42, stopped: true);
+      circus.hire<Joker<int>>(joker, tag: 'stopped_joker');
 
-      // Register without specifying tag in put
-      ring.put<JokerCard<int>>(card);
+      // Add a listener to verify it's not called
+      bool listenerCalled = false;
+      joker.addListener(() {
+        listenerCalled = true;
+      });
 
-      // Assert - retrieved card should have the original tag
-      final retrievedCard = ring.find<JokerCard<int>>();
-      expect(retrievedCard.tag, equals('answer'));
+      // Act - modify the joker
+      joker.trick(100);
+
+      // Assert - value should change but listener should not be called
+      expect(joker.value, equals(100));
+      expect(listenerCalled, isFalse);
+
+      // Retrieved joker should also maintain the stopped flag
+      final retrievedJoker = circus.find<Joker<int>>('stopped_joker');
+      expect(retrievedJoker.stopped, isTrue);
+    });
+
+    test('should summon and spotlight Jokers through CircusRing extension', () {
+      // Arrange & Act - summon a joker
+      final joker = circus.summon<int>(42, tag: 'answer');
+
+      // Assert - joker should be registered with the tag
+      expect(circus.isHired<Joker<int>>('answer'), isTrue);
+
+      // Modify the joker
+      joker.trick(100);
+
+      // Spotlight should retrieve the updated joker
+      final spotlightedJoker = circus.spotlight<int>(tag: 'answer');
+      expect(spotlightedJoker.value, equals(100));
+
+      // Vanish should remove the joker
+      circus.vanish<int>(tag: 'answer');
+      expect(circus.isHired<Joker<int>>('answer'), isFalse);
+    });
+
+    test('should verify summon is the preferred way to register Jokers', () {
+      // Arrange & Act - summon a joker
+      // ignore: unused_local_variable
+      final joker = circus.summon<String>('test', tag: 'message');
+
+      // Assert - joker should be registered correctly
+      expect(circus.isHired<Joker<String>>('message'), isTrue);
+      expect(circus.spotlight<String>(tag: 'message').value, equals('test'));
     });
   });
 }

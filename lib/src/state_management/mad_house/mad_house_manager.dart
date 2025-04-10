@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
-import 'package:joker_state/src/state_management/joker_card/joker_card.dart';
+
+import '../joker/joker.dart';
 
 /// MadHouseManager - a holder for state that can be accessed through the widget tree
 class MadHouseState<T> {
@@ -43,7 +44,7 @@ class MadHouseState<T> {
 
 /// A special MadHouseManager that wraps a JokerCard
 class MadHouseManager<T> extends MadHouseState<T> {
-  final JokerCard<T> joker;
+  final Joker<T> joker;
 
   MadHouseManager(this.joker) : super(joker.value) {
     // Listen to JokerCard changes

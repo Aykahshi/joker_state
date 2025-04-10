@@ -1,50 +1,50 @@
 import 'package:flutter/widgets.dart';
-import 'package:joker_state/src/state_management/joker_card/joker_card_extension.dart';
 
 import '../../di/circus_ring/circus_ring.dart';
-import '../joker_card/joker_card.dart';
+import '../joker/joker.dart';
+import '../joker/joker_trickx.dart';
 
-typedef JokerDeckBuilder = Widget Function(
+typedef JokerTroupeBuilder = Widget Function(
   BuildContext context,
   List<dynamic> values,
   Widget? child,
 );
 
-/// JokerDeck - A widget that listens to multiple JokerCards and rebuilds when any of them change
-class JokerDeck extends StatefulWidget {
-  const JokerDeck({
+/// JokerGroup - A widget that listens to multiple JokerCards and rebuilds when any of them change
+class JokerTroupe extends StatefulWidget {
+  const JokerTroupe({
     super.key,
-    required this.cards,
+    required this.jokers,
     required this.builder,
     this.autoDispose = true,
     this.child,
   });
 
-  final List<JokerCard> cards;
-  final JokerDeckBuilder builder;
+  final List<Joker> jokers;
+  final JokerTroupeBuilder builder;
   final bool autoDispose;
   final Widget? child;
 
   @override
-  _JokerDeckState createState() => _JokerDeckState();
+  _JokerTroupeState createState() => _JokerTroupeState();
 }
 
-class _JokerDeckState extends State<JokerDeck> {
+class _JokerTroupeState extends State<JokerTroupe> {
   late List<dynamic> _values;
 
   // Keep track of listener functions to correctly remove them
-  final Map<JokerCard, VoidCallback> _listeners = {};
+  final Map<Joker, VoidCallback> _listeners = {};
 
   @override
   void initState() {
     super.initState();
-    _values = List.from(widget.cards.map((JokerCard card) => card.value));
+    _values = List.from(widget.jokers.map((Joker card) => card.value));
     _addListeners();
   }
 
   void _addListeners() {
-    for (int i = 0; i < widget.cards.length; i++) {
-      final card = widget.cards[i];
+    for (int i = 0; i < widget.jokers.length; i++) {
+      final card = widget.jokers[i];
       final int index = i; // Capture the current index
 
       // Create and store the listener function
@@ -73,17 +73,17 @@ class _JokerDeckState extends State<JokerDeck> {
   }
 
   @override
-  void didUpdateWidget(JokerDeck oldWidget) {
+  void didUpdateWidget(JokerTroupe oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     // Check if the card list changed
-    if (widget.cards.length != oldWidget.cards.length ||
-        !widget.cards.every((card) => oldWidget.cards.contains(card))) {
+    if (widget.jokers.length != oldWidget.jokers.length ||
+        !widget.jokers.every((card) => oldWidget.jokers.contains(card))) {
       // Remove old listeners
       _removeListeners();
 
       // Update values and add new listeners
-      _values = List.from(widget.cards.map((card) => card.value));
+      _values = List.from(widget.jokers.map((card) => card.value));
       _addListeners();
     }
   }
@@ -94,14 +94,14 @@ class _JokerDeckState extends State<JokerDeck> {
 
     // Handle auto disposal if needed
     if (widget.autoDispose) {
-      for (final card in widget.cards) {
+      for (final card in widget.jokers) {
         final tag = card.tag;
         if (tag != null && tag.isNotEmpty) {
-          final joker = Circus.tryDrawCard(tag: tag);
+          final joker = Circus.trySpotlight(tag: tag);
           if (joker == null) {
             card.dispose();
           } else {
-            Circus.discard(tag: tag);
+            Circus.vanish(tag: tag);
           }
         } else {
           card.dispose();

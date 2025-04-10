@@ -1,130 +1,130 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:joker_state/src/state_management/joker_card/joker_card.dart';
+import 'package:joker_state/src/state_management/joker/joker.dart';
 
 void main() {
-  group('JokerCard', () {
+  group('Joker', () {
     test('should initialize with the given value', () {
       // Arrange & Act
-      final card = JokerCard<int>(42);
+      final joker = Joker<int>(42);
 
       // Assert
-      expect(card.value, equals(42));
+      expect(joker.value, equals(42));
     });
 
     test('should update value and notify listeners', () {
       // Arrange
-      final card = JokerCard<int>(10);
+      final joker = Joker<int>(10);
       bool listenerCalled = false;
 
-      card.addListener(() {
+      joker.addListener(() {
         listenerCalled = true;
       });
 
       // Act
-      card.value = 20;
+      joker.value = 20;
 
       // Assert
-      expect(card.value, equals(20));
+      expect(joker.value, equals(20));
       expect(listenerCalled, isTrue);
     });
 
     test('should track previous value when updated', () {
       // Arrange
-      final card = JokerCard<int>(10);
+      final joker = Joker<int>(10);
 
       // Act
-      card.value = 20;
+      joker.value = 20;
 
       // Assert
-      expect(card.value, equals(20));
+      expect(joker.value, equals(20));
     });
 
-    test('update() method should change value and notify listeners', () {
+    test('trick() method should change value and notify listeners', () {
       // Arrange
-      final card = JokerCard<String>('hello');
+      final joker = Joker<String>('hello');
       bool listenerCalled = false;
 
-      card.addListener(() {
+      joker.addListener(() {
         listenerCalled = true;
       });
 
       // Act
-      card.update('world');
+      joker.trick('world');
 
       // Assert
-      expect(card.value, equals('world'));
+      expect(joker.value, equals('world'));
       expect(listenerCalled, isTrue);
     });
 
-    test('updateWith() should apply function and notify listeners', () {
+    test('trickWith() should apply function and notify listeners', () {
       // Arrange
-      final card = JokerCard<int>(5);
+      final joker = Joker<int>(5);
       bool listenerCalled = false;
 
-      card.addListener(() {
+      joker.addListener(() {
         listenerCalled = true;
       });
 
       // Act
-      card.updateWith((value) => value * 2);
+      joker.trickWith((value) => value * 2);
 
       // Assert
-      expect(card.value, equals(10));
+      expect(joker.value, equals(10));
       expect(listenerCalled, isTrue);
     });
 
-    test('updateWithAsync() should apply async function and notify listeners',
+    test('trickAsync() should apply async function and notify listeners',
         () async {
       // Arrange
-      final card = JokerCard<int>(5);
+      final joker = Joker<int>(5);
       bool listenerCalled = false;
 
-      card.addListener(() {
+      joker.addListener(() {
         listenerCalled = true;
       });
 
       // Act
-      await card.updateWithAsync((value) async {
+      await joker.trickAsync((value) async {
         await Future.delayed(Duration(milliseconds: 10));
         return value * 3;
       });
 
       // Assert
-      expect(card.value, equals(15));
+      expect(joker.value, equals(15));
       expect(listenerCalled, isTrue);
     });
 
-    test('hasChanged() should return true when value changed', () {
+    test('isDifferent() should return true when value changed', () {
       // Arrange
-      final card = JokerCard<int>(5);
+      final joker = Joker<int>(5);
 
       // Act
-      card.value = 10;
+      joker.value = 10;
 
       // Assert
-      expect(card.hasChanged(), isTrue);
+      expect(joker.isDifferent(), isTrue);
     });
 
-    test('hasChanged() should return false when value is the same', () {
+    test('isDifferent() should return false when value is the same', () {
       // Arrange
-      final card = JokerCard<int>(5);
+      final joker = Joker<int>(5);
 
       // Act
-      card.value = 5;
+      joker.value = 5;
 
       // Assert
-      expect(card.hasChanged(), isFalse);
+      expect(joker.isDifferent(), isFalse);
     });
 
     test('peek() should provide previous and current values', () {
       // Arrange
-      final card = JokerCard<int>(5);
+      final joker = Joker<int>(5);
       int? oldValue;
       int newValue = 0;
 
       // Act
-      card.value = 10;
-      card.peek((previous, current) {
+      joker.value = 10;
+      joker.peek((previous, current) {
         oldValue = previous;
         newValue = current;
       });
@@ -136,89 +136,89 @@ void main() {
 
     test('when stopped is true, should not notify listeners', () {
       // Arrange
-      final card = JokerCard<int>(5, stopped: true);
+      final joker = Joker<int>(5, stopped: true);
       bool listenerCalled = false;
 
-      card.addListener(() {
+      joker.addListener(() {
         listenerCalled = true;
       });
 
       // Act
-      card.value = 10;
+      joker.value = 10;
 
       // Assert
-      expect(card.value, equals(10)); // Value should still update
+      expect(joker.value, equals(10)); // Value should still update
       expect(listenerCalled, isFalse); // But listener should not be called
     });
 
     test('should maintain tag value', () {
       // Arrange & Act
-      final card = JokerCard<int>(42, tag: 'score');
+      final joker = Joker<int>(42, tag: 'score');
 
       // Assert
-      expect(card.tag, equals('score'));
+      expect(joker.tag, equals('score'));
     });
 
     test('tag should be null by default', () {
       // Arrange & Act
-      final card = JokerCard<int>(42);
+      final joker = Joker<int>(42);
 
       // Assert
-      expect(card.tag, isNull);
+      expect(joker.tag, isNull);
     });
 
     group('with complex objects', () {
       test('should handle lists correctly', () {
         // Arrange
-        final card = JokerCard<List<String>>(['a', 'b']);
+        final joker = Joker<List<String>>(['a', 'b']);
         bool listenerCalled = false;
 
-        card.addListener(() {
+        joker.addListener(() {
           listenerCalled = true;
         });
 
         // Act
-        card.value = [...card.value, 'c'];
+        joker.value = [...joker.value, 'c'];
 
         // Assert
-        expect(card.value, equals(['a', 'b', 'c']));
+        expect(joker.value, equals(['a', 'b', 'c']));
         expect(listenerCalled, isTrue);
       });
 
       test('should handle maps correctly', () {
         // Arrange
-        final card = JokerCard<Map<String, int>>({'a': 1, 'b': 2});
+        final joker = Joker<Map<String, int>>({'a': 1, 'b': 2});
         bool listenerCalled = false;
 
-        card.addListener(() {
+        joker.addListener(() {
           listenerCalled = true;
         });
 
         // Act
-        card.value = {...card.value, 'c': 3};
+        joker.value = {...joker.value, 'c': 3};
 
         // Assert
-        expect(card.value, equals({'a': 1, 'b': 2, 'c': 3}));
+        expect(joker.value, equals({'a': 1, 'b': 2, 'c': 3}));
         expect(listenerCalled, isTrue);
       });
 
       test('should handle custom objects correctly', () {
         // Arrange
         final user1 = User('John', 25);
-        final card = JokerCard<User>(user1);
+        final joker = Joker<User>(user1);
         bool listenerCalled = false;
 
-        card.addListener(() {
+        joker.addListener(() {
           listenerCalled = true;
         });
 
         // Act
         final user2 = User('John', 26); // Only age changed
-        card.value = user2;
+        joker.value = user2;
 
         // Assert
-        expect(card.value.name, equals('John'));
-        expect(card.value.age, equals(26));
+        expect(joker.value.name, equals('John'));
+        expect(joker.value.age, equals(26));
         expect(listenerCalled, isTrue);
       });
     });
@@ -226,17 +226,17 @@ void main() {
     group('memory management', () {
       test('dispose() should remove all listeners', () {
         // Arrange
-        final card = JokerCard<int>(5);
+        final joker = Joker<int>(5);
         bool listenerCalled = false;
 
-        card.addListener(() {
+        joker.addListener(() {
           listenerCalled = true;
         });
 
         // Act
-        card.dispose();
+        joker.dispose();
         try {
-          card.value = 10; // This should not call any listeners
+          joker.value = 10; // This should not call any listeners
         } catch (e) {
           // ValueNotifier might throw after dispose
         }
@@ -249,15 +249,15 @@ void main() {
     group('edge cases', () {
       test('setting the same value should not notify listeners', () {
         // Arrange
-        final card = JokerCard<int>(5);
+        final joker = Joker<int>(5);
         int notificationCount = 0;
 
-        card.addListener(() {
+        joker.addListener(() {
           notificationCount++;
         });
 
         // Act
-        card.value = 5; //  Same value
+        joker.value = 5; //  Same value
 
         // Assert
         expect(notificationCount, equals(0));
@@ -265,32 +265,32 @@ void main() {
 
       test('updating with null for nullable types', () {
         // Arrange
-        final card = JokerCard<int?>(5);
+        final joker = Joker<int?>(5);
         bool listenerCalled = false;
 
-        card.addListener(() {
+        joker.addListener(() {
           listenerCalled = true;
         });
 
         // Act
-        card.value = null;
+        joker.value = null;
 
         // Assert
-        expect(card.value, isNull);
+        expect(joker.value, isNull);
         expect(listenerCalled, isTrue);
       });
 
       test('multiple updates should track the initial previous value', () {
         // Arrange
-        final card = JokerCard<int>(5);
+        final joker = Joker<int>(5);
 
         // Act - multiple updates
-        card.value = 10;
-        card.value = 15;
-        card.value = 20;
+        joker.value = 10;
+        joker.value = 15;
+        joker.value = 20;
 
         // Assert
-        expect(card.value, equals(20));
+        expect(joker.value, equals(20));
       });
     });
   });
