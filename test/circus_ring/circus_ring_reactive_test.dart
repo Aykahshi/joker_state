@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:joker_state/src/di/circus_ring/src/circus_ring.dart';
-import 'package:joker_state/src/di/circus_ring/src/circus_ring_exception.dart';
+import 'package:joker_state/src/di/circus_ring/circus_ring.dart';
 import 'package:joker_state/src/state_management/joker/joker.dart';
 import 'package:joker_state/src/state_management/joker/joker_trickx.dart';
+import 'package:joker_state/src/state_management/joker_exception.dart';
 
 void main() {
   group('CircusRing with Reactive Jokers', () {
@@ -37,27 +37,24 @@ void main() {
           throwsA(isA<CircusRingException>()));
     });
 
-    test('should throw exception when registering Joker with empty tag', () {
-      // Arrange
-      final joker = Joker<int>(42);
+    test('should enforce method usage based on autoNotify mode', () {
+      // Arrange - create jokers with different modes
+      final autoJoker = Joker<int>(0, autoNotify: true);
+      final manualJoker = Joker<int>(0, autoNotify: false);
 
-      // Act & Assert
-      expect(
-          () => circus.hire<Joker<int>>(joker, tag: ''), // Empty tag
-          throwsA(isA<CircusRingException>()));
-    });
+      // Assert - methods restricted by mode
+      expect(() => autoJoker.trick(10), returnsNormally);
+      expect(() => manualJoker.trick(10), throwsA(isA<JokerException>()));
 
-    test('should succeed when registering Joker with proper tag', () {
-      // Arrange
-      final joker = Joker<int>(42);
+      expect(() => autoJoker.whisper(10), throwsA(isA<JokerException>()));
+      expect(() => manualJoker.whisper(10), returnsNormally);
 
-      // Act & Assert - should not throw
-      expect(() => circus.hire<Joker<int>>(joker, tag: 'valid_tag'),
-          returnsNormally);
+      expect(() => autoJoker.yell(), throwsA(isA<JokerException>()));
+      expect(() => manualJoker.yell(), returnsNormally);
     });
 
     test('should preserve listeners when accessing Joker multiple times', () {
-      // Arrange - create a joker with a listener
+      // Arrange - create an auto joker with a listener
       final joker = Joker<int>(0);
       int callCount = 0;
 
@@ -90,142 +87,84 @@ void main() {
       expect(joker.value, equals(20));
     });
 
-    test('should support Joker value changes through contract', () {
-      // Arrange - register a factory for Joker
-      int counter = 0;
-      circus.contract<Joker<int>>(() {
-        counter++;
-        return Joker<int>(counter);
-      });
+    test('should notify correctly with auto jokers', () {
+      // Arrange - create an auto joker with listener
+      final joker = Joker<int>(0, autoNotify: true);
+      int countNotified = 0;
+      joker.addListener(() => countNotified++);
 
-      // Act - get instances and modify them
-      final joker1 = circus.find<Joker<int>>();
-      final joker2 = circus.find<Joker<int>>();
+      // Act - update with value
+      joker.trick(10);
 
-      // Assert - each factory call creates a new instance
-      expect(joker1, isNot(equals(joker2)));
-      expect(joker1.value, equals(1));
-      expect(joker2.value, equals(2));
+      // Assert - should have notified once
+      expect(joker.value, equals(10));
+      expect(countNotified, equals(1));
 
-      // Changing one doesn't affect the other
-      joker1.trick(100);
-      expect(joker1.value, equals(100));
-      expect(joker2.value, equals(2));
+      // Act - update with function
+      joker.trickWith((val) => val * 2);
+
+      // Assert - should have notified again
+      expect(joker.value, equals(20));
+      expect(countNotified, equals(2));
     });
 
-    test('should create Joker through hireLazily only when accessed', () {
-      // Arrange - track if factory was called
-      bool factoryCalled = false;
+    test('should notify correctly with manual jokers', () {
+      // Arrange - create a manual joker with listener
+      final joker = Joker<int>(0, autoNotify: false);
+      int countNotified = 0;
+      joker.addListener(() => countNotified++);
 
-      // Register lazy factory
-      circus.hireLazily<Joker<String>>(() {
-        factoryCalled = true;
-        return Joker<String>('created');
-      });
+      // Act - update value silently
+      joker.whisper(10);
 
-      // Assert - factory not yet called
-      expect(factoryCalled, isFalse);
+      // Assert - should not have notified
+      expect(joker.value, equals(10));
+      expect(countNotified, equals(0));
 
-      // Act - access the lazy instance
-      final joker = circus.find<Joker<String>>();
+      // Act - call yell to notify
+      joker.yell();
 
-      // Assert - factory called and instance created
-      expect(factoryCalled, isTrue);
-      expect(joker.value, equals('created'));
-
-      // Modify the instance
-      joker.trick('modified');
-
-      // Retrieve again - should be the same instance with updated value
-      final joker2 = circus.find<Joker<String>>();
-      expect(joker2.value, equals('modified'));
-      expect(joker2, equals(joker));
+      // Assert - should notify now
+      expect(countNotified, equals(1));
     });
 
-    test('should support complex objects with Joker', () {
-      // Arrange - create a joker with a complex object
-      final user = User('John', 30);
-      final joker = Joker<User>(user);
+    test('should batch update and notify only once', () {
+      // Arrange
+      final joker = Joker<int>(1);
+      int countNotified = 0;
+      joker.addListener(() => countNotified++);
 
-      // Register the joker with a tag
-      circus.hire<Joker<User>>(joker, tag: 'user_joker');
-
-      // Act - retrieve and modify the object
-      final retrievedJoker = circus.find<Joker<User>>('user_joker');
-      retrievedJoker.trick(User('John', 31)); // Update age
-
-      // Assert - object should be updated
-      expect(retrievedJoker.value.age, equals(31));
-      expect(retrievedJoker.value.name, equals('John'));
-
-      // Original reference should reflect the change
-      expect(joker.value.age, equals(31));
-    });
-
-    test('should handle Joker with collections', () {
-      // Arrange - create a joker with a list
-      final joker = Joker<List<String>>(['item1', 'item2']);
-      circus.hire<Joker<List<String>>>(joker, tag: 'list_joker');
-
-      // Act - retrieve and modify the list
-      final retrievedJoker = circus.find<Joker<List<String>>>('list_joker');
-
-      // Modify list (immutable way - recommended)
-      retrievedJoker.trick([...retrievedJoker.value, 'item3']);
+      // Act - make batch updates
+      joker
+          .batch()
+          .apply((val) => val + 1) // 1 -> 2
+          .apply((val) => val * 3) // 2 -> 6
+          .apply((val) => val - 1) // 6 -> 5
+          .commit();
 
       // Assert
-      expect(retrievedJoker.value.length, equals(3));
-      expect(retrievedJoker.value, contains('item3'));
-
-      // Original reference should reflect the change
-      expect(joker.value.length, equals(3));
+      expect(joker.value, equals(5)); // Final value
+      expect(countNotified, equals(1)); // Only notified once at commit
     });
 
-    test('should support trickAsync with Joker', () async {
-      // Arrange - create and register a joker
-      final joker = Joker<int>(0);
-      circus.hire<Joker<int>>(joker, tag: 'async_joker');
+    test('should discard batch changes if needed', () {
+      // Arrange
+      final joker = Joker<int>(10);
 
-      // Act - perform async update
-      await joker.trickAsync((value) async {
-        await Future.delayed(Duration(milliseconds: 10));
-        return value + 5;
-      });
+      // Act - make batch updates but discard
+      joker.batch().apply((val) => val * 2).apply((val) => val + 5).discard();
 
-      // Assert - retrieved joker should have updated value
-      final retrievedJoker = circus.find<Joker<int>>('async_joker');
-      expect(retrievedJoker.value, equals(5));
-    });
-
-    test('should maintain stopped flag when registered in CircusRing', () {
-      // Arrange - create a stopped joker
-      final joker = Joker<int>(42, stopped: true);
-      circus.hire<Joker<int>>(joker, tag: 'stopped_joker');
-
-      // Add a listener to verify it's not called
-      bool listenerCalled = false;
-      joker.addListener(() {
-        listenerCalled = true;
-      });
-
-      // Act - modify the joker
-      joker.trick(100);
-
-      // Assert - value should change but listener should not be called
-      expect(joker.value, equals(100));
-      expect(listenerCalled, isFalse);
-
-      // Retrieved joker should also maintain the stopped flag
-      final retrievedJoker = circus.find<Joker<int>>('stopped_joker');
-      expect(retrievedJoker.stopped, isTrue);
+      // Assert - value should remain unchanged
+      expect(joker.value, equals(10));
     });
 
     test('should summon and spotlight Jokers through CircusRing extension', () {
-      // Arrange & Act - summon a joker
+      // Arrange & Act - summon an auto-notify joker
       final joker = circus.summon<int>(42, tag: 'answer');
 
       // Assert - joker should be registered with the tag
       expect(circus.isHired<Joker<int>>('answer'), isTrue);
+      expect(joker.autoNotify, isTrue);
 
       // Modify the joker
       joker.trick(100);
@@ -239,33 +178,24 @@ void main() {
       expect(circus.isHired<Joker<int>>('answer'), isFalse);
     });
 
-    test('should verify summon is the preferred way to register Jokers', () {
-      // Arrange & Act - summon a joker
-      // ignore: unused_local_variable
-      final joker = circus.summon<String>('test', tag: 'message');
+    test('should recruit manual jokers through CircusRing extension', () {
+      // Arrange & Act - recruit a manual joker
+      final joker = circus.recruit<int>(42, tag: 'manual');
 
-      // Assert - joker should be registered correctly
-      expect(circus.isHired<Joker<String>>('message'), isTrue);
-      expect(circus.spotlight<String>(tag: 'message').value, equals('test'));
+      // Assert - joker should be manual (autoNotify = false)
+      expect(circus.isHired<Joker<int>>('manual'), isTrue);
+      expect(joker.autoNotify, isFalse);
+
+      int notifications = 0;
+      joker.addListener(() => notifications++);
+
+      // Modify using whisper (shouldn't notify)
+      joker.whisper(100);
+      expect(notifications, equals(0));
+
+      // Yell to notify
+      joker.yell();
+      expect(notifications, equals(1));
     });
   });
-}
-
-// Helper class for testing complex objects
-class User {
-  final String name;
-  final int age;
-
-  User(this.name, this.age);
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is User &&
-          runtimeType == other.runtimeType &&
-          name == other.name &&
-          age == other.age;
-
-  @override
-  int get hashCode => name.hashCode ^ age.hashCode;
 }

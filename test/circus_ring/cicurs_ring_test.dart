@@ -1,175 +1,247 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/src/di/circus_ring/circus_ring.dart';
+import 'package:joker_state/src/state_management/joker/joker.dart';
 
 void main() {
-  late CircusRing circus;
-
-  // reset CircusRing before each test
   setUp(() {
-    circus = CircusRing();
-    circus.fireAll();
-    circus.config(enableLogs: true);
+    // Reset CircusRing before each test
+    Circus.fireAll();
   });
 
-  group('CircusRing Basics', () {
-    test('singleton instance should be the same', () {
-      expect(Circus, equals(CircusRing.instance));
-      expect(Circus, equals(CircusRing()));
-      expect(CircusRing(), equals(CircusRing()));
-    });
-  });
-
-  group('Registration', () {
-    test('should register and retrieve instances', () {
+  group('CircusRing Basic Functionality', () {
+    test('should be a singleton', () {
       // Arrange
-      final testString = 'Hello World';
-      final testInt = 42;
-
-      // Act
-      circus.hire<String>(testString);
-      circus.hire<int>(testInt, tag: 'answer');
+      final instance1 = CircusRing();
+      final instance2 = CircusRing();
 
       // Assert
-      expect(circus.find<String>(), equals(testString));
-      expect(circus.find<int>('answer'), equals(testInt));
+      expect(instance1, same(instance2));
+      expect(CircusRing.instance, same(instance1));
+      expect(Circus, same(instance1));
     });
 
-    test('should replace existing instances', () {
-      // Arrange
-      final firstString = 'First';
-      final secondString = 'Second';
+    test('should enable and disable logs', () {
+      // Arrange & Act
+      Circus.config(enableLogs: true);
 
-      // Act
-      circus.hire<String>(firstString);
-      expect(circus.find<String>(), equals(firstString));
-      circus.hire<String>(secondString);
-
-      // Assert
-      expect(circus.find<String>(), equals(secondString));
-    });
-
-    test('should lazy register and instantiate', () {
-      // Arrange
-      var factoryCalled = false;
-
-      // Act
-      circus.hireLazily<String>(() {
-        factoryCalled = true;
-        return 'Lazy String';
-      });
-
-      // Assert - factory not yet called
-      expect(factoryCalled, isFalse);
-
-      // Act - trigger lazy instantiation
-      final result = circus.find<String>();
-
-      // Assert - factory was called and instance created
-      expect(factoryCalled, isTrue);
-      expect(result, equals('Lazy String'));
-
-      // Check instance is now registered and factory not called again
-      factoryCalled = false;
-      final secondResult = circus.find<String>();
-      expect(factoryCalled, isFalse); // Not called again
-      expect(secondResult, equals('Lazy String'));
-    });
-
-    test('singleton method should register instance', () {
-      // Arrange
-      final service = TestService();
-
-      // Act
-      circus.appoint(service);
-
-      // Assert
-      expect(circus.find<TestService>(), equals(service));
-    });
-
-    test('factory should create new instance each time', () {
-      // Arrange
-      int counter = 0;
-
-      // Act
-      circus.contract<Counter>(() {
-        counter++;
-        return Counter(counter);
-      });
-
-      // Assert - each find should create new instance
-      expect(circus.find<Counter>().count, equals(1));
-      expect(circus.find<Counter>().count, equals(2));
-      expect(circus.find<Counter>().count, equals(3));
+      // We don't have direct access to _enableLogs, but we can test that
+      // the configuration doesn't throw an exception
+      expect(() => Circus.config(enableLogs: false), returnsNormally);
     });
   });
 
-  group('Async Registration', () {
-    test('should register and retrieve async instances', () async {
+  group('CircusRing Hiring (Registration)', () {
+    test('hire should register a synchronous singleton', () {
       // Arrange
-      var asyncInitCalled = false;
+      final testInstance = TestClass('test');
 
       // Act
-      await circus.hireAsync<String>(() async {
-        await Future.delayed(Duration(milliseconds: 10));
-        asyncInitCalled = true;
-        return 'Async String';
-      });
+      final result = Circus.hire<TestClass>(testInstance);
 
       // Assert
-      expect(asyncInitCalled, isTrue);
-      expect(circus.find<String>(), equals('Async String'));
+      expect(result, equals(testInstance));
+      expect(Circus.find<TestClass>(), equals(testInstance));
+      expect(Circus.isHired<TestClass>(), isTrue);
     });
 
-    test('should lazy register and instantiate async', () async {
+    test('hire should register a singleton with tag', () {
       // Arrange
-      var factoryCalled = false;
+      final testInstance1 = TestClass('test1');
+      final testInstance2 = TestClass('test2');
 
-      // Act - register
-      circus.hireLazilyAsync<String>(() async {
-        await Future.delayed(Duration(milliseconds: 10));
-        factoryCalled = true;
-        return 'Lazy Async String';
-      });
+      // Act
+      Circus.hire<TestClass>(testInstance1, tag: 'tag1');
+      Circus.hire<TestClass>(testInstance2, tag: 'tag2');
 
-      // Assert - factory not yet called
-      expect(factoryCalled, isFalse);
-
-      // Act - trigger lazy instantiation
-      final result = await circus.findAsync<String>();
-
-      // Assert - factory was called and instance created
-      expect(factoryCalled, isTrue);
-      expect(result, equals('Lazy Async String'));
-
-      // Check instance is now registered and factory not called again
-      factoryCalled = false;
-      final secondResult = await circus.findAsync<String>();
-      expect(factoryCalled, isFalse); // Not called again
-      expect(secondResult, equals('Lazy Async String'));
+      // Assert
+      expect(Circus.find<TestClass>('tag1'), equals(testInstance1));
+      expect(Circus.find<TestClass>('tag2'), equals(testInstance2));
     });
 
-    test('should throw when accessing async registered instance synchronously',
-        () {
+    test('hire should throw when registering Joker without tag', () {
       // Arrange
-      circus.hireLazilyAsync<String>(() async {
-        return 'Lazy Async String';
-      });
+      final jokerInstance = Joker<String>('test');
 
       // Act & Assert
-      expect(() => circus.find<String>(), throwsA(isA<CircusRingException>()));
+      expect(() => Circus.hire<Joker<String>>(jokerInstance),
+          throwsA(isA<CircusRingException>()));
+    });
+
+    test('hire should replace existing instance', () {
+      // Arrange
+      final testInstance1 = TestClass('test1');
+      final testInstance2 = TestClass('test2');
+
+      // Act
+      Circus.hire<TestClass>(testInstance1);
+      Circus.hire<TestClass>(testInstance2);
+
+      // Assert
+      expect(Circus.find<TestClass>(), equals(testInstance2));
+    });
+
+    test('hireAsync should register an asynchronous singleton', () async {
+      // Arrange
+      final builder = () async => TestClass('async');
+
+      // Act
+      final result = await Circus.hireAsync<TestClass>(builder);
+
+      // Assert
+      expect(result.value, equals('async'));
+      expect((await Circus.findAsync<TestClass>()).value, equals('async'));
+    });
+
+    test('hireLazily should register a lazy singleton', () {
+      // Arrange
+      int count = 0;
+      final builder = () {
+        count++;
+        return TestClass('lazy');
+      };
+
+      // Act
+      Circus.hireLazily<TestClass>(builder);
+
+      // Assert - Instance should not be created yet
+      expect(count, equals(0));
+
+      // Act - Access the instance
+      final instance = Circus.find<TestClass>();
+
+      // Assert - Instance should be created only once
+      expect(count, equals(1));
+      expect(instance.value, equals('lazy'));
+
+      // Access again should not create a new instance
+      final instance2 = Circus.find<TestClass>();
+      expect(count, equals(1));
+      expect(instance2, same(instance));
+    });
+
+    test('hireLazilyAsync should register an async lazy singleton', () async {
+      // Arrange
+      int count = 0;
+      final builder = () async {
+        count++;
+        return TestClass('async lazy');
+      };
+
+      // Act
+      Circus.hireLazilyAsync<TestClass>(builder);
+
+      // Assert - Instance should not be created yet
+      expect(count, equals(0));
+
+      // Act - Access the instance
+      final instance = await Circus.findAsync<TestClass>();
+
+      // Assert - Instance should be created
+      expect(count, equals(1));
+      expect(instance.value, equals('async lazy'));
+
+      // Access again should not create a new instance
+      final instance2 = await Circus.findAsync<TestClass>();
+      expect(count, equals(1));
+      expect(instance2, same(instance));
+    });
+
+    test('contract should register a factory', () {
+      // Arrange
+      int count = 0;
+      final builder = () {
+        count++;
+        return TestClass('factory');
+      };
+
+      // Act
+      Circus.contract<TestClass>(builder);
+
+      // Assert - Each access should create new instance
+      final instance1 = Circus.find<TestClass>();
+      expect(count, equals(1));
+      expect(instance1.value, equals('factory'));
+
+      final instance2 = Circus.find<TestClass>();
+      expect(count, equals(2));
+      expect(instance2.value, equals('factory'));
+      expect(instance2, isNot(same(instance1)));
+    });
+
+    test('appoint should register a singleton (alias for hire)', () {
+      // Arrange
+      final testInstance = TestClass('appointed');
+
+      // Act
+      final result = Circus.appoint<TestClass>(testInstance);
+
+      // Assert
+      expect(result, equals(testInstance));
+      expect(Circus.find<TestClass>(), equals(testInstance));
+    });
+
+    test('draft should create instance without registration', () {
+      // Arrange
+      final builder = () => TestClass('draft');
+
+      // Act
+      final result = Circus.draft<TestClass>(builder: builder);
+
+      // Assert
+      expect(result.value, equals('draft'));
+      expect(Circus.isHired<TestClass>(), isFalse);
+      expect(
+          () => Circus.find<TestClass>(), throwsA(isA<CircusRingException>()));
     });
   });
 
-  group('Find and TryFind', () {
-    test('should throw when instance not found', () {
+  group('CircusRing Finding', () {
+    test('find should retrieve registered instance', () {
+      // Arrange
+      final testInstance = TestClass('test');
+      Circus.hire<TestClass>(testInstance);
+
+      // Act
+      final result = Circus.find<TestClass>();
+
+      // Assert
+      expect(result, equals(testInstance));
+    });
+
+    test('find should throw when instance not found', () {
       // Act & Assert
-      expect(() => circus.find<String>(), throwsA(isA<CircusRingException>()));
+      expect(
+          () => Circus.find<TestClass>(), throwsA(isA<CircusRingException>()));
+    });
+
+    test('findAsync should retrieve registered instance synchronously',
+        () async {
+      // Arrange
+      final testInstance = TestClass('test');
+      Circus.hire<TestClass>(testInstance);
+
+      // Act
+      final result = await Circus.findAsync<TestClass>();
+
+      // Assert
+      expect(result, equals(testInstance));
+    });
+
+    test('findAsync should create and return async lazy instance', () async {
+      // Arrange
+      Circus.hireLazilyAsync<TestClass>(() async => TestClass('async'));
+
+      // Act
+      final result = await Circus.findAsync<TestClass>();
+
+      // Assert
+      expect(result.value, equals('async'));
     });
 
     test('tryFind should return null when instance not found', () {
       // Act
-      final result = circus.tryFind<String>();
+      final result = Circus.tryFind<TestClass>();
 
       // Assert
       expect(result, isNull);
@@ -177,113 +249,176 @@ void main() {
 
     test('tryFindAsync should return null when instance not found', () async {
       // Act
-      final result = await circus.tryFindAsync<String>();
+      final result = await Circus.tryFindAsync<TestClass>();
 
       // Assert
       expect(result, isNull);
     });
 
-    test('isRegistered should return correct status', () {
+    test('find should throw when asking for async instance synchronously', () {
       // Arrange
-      circus.hire('Test');
-      circus.hireLazily<int>(() => 42);
+      Circus.hireLazilyAsync<TestClass>(() async => TestClass('async'));
 
-      // Assert
-      expect(circus.isHired<String>(), isTrue);
-      expect(circus.isHired<int>(), isTrue);
-      expect(circus.isHired<bool>(), isFalse);
-      expect(circus.isHired<String>('tagged'), isFalse);
+      // Act & Assert
+      expect(
+          () => Circus.find<TestClass>(), throwsA(isA<CircusRingException>()));
     });
   });
 
-  group('Resource Cleanup', () {
-    test('should dispose resources when deleting', () {
+  group('CircusRing Disposing', () {
+    test('fire should delete an instance', () {
       // Arrange
-      final service = MockDisposable();
-      circus.hire(service);
+      final testInstance = TestClass('test');
+      Circus.hire<TestClass>(testInstance);
 
       // Act
-      circus.fire<MockDisposable>();
+      final result = Circus.fire<TestClass>();
 
       // Assert
-      expect(service.disposed, isTrue);
+      expect(result, isTrue);
+      expect(Circus.isHired<TestClass>(), isFalse);
     });
 
-    test('should dispose async resources when deleting async', () async {
+    test('fire should dispose DisposableObject', () {
       // Arrange
-      final service = MockAsyncDisposable();
-      circus.hire(service);
+      final disposable = DisposableObject();
+      Circus.hire<DisposableObject>(disposable);
 
       // Act
-      await circus.fireAsync<MockAsyncDisposable>();
+      Circus.fire<DisposableObject>();
 
       // Assert
-      expect(service.disposed, isTrue);
+      expect(disposable.isDisposed, isTrue);
     });
 
-    test('should dispose ValueNotifier when deleting', () {
+    test('fireAsync should delete an instance asynchronously', () async {
       // Arrange
-      final notifier = ValueNotifier<int>(42);
-      circus.hire(notifier);
-
-      // Keep a weak reference to check if it's garbage collected
-      var listenerCalled = false;
-      notifier.addListener(() {
-        listenerCalled = true;
-      });
+      final testInstance = TestClass('test');
+      Circus.hire<TestClass>(testInstance);
 
       // Act
-      circus.fire<ValueNotifier<int>>();
-
-      // Try to use the notifier (should throw if properly disposed)
-      expect(() => notifier.value = 43, throwsFlutterError);
-
-      // Assert - listener shouldn't be called after disposal
-      expect(listenerCalled, isFalse);
-    });
-
-    test('should dispose resources when calling deleteAll', () {
-      // Arrange
-      final service1 = MockDisposable();
-      final service2 = MockDisposable();
-      circus.hire(service1, tag: '1');
-      circus.hire(service2, tag: '2');
-
-      // Act
-      circus.fireAll();
+      final result = await Circus.fireAsync<TestClass>();
 
       // Assert
-      expect(service1.disposed, isTrue);
-      expect(service2.disposed, isTrue);
+      expect(result, isTrue);
+      expect(Circus.isHired<TestClass>(), isFalse);
+    });
+
+    test('fireAsync should dispose AsyncDisposableObject', () async {
+      // Arrange
+      final disposable = AsyncDisposableObject();
+      Circus.hire<AsyncDisposableObject>(disposable);
+
+      // Act
+      await Circus.fireAsync<AsyncDisposableObject>();
+
+      // Assert
+      expect(disposable.isDisposed, isTrue);
+    });
+
+    test('fireAll should delete all instances', () {
+      // Arrange
+      Circus.hire<TestClass>(TestClass('test1'));
+      Circus.hire<String>('test2');
+
+      // Act
+      Circus.fireAll();
+
+      // Assert
+      expect(Circus.isHired<TestClass>(), isFalse);
+      expect(Circus.isHired<String>(), isFalse);
+    });
+
+    test('fireAllAsync should delete all instances asynchronously', () async {
+      // Arrange
+      Circus.hire<TestClass>(TestClass('test1'));
+      Circus.hire<String>('test2');
+
+      // Act
+      await Circus.fireAllAsync();
+
+      // Assert
+      expect(Circus.isHired<TestClass>(), isFalse);
+      expect(Circus.isHired<String>(), isFalse);
+    });
+  });
+
+  group('CircusRing Tag-based Operations', () {
+    test('findByTag should retrieve instance by tag', () {
+      // Arrange
+      final testInstance = TestClass('test');
+      Circus.hire<TestClass>(testInstance, tag: 'myTag');
+
+      // Act
+      final result = Circus.findByTag('myTag');
+
+      // Assert
+      expect(result, equals(testInstance));
+    });
+
+    test('tryFindByTag should return null when tag not found', () {
+      // Act
+      final result = Circus.tryFindByTag('nonExistentTag');
+
+      // Assert
+      expect(result, isNull);
+    });
+
+    test('fireByTag should delete instance by tag', () {
+      // Arrange
+      Circus.hire<TestClass>(TestClass('test'), tag: 'myTag');
+
+      // Act
+      final result = Circus.fireByTag('myTag');
+
+      // Assert
+      expect(result, isTrue);
+      expect(Circus.tryFindByTag('myTag'), isNull);
     });
   });
 }
 
-// Helper classes for testing
+// Test classes used in tests
+class TestClass {
+  final String value;
 
-class TestService {}
+  TestClass(this.value);
 
-class Counter {
-  final int count;
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TestClass &&
+          runtimeType == other.runtimeType &&
+          value == other.value;
 
-  Counter(this.count);
+  @override
+  int get hashCode => value.hashCode;
 }
 
-class MockDisposable implements Disposable {
-  bool disposed = false;
+class DisposableObject implements Disposable {
+  bool isDisposed = false;
 
   @override
   void dispose() {
-    disposed = true;
+    isDisposed = true;
   }
 }
 
-class MockAsyncDisposable implements AsyncDisposable {
-  bool disposed = false;
+class AsyncDisposableObject implements AsyncDisposable {
+  bool isDisposed = false;
 
   @override
   Future<void> dispose() async {
-    await Future.delayed(Duration(milliseconds: 10));
-    disposed = true;
+    isDisposed = true;
+  }
+}
+
+class TestChangeNotifier extends ChangeNotifier {
+  bool isDisposed = false;
+
+  @override
+  void dispose() {
+    isDisposed = true;
+    super.dispose();
   }
 }

@@ -7,7 +7,6 @@ import '../joker/joker_trickx.dart';
 typedef JokerStageBuilder<T> = Widget Function(
   BuildContext context,
   T value,
-  Widget? child,
 );
 
 class JokerStage<T> extends StatefulWidget {
@@ -16,27 +15,72 @@ class JokerStage<T> extends StatefulWidget {
     required this.joker,
     this.autoDispose = true,
     required this.builder,
-    this.child,
   });
 
   final Joker<T> joker;
   final JokerStageBuilder<T> builder;
   final bool autoDispose;
-  final Widget? child;
 
   @override
   State<JokerStage<T>> createState() => _JokerStageState<T>();
 }
 
 class _JokerStageState<T> extends State<JokerStage<T>> {
+  late T _value;
+
+  @override
+  void initState() {
+    super.initState();
+    _value = widget.joker.value;
+    widget.joker.addListener(_updateState);
+  }
+
+  void _updateState() {
+    if (mounted) {
+      setState(() {
+        _value = widget.joker.value;
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(JokerStage<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.joker != oldWidget.joker) {
+      oldWidget.joker.removeListener(_updateState);
+      _value = widget.joker.value;
+      widget.joker.addListener(_updateState);
+    }
+  }
+
   @override
   void dispose() {
+    widget.joker.removeListener(_updateState);
+
+// 如果設置了自動釋放
     if (widget.autoDispose) {
-      var joker = Circus.trySpotlight<T>(tag: widget.joker.tag ?? '');
-      if (joker == null) {
-        widget.joker.dispose();
+      // 檢查這個 Joker 是否有標籤
+      final tag = widget.joker.tag;
+
+      if (tag != null && tag.isNotEmpty) {
+        // Check if the Joker is registered in CircusRing
+        try {
+          final registeredJoker = Circus.spotlight<T>(tag: tag);
+
+          // If the Joker is registered and the same instance, vanish it
+          if (identical(registeredJoker, widget.joker)) {
+            Circus.vanish<T>(tag: tag);
+          } else {
+            // If the Joker is registered but not the same instance, dispose it
+            widget.joker.dispose();
+          }
+        } catch (_) {
+          // If the Joker is not registered, dispose it
+          widget.joker.dispose();
+        }
       } else {
-        Circus.vanish<T>(tag: widget.joker.tag ?? '');
+        // If the Joker has no tag, dispose it
+        widget.joker.dispose();
       }
     }
     super.dispose();
@@ -44,10 +88,6 @@ class _JokerStageState<T> extends State<JokerStage<T>> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<T>(
-      valueListenable: widget.joker,
-      builder: widget.builder,
-      child: widget.child,
-    );
+    return widget.builder(context, _value);
   }
 }

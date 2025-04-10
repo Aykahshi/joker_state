@@ -149,8 +149,8 @@ extension CircusRingHiring on CircusRing {
   bool _deleteSingle<T>({required String key}) {
     if (_instances.containsKey(key)) {
       final instance = _instances[key];
-      // Handle ValueNotifier-based instances
-      if (instance is ValueNotifier) {
+      // Handle ChangeNotifier-based instances
+      if (instance is ChangeNotifier) {
         instance.dispose();
       }
       if (instance is Disposable) {
@@ -299,7 +299,7 @@ extension CircusRingFind on CircusRing {
   void fireAll() {
     for (final key in _instances.keys.toList()) {
       final instance = _instances[key];
-      if (instance is ValueNotifier) {
+      if (instance is ChangeNotifier) {
         instance.dispose();
       }
       if (instance is Disposable) {
@@ -317,7 +317,7 @@ extension CircusRingFind on CircusRing {
   Future<void> fireAllAsync() async {
     for (final key in _instances.keys) {
       final instance = _instances[key];
-      if (instance is ValueNotifier) {
+      if (instance is ChangeNotifier) {
         instance.dispose();
       }
       if (instance is AsyncDisposable) {
@@ -331,5 +331,88 @@ extension CircusRingFind on CircusRing {
     _lazyFactories.clear();
     _lazyAsyncSingleton.clear();
     _log('Force deleted all instances and factories asynchronously');
+  }
+}
+
+extension CircusRingTagFind on CircusRing {
+  /// Find any instance by its tag without specifying concrete type
+  dynamic findByTag(String tag) {
+    // Traverse all possible containers that may hold an instance
+    // 1. Check already instantiated objects first
+    for (final entry in _instances.entries) {
+      if (entry.key.endsWith('_$tag')) {
+        return entry.value;
+      }
+    }
+
+    // 2. Check lazy factories
+    for (final entry in _lazyFactories.entries) {
+      if (entry.key.endsWith('_$tag')) {
+        final instance = entry.value() as dynamic;
+        _instances[entry.key] = instance;
+        _log('Lazy instance instantiated by tag: $tag');
+        return instance;
+      }
+    }
+
+    // 3. Check asynchronous lazy factories (but do not invoke them)
+    for (final entry in _lazyAsyncSingleton.entries) {
+      if (entry.key.endsWith('_$tag')) {
+        throw CircusRingException(
+            'Instance with tag $tag is registered asynchronously, please use findAsyncByTag() to access it');
+      }
+    }
+
+    // 4. Check factories
+    for (final entry in _factories.entries) {
+      if (entry.key.endsWith('_$tag')) {
+        _log('Creating from factory by tag: $tag');
+        return entry.value() as dynamic;
+      }
+    }
+
+    return null; // Return null instead of throwing if instance not found
+  }
+
+  /// Try to find any instance by its tag, return null if not found
+  dynamic tryFindByTag(String tag) {
+    try {
+      return findByTag(tag);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Delete any instance by its tag without specifying concrete type
+  bool fireByTag(String tag) {
+    // Find all instance keys that match the tag
+    final keysToDelete = <String>[];
+
+    for (final entry in _instances.entries) {
+      if (entry.key.endsWith('_$tag')) {
+        keysToDelete.add(entry.key);
+      }
+    }
+
+    if (keysToDelete.isEmpty) {
+      return false;
+    }
+
+    // Delete all found instances
+    bool anyDeleted = false;
+    for (final key in keysToDelete) {
+      final instance = _instances[key];
+      if (instance is Disposable) {
+        instance.dispose();
+      } else if (instance is ChangeNotifier) {
+        instance.dispose();
+      }
+
+      _instances.remove(key);
+      anyDeleted = true;
+      _log('Instance deleted by tag: $tag');
+    }
+
+    return anyDeleted;
   }
 }

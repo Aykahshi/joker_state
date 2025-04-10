@@ -1,5 +1,3 @@
-import 'package:flutter/widgets.dart';
-
 import '../../di/circus_ring/src/circus_ring.dart';
 import '../../di/circus_ring/src/circus_ring_exception.dart';
 import '../joker_stage/joker_stage.dart';
@@ -11,27 +9,27 @@ extension JokerStageExtension<T> on Joker<T> {
   JokerStage<T> perform(
     JokerStageBuilder<T> builder, {
     bool autoDispose = true,
-    Widget? child,
   }) {
     return JokerStage<T>(
       joker: this,
       builder: builder,
       autoDispose: autoDispose,
-      child: child,
     );
   }
 }
 
 /// extension methods for cleaner usage
 extension JokerTroupeExtension on List<Joker> {
-  JokerTroupe assemble({
-    required JokerTroupeBuilder builder,
-    Widget? child,
+  JokerTroupe<T> assemble<T extends Record>({
+    required JokerTroupeConverter<T> converter,
+    required JokerTroupeBuilder<T> builder,
+    bool autoDispose = true,
   }) {
-    return JokerTroupe(
+    return JokerTroupe<T>(
       jokers: this,
+      converter: converter,
       builder: builder,
-      child: child,
+      autoDispose: autoDispose,
     );
   }
 }
@@ -39,25 +37,44 @@ extension JokerTroupeExtension on List<Joker> {
 /// Extension to get Jokers from CircusRing with auto-disposal
 /// Tag is required to avoid conflicts if multiple cards are registered
 extension JokerRingExtension on CircusRing {
-  /// Summon a Joker to the CircusRing
+  /// Summon a autoNotify Joker to the CircusRing
   Joker<T> summon<T>(
     T initialValue, {
     required String tag,
-    bool stopped = false,
   }) {
     if (tag.isEmpty) {
       throw CircusRingException(
-        'To avoid conflicts, Jokers must be summoned with a unique tag.'
+        'To avoid conflicts, Jokers must be registered with a unique tag.'
         'Use: Circus.summon<T>(tag: "unique_tag")',
       );
     }
-    final joker = Joker<T>(initialValue, stopped: stopped);
+    final joker = Joker<T>(initialValue);
+    hire<Joker<T>>(joker, tag: tag);
+    return joker;
+  }
+
+  /// Register a Joker with manual notifications
+  Joker<T> recruit<T>(
+    T initialValue, {
+    required String tag,
+  }) {
+    if (tag.isEmpty) {
+      throw CircusRingException(
+        'To avoid conflicts, Jokers must be registered with a unique tag.'
+        'Use: Circus.recruit<T>(tag: "unique_tag")',
+      );
+    }
+    final joker = Joker<T>(initialValue, autoNotify: false);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
   }
 
   /// Spotlight a Joker from the CircusRing
   Joker<T> spotlight<T>({required String tag}) {
+    if (tag.isEmpty) {
+      throw CircusRingException('All Jokers be registered with a unique tag.'
+          'Please add tag to spotlight a Joker.');
+    }
     return find<Joker<T>>(tag);
   }
 
@@ -68,6 +85,10 @@ extension JokerRingExtension on CircusRing {
 
   /// Vanish a Joker from the CircusRing
   bool vanish<T>({required String tag}) {
+    if (tag.isEmpty) {
+      throw CircusRingException('All Jokers be registered with a unique tag.'
+          'Please add tag to vanish a Joker.');
+    }
     return fire<Joker<T>>(tag: tag);
   }
 }

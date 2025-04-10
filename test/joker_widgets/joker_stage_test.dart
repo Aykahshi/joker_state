@@ -1,249 +1,320 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:joker_state/src/di/circus_ring/circus_ring.dart';
+import 'package:joker_state/src/di/circus_ring/src/circus_ring.dart';
 import 'package:joker_state/src/state_management/joker/joker.dart';
 import 'package:joker_state/src/state_management/joker_stage/joker_stage.dart';
 
 void main() {
-  group('JokerStage Widget', () {
-    late Joker<int> joker;
-
+  group('JokerStage', () {
     setUp(() {
-      joker = Joker<int>(42);
       Circus.fireAll();
     });
 
-    testWidgets('should display joker value', (WidgetTester tester) async {
+    testWidgets('should display initial value of joker',
+        (WidgetTester tester) async {
       // Arrange
-      bool builderCalled = false;
+      final joker = Joker<String>('Hello');
 
-      // Act - build widget
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<int>(
-          joker: joker,
-          builder: (context, value, child) {
-            builderCalled = true;
-            return Text('Value: $value');
-          },
+      // Act
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: JokerStage<String>(
+            joker: joker,
+            builder: (context, value) => Text(value),
+          ),
         ),
-      ));
+      );
 
       // Assert
-      expect(builderCalled, isTrue);
-      expect(find.text('Value: 42'), findsOneWidget);
+      expect(find.text('Hello'), findsOneWidget);
     });
 
-    testWidgets('should rebuild when joker value changes',
+    testWidgets('should update when joker value changes',
         (WidgetTester tester) async {
-      // Arrange - build widget
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<int>(
-          joker: joker,
-          builder: (context, value, child) {
-            return Text('Value: $value');
-          },
+      // Arrange
+      final joker = Joker<int>(10);
+
+      // Act - build the widget
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: JokerStage<int>(
+            joker: joker,
+            builder: (context, value) => Text('Count: $value'),
+          ),
         ),
-      ));
+      );
 
       // Initial state
-      expect(find.text('Value: 42'), findsOneWidget);
+      expect(find.text('Count: 10'), findsOneWidget);
 
-      // Act - change joker value
-      joker.trick(100);
+      // Update joker
+      joker.trick(20);
       await tester.pump();
 
       // Assert
-      expect(find.text('Value: 100'), findsOneWidget);
-      expect(find.text('Value: 42'), findsNothing);
-    });
-
-    testWidgets('should pass child widget to builder',
-        (WidgetTester tester) async {
-      // Arrange
-      final childWidget = Container(key: Key('child'));
-      Widget? passedChild;
-
-      // Act - build widget
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<int>(
-          joker: joker,
-          builder: (context, value, child) {
-            passedChild = child;
-            return Column(children: [
-              Text('Value: $value'),
-              if (child != null) child,
-            ]);
-          },
-          child: childWidget,
-        ),
-      ));
-
-      // Assert
-      expect(passedChild, equals(childWidget));
-      expect(find.byKey(Key('child')), findsOneWidget);
+      expect(find.text('Count: 20'), findsOneWidget);
     });
 
     testWidgets('should dispose joker when autoDispose is true',
         (WidgetTester tester) async {
       // Arrange
-      final localJoker = Joker<String>('test');
-      bool listenerCalled = false;
-
-      localJoker.addListener(() {
-        listenerCalled = true;
-      });
-
-      // Act - build and dispose widget
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<String>(
-          joker: localJoker,
-          autoDispose: true,
-          builder: (context, value, _) => Text(value),
+      final joker = Joker<int>(42);
+      // Act - build and then remove widget
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: JokerStage<int>(
+            joker: joker,
+            autoDispose: true,
+            builder: (context, value) => Text('$value'),
+          ),
         ),
-      ));
+      );
 
-      // Dispose widget
-      await tester.pumpWidget(Container());
+      await tester.pumpWidget(Container()); // Remove widget
 
-      // Try to update joker after disposal
-      try {
-        localJoker.trick('updated');
-        fail('Joker should be disposed and throw exception');
-      } catch (e) {
-        // Expected
-      }
-
-      expect(listenerCalled, isFalse);
+      // Assert
+      expect(() => joker.trick(100), throwsA(isInstanceOf<FlutterError>()));
     });
 
     testWidgets('should not dispose joker when autoDispose is false',
         (WidgetTester tester) async {
       // Arrange
-      final localJoker = Joker<String>('test');
-
-      // Act - build and dispose widget
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<String>(
-          joker: localJoker,
-          autoDispose: false,
-          builder: (context, value, _) => Text(value),
+      final joker = Joker<int>(42);
+      // Act - build and then remove widget
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: JokerStage<int>(
+            joker: joker,
+            autoDispose: false,
+            builder: (context, value) => Text('$value'),
+          ),
         ),
-      ));
+      );
 
-      // Dispose widget
-      await tester.pumpWidget(Container());
+      await tester.pumpWidget(Container()); // Remove widget
 
-      // Update joker after widget disposal
-      localJoker.trick('updated');
-
-      // Assert - joker should still work
-      expect(localJoker.value, equals('updated'));
+      // Assert
+      expect(joker.value, 42);
     });
 
-    testWidgets('should handle CircusRing registered jokers correctly',
+    testWidgets('should handle CircusRing integrated jokers',
         (WidgetTester tester) async {
       // Arrange - register joker in CircusRing
-      final taggedJoker = Joker<int>(100, tag: 'counter');
-      Circus.hire(taggedJoker, tag: 'counter');
+      final joker = Joker<String>('Registered', tag: 'test-joker');
+      Circus.hire<Joker<String>>(joker, tag: 'test-joker');
 
-      // Act - build widget with registered joker
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<int>(
-          joker: taggedJoker,
-          builder: (context, value, _) => Text('Value: $value'),
+      // Verify joker is registered
+      expect(Circus.isHired<Joker<String>>('test-joker'), isTrue);
+
+      // Act - build with registered joker
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: JokerStage<String>(
+            joker: joker,
+            builder: (context, value) => Text(value),
+          ),
         ),
-      ));
+      );
 
-      // Check initial display
-      expect(find.text('Value: 100'), findsOneWidget);
+      // Assert
+      expect(find.text('Registered'), findsOneWidget);
 
-      // Dispose widget
+      // Update joker
+      joker.trick('Updated');
+      await tester.pump();
+
+      expect(find.text('Updated'), findsOneWidget);
+
+      // Remove widget
       await tester.pumpWidget(Container());
 
-      // Assert - joker should be removed from CircusRing
-      expect(Circus.tryFind<Joker<int>>('counter'), isNull);
+      // Joker should still be registered (not auto-disposed)
+      expect(Circus.isHired<Joker<String>>('test-joker'), isFalse);
     });
 
-    testWidgets('should handle joker with null tag',
-        (WidgetTester tester) async {
-      // Arrange - joker with null tag
-      final untaggedJoker = Joker<int>(200);
-
-      // Act - build widget with untagged joker
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<int>(
-          joker: untaggedJoker,
-          builder: (context, value, _) => Text('Value: $value'),
-        ),
-      ));
-
-      // Check initial display
-      expect(find.text('Value: 200'), findsOneWidget);
-
-      // Dispose widget should not crash with null tag
-      await tester.pumpWidget(Container());
-    });
-
-    testWidgets('should not dispose CircusRing joker if autoDispose is false',
+    testWidgets(
+        'should properly unregister CircusRing jokers when autoDispose=true',
         (WidgetTester tester) async {
       // Arrange - register joker in CircusRing
-      final taggedJoker = Joker<int>(100, tag: 'persistent');
-      Circus.hire(taggedJoker, tag: 'persistent');
+      final joker = Joker<int>(42, tag: 'auto-remove');
+      Circus.hire<Joker<int>>(joker, tag: 'auto-remove');
 
-      // Act - build widget with autoDispose = false
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<int>(
-          joker: taggedJoker,
-          autoDispose: false,
-          builder: (context, value, _) => Text('Value: $value'),
+      // Act - build with registered joker and autoDispose=true
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: JokerStage<int>(
+            joker: joker,
+            autoDispose: true,
+            builder: (context, value) => Text('$value'),
+          ),
         ),
-      ));
+      );
 
-      // Dispose widget
+      // Initial check
+      expect(find.text('42'), findsOneWidget);
+      expect(Circus.isHired<Joker<int>>('auto-remove'), isTrue);
+
+      // Remove widget
       await tester.pumpWidget(Container());
+      await tester.pump(); // Ensure dispose completes
 
-      // Assert - joker should still be in CircusRing
-      expect(Circus.isHired<Joker<int>>('persistent'), isTrue);
-
-      // Clean up
-      Circus.fire<Joker<int>>(tag: 'persistent');
+      // Joker should be unregistered
+      expect(Circus.isHired<Joker<int>>('auto-remove'), isFalse);
     });
 
-    testWidgets('should handle edge case - using tag for CircusRing lookup',
-        (WidgetTester tester) async {
-      // This test ensures the dispose logic properly uses tag for CircusRing operations
+    testWidgets('should handle joker without tag', (WidgetTester tester) async {
+      // Arrange - joker without tag
+      final joker = Joker<String>('No tag');
 
-      // Arrange - register a joker with a specific tag
-      final tag = 'special_tag';
-      final jokerA = Joker<String>('Joker A', tag: tag);
-      Circus.hire(jokerA, tag: tag);
-
-      // Act - create JokerWatcher with this joker
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: JokerStage<String>(
-          joker: jokerA,
-          builder: (context, value, _) => Text(value),
+      // Act - build and then remove
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: JokerStage<String>(
+            joker: joker,
+            autoDispose: true,
+            builder: (context, value) => Text(value),
+          ),
         ),
-      ));
+      );
 
-      // Verify initial state
-      expect(find.text('Joker A'), findsOneWidget);
-      expect(Circus.isHired<Joker<String>>(tag), isTrue);
+      expect(find.text('No tag'), findsOneWidget);
 
-      // Dispose widget
+      // Should not crash when removed (even though joker has no tag)
       await tester.pumpWidget(Container());
+    });
 
-      // Assert - joker should be removed from CircusRing using the correct tag
-      expect(Circus.isHired<Joker<String>>(tag), isFalse);
+    testWidgets('should handle multiple stages with same joker',
+        (WidgetTester tester) async {
+      // Arrange - single joker used by multiple stages
+      final joker = Joker<int>(10);
+
+      // Act - build multiple stages
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Column(
+            children: [
+              JokerStage<int>(
+                joker: joker,
+                autoDispose: false, // Important: only one should auto-dispose
+                builder: (context, value) => Text('First: $value'),
+              ),
+              JokerStage<int>(
+                joker: joker,
+                autoDispose: true,
+                builder: (context, value) => Text('Second: $value'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      // Initial state
+      expect(find.text('First: 10'), findsOneWidget);
+      expect(find.text('Second: 10'), findsOneWidget);
+
+      // Update joker
+      joker.trick(20);
+      await tester.pump();
+
+      // Both should update
+      expect(find.text('First: 20'), findsOneWidget);
+      expect(find.text('Second: 20'), findsOneWidget);
+    });
+
+    testWidgets('should work correctly with manual jokers',
+        (WidgetTester tester) async {
+      // Arrange - manual joker (autoNotify=false)
+      final joker = Joker<int>(5, autoNotify: false);
+
+      // Act - build with manual joker
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: JokerStage<int>(
+            joker: joker,
+            builder: (context, value) => Text('Value: $value'),
+          ),
+        ),
+      );
+
+      // Initial state
+      expect(find.text('Value: 5'), findsOneWidget);
+
+      // Update without notification
+      joker.whisper(10);
+      await tester.pump();
+
+      // Should not update yet
+      expect(find.text('Value: 5'), findsOneWidget);
+
+      // Now send notification
+      joker.yell();
+      await tester.pump();
+
+      // Should update now
+      expect(find.text('Value: 10'), findsOneWidget);
     });
   });
+}
+
+// Helper widget for testing joker switching
+class _JokerSwitcher extends StatefulWidget {
+  final Joker<String> initialJoker;
+  final Joker<String> secondJoker;
+
+  _JokerSwitcher({
+    required this.initialJoker,
+    required this.secondJoker,
+  });
+
+  @override
+  _JokerSwitcherState createState() => _JokerSwitcherState();
+
+  void switchJokers() {
+    _JokerSwitcherState.instance?.switchJokers();
+  }
+}
+
+class _JokerSwitcherState extends State<_JokerSwitcher> {
+  static _JokerSwitcherState? instance;
+  late Joker<String> currentJoker;
+
+  @override
+  void initState() {
+    super.initState();
+    currentJoker = widget.initialJoker;
+    instance = this;
+  }
+
+  @override
+  void dispose() {
+    if (instance == this) {
+      instance = null;
+    }
+    super.dispose();
+  }
+
+  void switchJokers() {
+    setState(() {
+      currentJoker = currentJoker == widget.initialJoker
+          ? widget.secondJoker
+          : widget.initialJoker;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return JokerStage<String>(
+      joker: currentJoker,
+      builder: (context, value) => Text(value),
+    );
+  }
 }

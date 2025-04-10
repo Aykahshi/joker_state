@@ -2,70 +2,79 @@ import 'package:flutter/widgets.dart';
 
 import '../../di/circus_ring/circus_ring.dart';
 import '../joker/joker.dart';
-import '../joker/joker_trickx.dart';
 
-typedef JokerTroupeBuilder = Widget Function(
+typedef JokerTroupeBuilder<T> = Widget Function(
   BuildContext context,
-  List<dynamic> values,
-  Widget? child,
+  T values,
 );
 
-/// JokerGroup - A widget that listens to multiple JokerCards and rebuilds when any of them change
-class JokerTroupe extends StatefulWidget {
+typedef JokerTroupeConverter<T> = T Function(List values);
+
+/// JokerTroupe - Using Record to implement strong typing for Jokers
+class JokerTroupe<T extends Record> extends StatefulWidget {
+  /// Jokers
+  final List<Joker> jokers;
+
+  /// Converts a dynamic list of values to a strong type T
+  final JokerTroupeConverter converter;
+
+  /// Builder functions for building UI
+  final JokerTroupeBuilder<T> builder;
+
+  /// Whether to automatically release Joker when the component is destroyed
+  final bool autoDispose;
+
   const JokerTroupe({
     super.key,
     required this.jokers,
+    required this.converter,
     required this.builder,
     this.autoDispose = true,
-    this.child,
   });
 
-  final List<Joker> jokers;
-  final JokerTroupeBuilder builder;
-  final bool autoDispose;
-  final Widget? child;
-
   @override
-  _JokerTroupeState createState() => _JokerTroupeState();
+  _JokerTroupeState<T> createState() => _JokerTroupeState<T>();
 }
 
-class _JokerTroupeState extends State<JokerTroupe> {
+class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
+  /// Store all Joker values
   late List<dynamic> _values;
 
-  // Keep track of listener functions to correctly remove them
+  /// Store all Joker listeners
   final Map<Joker, VoidCallback> _listeners = {};
 
   @override
   void initState() {
     super.initState();
-    _values = List.from(widget.jokers.map((Joker card) => card.value));
+    _initValues();
     _addListeners();
+  }
+
+  void _initValues() {
+    _values = List.from(widget.jokers.map((joker) => joker.value));
   }
 
   void _addListeners() {
     for (int i = 0; i < widget.jokers.length; i++) {
-      final card = widget.jokers[i];
-      final int index = i; // Capture the current index
+      final joker = widget.jokers[i];
+      final index = i;
 
-      // Create and store the listener function
       final listener = () {
         if (mounted) {
           setState(() {
             if (index < _values.length) {
-              _values[index] = card.value;
+              _values[index] = joker.value;
             }
           });
         }
       };
 
-      // Store reference to the listener
-      _listeners[card] = listener;
-      card.addListener(listener);
+      _listeners[joker] = listener;
+      joker.addListener(listener);
     }
   }
 
   void _removeListeners() {
-    // Remove using the stored references
     for (final entry in _listeners.entries) {
       entry.key.removeListener(entry.value);
     }
@@ -73,47 +82,48 @@ class _JokerTroupeState extends State<JokerTroupe> {
   }
 
   @override
-  void didUpdateWidget(JokerTroupe oldWidget) {
+  void didUpdateWidget(JokerTroupe<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Check if the card list changed
     if (widget.jokers.length != oldWidget.jokers.length ||
-        !widget.jokers.every((card) => oldWidget.jokers.contains(card))) {
-      // Remove old listeners
+        !_areJokersEqual(widget.jokers, oldWidget.jokers)) {
       _removeListeners();
-
-      // Update values and add new listeners
-      _values = List.from(widget.jokers.map((card) => card.value));
+      _initValues();
       _addListeners();
     }
+  }
+
+  bool _areJokersEqual(List<Joker> list1, List<Joker> list2) {
+    if (list1.length != list2.length) return false;
+    for (int i = 0; i < list1.length; i++) {
+      if (list1[i] != list2[i]) return false;
+    }
+    return true;
   }
 
   @override
   void dispose() {
     _removeListeners();
 
-    // Handle auto disposal if needed
     if (widget.autoDispose) {
-      for (final card in widget.jokers) {
-        final tag = card.tag;
+      for (final joker in widget.jokers) {
+        final tag = joker.tag;
         if (tag != null && tag.isNotEmpty) {
-          final joker = Circus.trySpotlight(tag: tag);
-          if (joker == null) {
-            card.dispose();
-          } else {
-            Circus.vanish(tag: tag);
+          // If cannot fireByTag, dispose it
+          if (!Circus.fireByTag(tag)) {
+            joker.dispose();
           }
         } else {
-          card.dispose();
+          joker.dispose();
         }
       }
     }
-
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return widget.builder(context, _values, widget.child);
+    final typedValues = widget.converter(_values);
+    return widget.builder(context, typedValues);
   }
 }
