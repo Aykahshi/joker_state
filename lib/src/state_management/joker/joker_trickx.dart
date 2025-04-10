@@ -4,8 +4,16 @@ import '../joker_stage/joker_stage.dart';
 import '../joker_troupe/joker_troupe.dart';
 import 'joker.dart';
 
+/// Extension for Joker to easily create a JokerStage widget
+///
+/// Provides a more fluent, builder-like API for creating JokerStage widgets
 extension JokerStageExtension<T> on Joker<T> {
-  /// Creates a JokerStage that watch the Joker changes
+  /// Creates a JokerStage that watches the Joker changes
+  ///
+  /// [builder]: Function that builds UI based on the current Joker value
+  /// [autoDispose]: Whether to automatically dispose the Joker when the widget is disposed
+  ///
+  /// Returns a JokerStage widget that rebuilds when this Joker's value changes
   JokerStage<T> perform(
     JokerStageBuilder<T> builder, {
     bool autoDispose = true,
@@ -18,8 +26,17 @@ extension JokerStageExtension<T> on Joker<T> {
   }
 }
 
-/// extension methods for cleaner usage
+/// Extension for List<Joker> to easily create a JokerTroupe widget
+///
+/// Provides a more fluent, builder-like API for creating JokerTroupe widgets
 extension JokerTroupeExtension on List<Joker> {
+  /// Creates a JokerTroupe that watches multiple Jokers and combines their values
+  ///
+  /// [converter]: Function that converts raw Joker values to a Record type T
+  /// [builder]: Function that builds UI based on the combined Record value
+  /// [autoDispose]: Whether to automatically dispose Jokers when the widget is disposed
+  ///
+  /// Returns a JokerTroupe widget that rebuilds when any of the Jokers' values change
   JokerTroupe<T> assemble<T extends Record>({
     required JokerTroupeConverter<T> converter,
     required JokerTroupeBuilder<T> builder,
@@ -34,17 +51,24 @@ extension JokerTroupeExtension on List<Joker> {
   }
 }
 
-/// Extension to get Jokers from CircusRing with auto-disposal
-/// Tag is required to avoid conflicts if multiple cards are registered
+/// Extension to integrate Jokers with the CircusRing dependency injection system
+///
+/// Provides methods to create, retrieve, and dispose of Jokers through CircusRing
 extension JokerRingExtension on CircusRing {
-  /// Summon a autoNotify Joker to the CircusRing
+  /// Creates and registers a new auto-notify Joker in the CircusRing
+  ///
+  /// [initialValue]: Starting value for the Joker
+  /// [tag]: Unique identifier for this Joker (required)
+  ///
+  /// Returns the created Joker instance
+  /// Throws [CircusRingException] if tag is empty
   Joker<T> summon<T>(
     T initialValue, {
     required String tag,
   }) {
     if (tag.isEmpty) {
       throw CircusRingException(
-        'To avoid conflicts, Jokers must be registered with a unique tag.'
+        'To avoid conflicts, Jokers must be registered with a unique tag. '
         'Use: Circus.summon<T>(tag: "unique_tag")',
       );
     }
@@ -53,14 +77,20 @@ extension JokerRingExtension on CircusRing {
     return joker;
   }
 
-  /// Register a Joker with manual notifications
+  /// Creates and registers a manually-notifying Joker in the CircusRing
+  ///
+  /// [initialValue]: Starting value for the Joker
+  /// [tag]: Unique identifier for this Joker (required)
+  ///
+  /// Returns the created Joker instance
+  /// Throws [CircusRingException] if tag is empty
   Joker<T> recruit<T>(
     T initialValue, {
     required String tag,
   }) {
     if (tag.isEmpty) {
       throw CircusRingException(
-        'To avoid conflicts, Jokers must be registered with a unique tag.'
+        'To avoid conflicts, Jokers must be registered with a unique tag. '
         'Use: Circus.recruit<T>(tag: "unique_tag")',
       );
     }
@@ -69,24 +99,40 @@ extension JokerRingExtension on CircusRing {
     return joker;
   }
 
-  /// Spotlight a Joker from the CircusRing
+  /// Retrieves a registered Joker from the CircusRing
+  ///
+  /// [tag]: Unique identifier for the Joker to retrieve
+  ///
+  /// Returns the Joker instance if found
+  /// Throws [CircusRingException] if tag is empty or Joker not found
   Joker<T> spotlight<T>({required String tag}) {
     if (tag.isEmpty) {
-      throw CircusRingException('All Jokers be registered with a unique tag.'
+      throw CircusRingException(
+          'All Jokers must be registered with a unique tag. '
           'Please add tag to spotlight a Joker.');
     }
     return find<Joker<T>>(tag);
   }
 
-  /// Try Spotlight a Joker (nullable)
+  /// Attempts to retrieve a registered Joker from the CircusRing
+  ///
+  /// [tag]: Unique identifier for the Joker to retrieve
+  ///
+  /// Returns the Joker instance if found, or null if not found
   Joker<T>? trySpotlight<T>({required String tag}) {
     return tryFind<Joker<T>>(tag);
   }
 
-  /// Vanish a Joker from the CircusRing
+  /// Removes and disposes a registered Joker from the CircusRing
+  ///
+  /// [tag]: Unique identifier for the Joker to remove
+  ///
+  /// Returns true if the Joker was found and removed, false otherwise
+  /// Throws [CircusRingException] if tag is empty
   bool vanish<T>({required String tag}) {
     if (tag.isEmpty) {
-      throw CircusRingException('All Jokers be registered with a unique tag.'
+      throw CircusRingException(
+          'All Jokers must be registered with a unique tag. '
           'Please add tag to vanish a Joker.');
     }
     return fire<Joker<T>>(tag: tag);
