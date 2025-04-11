@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../di/circus_ring/src/circus_ring.dart';
 import '../../di/circus_ring/src/circus_ring_exception.dart';
 import '../joker_stage/joker_stage.dart';
@@ -14,11 +16,13 @@ extension JokerStageExtension<T> on Joker<T> {
   /// [autoDispose]: Whether to automatically dispose the Joker when the widget is disposed
   ///
   /// Returns a JokerStage widget that rebuilds when this Joker's value changes
-  JokerStage<T> perform(
-    JokerStageBuilder<T> builder, {
+  JokerStage<T> perform({
+    Key? key,
+    required JokerStageBuilder<T> builder,
     bool autoDispose = true,
   }) {
     return JokerStage<T>(
+      key: key,
       joker: this,
       builder: builder,
       autoDispose: autoDispose,
@@ -38,11 +42,13 @@ extension JokerTroupeExtension on List<Joker> {
   ///
   /// Returns a JokerTroupe widget that rebuilds when any of the Jokers' values change
   JokerTroupe<T> assemble<T extends Record>({
+    Key? key,
     required JokerTroupeConverter<T> converter,
     required JokerTroupeBuilder<T> builder,
     bool autoDispose = true,
   }) {
     return JokerTroupe<T>(
+      key: key,
       jokers: this,
       converter: converter,
       builder: builder,

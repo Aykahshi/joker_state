@@ -16,7 +16,7 @@ void main() {
       int? handValue;
 
       // Act
-      final stage = joker.perform((context, value) {
+      final stage = joker.perform(builder: (context, value) {
         handBuilderCalled = true;
         handValue = value;
         return Text('$value');
@@ -52,7 +52,7 @@ void main() {
 
       // Act - create stage with autoDispose = false
       final stage = joker.perform(
-        (context, value) => Text('$value'),
+        builder: (context, value) => Text('$value'),
         autoDispose: false,
       );
 
