@@ -73,6 +73,96 @@ void main() {
     });
   });
 
+  group('JokerFrame Extension', () {
+    testWidgets('observe() should create a JokerFrame with selected value',
+        (WidgetTester tester) async {
+      // Arrange
+      final joker = Joker<Map<String, dynamic>>({'count': 0});
+      bool builderCalled = false;
+      int? observedValue;
+
+      // Act
+      final widget = joker.observe<int>(
+        selector: (state) => state['count'] as int,
+        builder: (context, count) {
+          builderCalled = true;
+          observedValue = count;
+          return Text('Count: $count');
+        },
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: widget,
+          ),
+        ),
+      );
+
+      // Assert
+      expect(builderCalled, isTrue);
+      expect(observedValue, 0);
+      expect(find.text('Count: 0'), findsOneWidget);
+
+      // Reactivity test (change tracked value)
+      joker.trick({'count': 1});
+      await tester.pump();
+      expect(find.text('Count: 1'), findsOneWidget);
+    });
+
+    testWidgets('observe() should only rebuild on relevant value change',
+        (WidgetTester tester) async {
+      final joker = Joker<Map<String, dynamic>>({'name': 'Alice', 'age': 20});
+      int buildCount = 0;
+
+      final widget = joker.observe<String>(
+        selector: (state) => state['name'] as String,
+        builder: (context, name) {
+          buildCount++;
+          return Text('Name: $name');
+        },
+      );
+
+      await tester.pumpWidget(MaterialApp(home: widget));
+
+      expect(find.text('Name: Alice'), findsOneWidget);
+      expect(buildCount, equals(1));
+
+      // Change unrelated field
+      joker.trick({'name': 'Alice', 'age': 21});
+      await tester.pump();
+
+      // Should not rebuild
+      expect(buildCount, equals(1));
+
+      // Now change tracked field
+      joker.trick({'name': 'Bob', 'age': 21});
+      await tester.pump();
+
+      expect(find.text('Name: Bob'), findsOneWidget);
+      expect(buildCount, equals(2));
+    });
+
+    testWidgets('observe() should respect autoDispose parameter',
+        (WidgetTester tester) async {
+      final joker = _DisposableTracker<Map<String, dynamic>>({'key': 'value'});
+
+      final widget = joker.observe<String>(
+        selector: (state) => state['key'] as String,
+        builder: (context, value) => Text(value),
+        autoDispose: true,
+      );
+
+      await tester.pumpWidget(MaterialApp(home: widget));
+      expect(joker.isDisposed, isFalse);
+
+      await tester.pumpWidget(Container());
+      await tester.pump();
+
+      expect(joker.isDisposed, isTrue);
+    });
+  });
+
   group('JokerTroupeExtension', () {
     testWidgets(
         'assemble() should create a JokerTroupe with proper Record type',
@@ -141,8 +231,8 @@ void main() {
     testWidgets('assemble() should respect autoDispose parameter',
         (WidgetTester tester) async {
       // Arrange
-      final joker1 = DisposableTracker<int>(10);
-      final joker2 = DisposableTracker<String>('test');
+      final joker1 = _DisposableTracker<int>(10);
+      final joker2 = _DisposableTracker<String>('test');
       final jokers = [joker1, joker2];
 
       // Act - Create JokerTroupe with autoDispose = true
@@ -182,12 +272,12 @@ void main() {
       final jokers = [joker1, joker2, joker3];
 
       // Act - Use with complex Record type
-      final troupe = jokers.assemble<(int, String, User)>(
+      final troupe = jokers.assemble<(int, String, _User)>(
         converter: (values) {
           return (
             values[0] as int,
             values[1] as String,
-            User.fromJson(values[2] as Map<String, dynamic>),
+            _User.fromJson(values[2] as Map<String, dynamic>),
           );
         },
         builder: (context, values) {
@@ -377,30 +467,30 @@ void main() {
   });
 }
 
-class User {
+class _User {
   final String name;
   final int age;
 
-  User(this.name, this.age);
+  _User(this.name, this.age);
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is User &&
+      other is _User &&
           runtimeType == other.runtimeType &&
           name == other.name &&
           age == other.age;
 
-  static User fromJson(Map<String, dynamic> json) {
-    return User(json['name'], json['age']);
+  static _User fromJson(Map<String, dynamic> json) {
+    return _User(json['name'], json['age']);
   }
 }
 
 // Helper Tracker to tracking dispose calls
-class DisposableTracker<T> extends Joker<T> {
+class _DisposableTracker<T> extends Joker<T> {
   bool isDisposed = false;
 
-  DisposableTracker(T initialValue, {String? tag})
+  _DisposableTracker(T initialValue, {String? tag})
       : super(initialValue, tag: tag);
 
   @override

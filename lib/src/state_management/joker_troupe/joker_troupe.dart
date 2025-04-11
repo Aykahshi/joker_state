@@ -1,175 +1,67 @@
 import 'package:flutter/widgets.dart';
 
-import '../../di/circus_ring/circus_ring.dart';
+import '../../di/circus_ring/src/circus_ring.dart';
 import '../joker/joker.dart';
 
-/// Builder function for JokerTroupe
+/// Builder function for [JokerTroupe].
 ///
-/// Takes a BuildContext and the strongly typed record states, and returns a Widget
+/// Provides access to the strongly typed state from multiple [Joker]s after conversion.
+///
+/// This function is called every time any Joker's state changes.
 typedef JokerTroupeBuilder<T> = Widget Function(
   BuildContext context,
   T states,
 );
 
-/// Converter function for JokerTroupe
+/// Converter function for [JokerTroupe].
 ///
-/// Takes a list of dynamic states and converts them to a strongly typed record
+/// Receives raw states (a dynamic List of values from [Joker]) and maps
+/// it to a strongly typed Dart [Record].
 typedef JokerTroupeConverter<T> = T Function(List states);
 
-/// JokerTroupe - A widget that observes multiple Joker instances with strong typing
+/// JokerTroupe - Combines multiple [Joker]s using Dart Records into a single widget.
 ///
-/// Uses Dart Records to provide type-safe access to multiple reactive states.
-/// This widget automatically rebuilds when any of the observed Jokers change.
-
-/// JokerTroupe is a widget that observes multiple Jokers and combines their states
-/// using Dart Records for type safety
+/// This widget listens to any number of [Joker]s, and rebuilds whenever any of them
+/// updates. All Joker states are passed to a [converter] that transforms a List<dynamic>
+/// into a strongly-typed Dart record T, enabling safe and expressive UI updates.
 ///
-/// Usage examples:
+/// This is a powerful way to bind multiple reactive states into a single widget tree.
 ///
-/// Basic usage:
+/// {@tool dart}
+/// Example usage:
+///
 /// ```dart
-/// // Create multiple Jokers
-/// final nameJoker = Joker<String>('John');
-/// final ageJoker = Joker<int>(30);
-/// final activeJoker = Joker<bool>(true);
+/// final nameJoker = Joker<String>('Alice');
+/// final ageJoker = Joker<int>(22);
+/// final isActiveJoker = Joker<bool>(true);
 ///
-/// // Define a record type for type-safe access
-/// typedef UserRecord = (String name, int age, bool active);
+/// typedef UserData = (String name, int age, bool active);
 ///
-/// // Use JokerTroupe to combine multiple Jokers
-/// @override
-/// Widget build(BuildContext context) {
-///   return JokerTroupe<UserRecord>(
-///     jokers: [nameJoker, ageJoker, activeJoker],
-///     converter: (states) => (states[0], states[1], states[2]),
-///     builder: (context, record) {
-///       final (name, age, active) = record;
-///       return Card(
-///         child: ListTile(
-///           title: Text(name),
-///           subtitle: Text('Age: $age'),
-///           trailing: active ? Icon(Icons.check) : Icon(Icons.close),
-///         ),
-///       );
-///     },
-///   );
-/// }
-///
-/// // Later, update any of the Jokers
-/// nameJoker.trick('Jane');
-/// ageJoker.trick(31);
-/// // JokerTroupe will automatically rebuild
+/// JokerTroupe<UserData>(
+///   jokers: [nameJoker, ageJoker, isActiveJoker],
+///   converter: (values) => (values[0] as String, values[1] as int, values[2] as bool),
+///   builder: (context, user) {
+///     final (name, age, active) = user;
+///     return Column(
+///       children: [
+///         Text('Name: $name'),
+///         Text('Age: $age'),
+///         Icon(active ? Icons.check : Icons.close),
+///       ],
+///     );
+///   },
+/// );
 /// ```
-///
-/// Using extension method:
-/// ```dart
-/// // Create multiple Jokers
-/// final nameJoker = Joker<String>('John');
-/// final ageJoker = Joker<int>(30);
-/// final activeJoker = Joker<bool>(true);
-///
-/// // Define a record type
-/// typedef UserRecord = (String name, int age, bool active);
-///
-/// // Use the assemble extension for a cleaner API
-/// @override
-/// Widget build(BuildContext context) {
-///   return [nameJoker, ageJoker, activeJoker].assemble<UserRecord>(
-///     converter: (states) => (states[0], states[1], states[2]),
-///     builder: (context, record) {
-///       final (name, age, active) = record;
-///       return Card(
-///         child: ListTile(
-///           title: Text(name),
-///           subtitle: Text('Age: $age'),
-///           trailing: active ? Icon(Icons.check) : Icon(Icons.close),
-///         ),
-///       );
-///     },
-///   );
-/// }
-/// ```
-///
-/// With CircusRing integration:
-/// ```dart
-/// // In a setup or initialization method
-/// Circus.summon<String>('John', tag: 'userName');
-/// Circus.summon<int>(30, tag: 'userAge');
-/// Circus.summon<bool>(true, tag: 'userActive');
-///
-/// // In a widget build method
-/// @override
-/// Widget build(BuildContext context) {
-///   final nameJoker = Circus.spotlight<String>(tag: 'userName');
-///   final ageJoker = Circus.spotlight<int>(tag: 'userAge');
-///   final activeJoker = Circus.spotlight<bool>(tag: 'userActive');
-///
-///   typedef UserRecord = (String name, int age, bool active);
-///
-///   return [name, age, active].assemble<UserRecord>(
-///     converter: (states) => (states[0], states[1], states[2]),
-///     builder: (context, record) {
-///       final (name, age, active) = record;
-///       return Card(
-///         child: Column(
-///           children: [
-///             ListTile(
-///               title: Text(name),
-///               subtitle: Text('Age: $age'),
-///               trailing: active ? Icon(Icons.check) : Icon(Icons.close),
-///             ),
-///             Row(
-///               children: [
-///                 TextButton(
-///                   onPressed: () => nameJoker.trick('Jane'),
-///                   child: Text('Change Name'),
-///                 ),
-///                 TextButton(
-///                   onPressed: () => ageJoker.trick(age + 1),
-///                   child: Text('Increment Age'),
-///                 ),
-///                 TextButton(
-///                   onPressed: () => activeJoker.trick(!active),
-///                   child: Text('Toggle Active'),
-///                 ),
-///               ],
-///             ),
-///           ],
-///         ),
-///       );
-///     },
-///   );
-/// }
-/// ```
-
+/// {@end-tool}
 class JokerTroupe<T extends Record> extends StatefulWidget {
-  /// The list of Joker instances to observe
-  final List<Joker> jokers;
-
-  /// Function that converts raw Joker states to a strongly typed Record
+  /// Creates a [JokerTroupe] widget from multiple Jokers.
   ///
-  /// This converter transforms the raw states into the specified record type T,
-  /// allowing for type-safe access in the builder function
-  final JokerTroupeConverter converter;
-
-  /// UI builder function that receives the strongly typed states
+  /// The [jokers] list provides the reactive state sources.
+  /// The [converter] maps the dynamic state list into a [Record] of type T.
+  /// The [builder] uses the converted record to build the UI.
   ///
-  /// Called whenever any of the Joker states change, providing the latest
-  /// states in a strongly typed Record T
-  final JokerTroupeBuilder<T> builder;
-
-  /// Whether to automatically dispose Jokers when the widget is removed
-  ///
-  /// When true, all Joker instances will be disposed of when this widget
-  /// is removed from the widget tree
-  final bool autoDispose;
-
-  /// Creates a JokerTroupe widget
-  ///
-  /// [jokers]: List of Joker instances to observe
-  /// [converter]: Function to convert raw states to Record type T
-  /// [builder]: UI builder function called when states change
-  /// [autoDispose]: Whether to dispose Jokers when widget is disposed
+  /// If [autoDispose] is true (default), all [Joker]s will be disposed or
+  /// removed from [CircusRing] upon widget destruction.
   const JokerTroupe({
     super.key,
     required this.jokers,
@@ -178,16 +70,41 @@ class JokerTroupe<T extends Record> extends StatefulWidget {
     this.autoDispose = true,
   });
 
+  /// The list of [Joker]s to observe for changes.
+  ///
+  /// This can contain different types, as long as your [converter]
+  /// maps them correctly into a strongly-typed record.
+  final List<Joker> jokers;
+
+  /// Converts the raw, unordered dynamic list of values from [jokers]
+  /// into a Typed [Record] T.
+  ///
+  /// This is required to ensure consistency and to cast from dynamic to Record.
+  final JokerTroupeConverter<T> converter;
+
+  /// Builder function that rebuilds when any of the Joker states change.
+  ///
+  /// The converted record T is passed for safe access.
+  final JokerTroupeBuilder<T> builder;
+
+  /// Automatically disposes all [Joker]s when the widget is removed.
+  ///
+  /// If a [Joker] was registered with a tag (via Circus), this will attempt
+  /// to "vanish" it by tag. If not registered or unmatched, it will be disposed manually.
+  final bool autoDispose;
+
   @override
   _JokerTroupeState<T> createState() => _JokerTroupeState<T>();
 }
 
-/// State for JokerTroupe widget
+/// Internal state of [JokerTroupe].
+///
+/// Responsible for managing state snapshots and listener cleanup.
 class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
-  /// Stores the current states of all observed Jokers
+  /// Current snapshot of all Joker states.
   late List<dynamic> _states;
 
-  /// Maps each Joker to its listener callback for clean removal
+  /// Maps each Joker to its bound listener — used for cleanup.
   final Map<Joker, VoidCallback> _listeners = {};
 
   @override
@@ -197,16 +114,17 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
     _addListeners();
   }
 
-  /// Initialize the states list with current Joker states
+  /// Initializes [_states] from current joker values.
   void _initStates() {
     _states = List.from(widget.jokers.map((joker) => joker.state));
   }
 
-  /// Add listeners to all Jokers
+  /// Adds listeners to all [Joker]s so we can detect changes and rebuild.
   void _addListeners() {
     for (int i = 0; i < widget.jokers.length; i++) {
       final joker = widget.jokers[i];
       final index = i;
+
       final listener = () {
         if (mounted) {
           setState(() {
@@ -216,12 +134,13 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
           });
         }
       };
+
       _listeners[joker] = listener;
       joker.addListener(listener);
     }
   }
 
-  /// Remove all listeners from Jokers
+  /// Clean removal of all registered listeners.
   void _removeListeners() {
     for (final entry in _listeners.entries) {
       entry.key.removeListener(entry.value);
@@ -233,7 +152,7 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
   void didUpdateWidget(JokerTroupe<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // If the Jokers list changed, update listeners and states
+    // If the list of jokers changed, refresh listeners and state snapshots
     if (widget.jokers.length != oldWidget.jokers.length ||
         !_areJokersEqual(widget.jokers, oldWidget.jokers)) {
       _removeListeners();
@@ -242,14 +161,11 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
     }
   }
 
-  /// Compare two lists of Jokers for equality
+  /// Shallow equality check between two Joker lists.
   bool _areJokersEqual(List<Joker> list1, List<Joker> list2) {
-    if (list1.length != list2.length) return false;
-
     for (int i = 0; i < list1.length; i++) {
       if (list1[i] != list2[i]) return false;
     }
-
     return true;
   }
 
@@ -257,18 +173,15 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
   void dispose() {
     _removeListeners();
 
-    // Clean up Jokers if autoDispose is enabled
     if (widget.autoDispose) {
       for (final joker in widget.jokers) {
         final tag = joker.tag;
         if (tag != null && tag.isNotEmpty) {
-          // Try to remove from CircusRing if it has a tag
-          // If cannot fireByTag, dispose it directly
-          if (!Circus.fireByTag(tag)) {
+          final removed = Circus.fireByTag(tag);
+          if (!removed) {
             joker.dispose();
           }
         } else {
-          // No tag, just dispose directly
           joker.dispose();
         }
       }
@@ -279,7 +192,6 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
 
   @override
   Widget build(BuildContext context) {
-    // Convert raw states to typed record and pass to builder
     final typedStates = widget.converter(_states);
     return widget.builder(context, typedStates);
   }

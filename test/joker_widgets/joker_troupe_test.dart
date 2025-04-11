@@ -129,8 +129,8 @@ void main() {
     testWidgets('should dispose jokers when autoDispose is true',
         (WidgetTester tester) async {
       // Arrange - Using DisposableTracker to tracking dispose calls
-      final joker1 = DisposableTracker<int>(1);
-      final joker2 = DisposableTracker<String>('test');
+      final joker1 = _DisposableTracker<int>(1);
+      final joker2 = _DisposableTracker<String>('test');
 
       // Act - build and then remove widget
       await tester.pumpWidget(
@@ -156,8 +156,8 @@ void main() {
     testWidgets('should not dispose jokers when autoDispose is false',
         (WidgetTester tester) async {
       // Arrange - Using DisposableTracker to tracking dispose calls
-      final joker1 = DisposableTracker<int>(1);
-      final joker2 = DisposableTracker<String>('test');
+      final joker1 = _DisposableTracker<int>(1);
+      final joker2 = _DisposableTracker<String>('test');
 
       // Act - build and then remove widget
       await tester.pumpWidget(
@@ -194,7 +194,7 @@ void main() {
       final joker2 = Joker<String>('test');
 
       // Create a stateful controller widget
-      final controller = JokerSwapController(
+      final controller = _JokerSwapController(
         initialJokers: [joker1, joker2],
       );
 
@@ -313,10 +313,10 @@ void main() {
 }
 
 // Helper Tracker to tracking dispose calls
-class DisposableTracker<T> extends Joker<T> {
+class _DisposableTracker<T> extends Joker<T> {
   bool isDisposed = false;
 
-  DisposableTracker(T initialValue, {String? tag})
+  _DisposableTracker(T initialValue, {String? tag})
       : super(initialValue, tag: tag);
 
   @override
@@ -327,17 +327,17 @@ class DisposableTracker<T> extends Joker<T> {
 }
 
 // Helper widget for testing joker list changes with a GlobalKey
-class JokerSwapController extends StatefulWidget {
+class _JokerSwapController extends StatefulWidget {
   final List<Joker> initialJokers;
-  final JokerSwapControllerState state = JokerSwapControllerState();
+  final _JokerSwapControllerState state = _JokerSwapControllerState();
 
-  JokerSwapController({required this.initialJokers});
+  _JokerSwapController({required this.initialJokers});
 
   @override
-  JokerSwapControllerState createState() => state;
+  _JokerSwapControllerState createState() => state;
 }
 
-class JokerSwapControllerState extends State<JokerSwapController> {
+class _JokerSwapControllerState extends State<_JokerSwapController> {
   late List<Joker> _jokers;
 
   @override

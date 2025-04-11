@@ -1,21 +1,36 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../di/circus_ring/src/circus_ring.dart';
 import '../../di/circus_ring/src/circus_ring_exception.dart';
+import '../joker_frame/joker_frame.dart';
 import '../joker_stage/joker_stage.dart';
 import '../joker_troupe/joker_troupe.dart';
 import 'joker.dart';
 
-/// Extension for Joker to easily create a JokerStage widget
+/// Extension for Joker to easily create a [JokerStage] widget.
 ///
-/// Provides a more fluent, builder-like API for creating JokerStage widgets
+/// Provides a more fluent, builder-like API for creating [JokerStage]s
+/// without explicitly wrapping it in widget constructors.
+///
+/// This is ideal when you want the entire Joker state to trigger the rebuild.
+///
+/// Example:
+/// ```dart
+/// final counter = Joker<int>(0);
+///
+/// // Wrap with perform
+/// counter.perform(
+///   builder: (context, count) => Text('$count'),
+/// );
+/// ```
 extension JokerStageExtension<T> on Joker<T> {
-  /// Creates a JokerStage that watches the Joker changes
+  /// Creates a [JokerStage] that watches the entire state changes of this Joker.
   ///
-  /// [builder]: Function that builds UI based on the current Joker value
-  /// [autoDispose]: Whether to automatically dispose the Joker when the widget is disposed
+  /// The [builder] will be rebuilt whenever this Joker calls notifyListeners().
   ///
-  /// Returns a JokerStage widget that rebuilds when this Joker's value changes
+  /// [autoDispose]: Whether to automatically remove/dispose the Joker when the widget is removed.
+  ///
+  /// Returns a [JokerStage] widget.
   JokerStage<T> perform({
     Key? key,
     required JokerStageBuilder<T> builder,
@@ -30,17 +45,78 @@ extension JokerStageExtension<T> on Joker<T> {
   }
 }
 
-/// Extension for List<Joker> to easily create a JokerTroupe widget
+/// Extension for Joker to easily create a [JokerFrame] widget.
 ///
-/// Provides a more fluent, builder-like API for creating JokerTroupe widgets
+/// Similar to [perform], but allows selective listening using a [selector]
+/// function. Only when the selector's return value changes (`==` comparison)
+/// will the widget rebuild.
+///
+/// Useful for optimizing UI updates.
+///
+/// Example:
+/// ```dart
+/// final userJoker = Joker<User>(User(name: 'Alice', age: 20));
+///
+/// userJoker.observe<String>(
+///   selector: (user) => user.name,
+///   builder: (context, name) => Text('Hi $name'),
+/// );
+/// ```
+extension JokerFrameExtension<T> on Joker<T> {
+  /// Creates a [JokerFrame] that observes a selected portion of the Joker state.
+  ///
+  /// [selector]: Function to extract the slice of state to observe.
+  /// [builder]: Function called when the selected value changes.
+  /// [autoDispose]: Whether to automatically dispose the Joker when removed.
+  ///
+  /// Returns a [JokerFrame] widget that only rebuilds when selector result changes.
+  JokerFrame<T, S> observe<S>({
+    Key? key,
+    required JokerFrameSelector<T, S> selector,
+    required JokerFrameBuilder<S> builder,
+    bool autoDispose = true,
+  }) {
+    return JokerFrame<T, S>(
+      key: key,
+      joker: this,
+      selector: selector,
+      builder: builder,
+      autoDispose: autoDispose,
+    );
+  }
+}
+
+/// Extension for List<Joker> to quickly create a [JokerTroupe] widget.
+///
+/// Allows merging multiple Jokers into a single Record via [converter] and
+/// building UI accordingly.
+///
+/// This encourages strong-typed scoped state selection using Dart Records.
+///
+/// Example:
+/// ```dart
+/// final name = Joker<String>('Alice');
+/// final age = Joker<int>(20);
+/// final active = Joker<bool>(true);
+///
+/// typedef UserRecord = (String, int, bool);
+///
+/// [name, age, active].assemble<UserRecord>(
+///   converter: (values) => (values[0], values[1], values[2]),
+///   builder: (context, user) {
+///     final (name, age, active) = user;
+///     return Text('$name | $age | $active');
+///   },
+/// );
+/// ```
 extension JokerTroupeExtension on List<Joker> {
-  /// Creates a JokerTroupe that watches multiple Jokers and combines their values
+  /// Creates a [JokerTroupe] widget from this list of Jokers.
   ///
-  /// [converter]: Function that converts raw Joker values to a Record type T
-  /// [builder]: Function that builds UI based on the combined Record value
-  /// [autoDispose]: Whether to automatically dispose Jokers when the widget is disposed
+  /// [converter]: Maps the dynamic list of Joker values into a Dart Record of type [T].
+  /// [builder]: Receives the typed [T] and builds a widget based on combined state.
+  /// [autoDispose]: Whether to automatically dispose Jokers on widget removal.
   ///
-  /// Returns a JokerTroupe widget that rebuilds when any of the Jokers' values change
+  /// Returns a [JokerTroupe] widget.
   JokerTroupe<T> assemble<T extends Record>({
     Key? key,
     required JokerTroupeConverter<T> converter,
@@ -57,90 +133,100 @@ extension JokerTroupeExtension on List<Joker> {
   }
 }
 
-/// Extension to integrate Jokers with the CircusRing dependency injection system
+/// Extension methods to integrate Jokers with [CircusRing] for dependency injection.
 ///
-/// Provides methods to create, retrieve, and dispose of Jokers through CircusRing
+/// Provides easy summon/recruit/spotlight/vanish operation for Jokers
+/// using tags (string keys) registered within the global CircusRing.
+///
+/// This design allows runtime Joker registration and central management without
+/// passing around instances manually.
+///
+/// Example:
+/// ```dart
+/// Circus.summon<int>(0, tag: 'counter');
+/// final counter = Circus.spotlight<int>(tag: 'counter');
+/// counter.trick(1);
+/// ```
 extension JokerRingExtension on CircusRing {
-  /// Creates and registers a new auto-notify Joker in the CircusRing
+  /// Registers a new auto-notify Joker in the [CircusRing].
   ///
-  /// [initialValue]: Starting value for the Joker
-  /// [tag]: Unique identifier for this Joker (required)
+  /// [initialValue]: Starting value for the Joker.
+  /// [tag]: Globally unique tag used to identify this Joker.
   ///
-  /// Returns the created Joker instance
-  /// Throws [CircusRingException] if tag is empty
+  /// Throws [CircusRingException] if the tag is empty.
   Joker<T> summon<T>(
     T initialValue, {
     required String tag,
   }) {
     if (tag.isEmpty) {
       throw CircusRingException(
-        'To avoid conflicts, Jokers must be registered with a unique tag. '
-        'Use: Circus.summon<T>(tag: "unique_tag")',
+        'To avoid conflicts, Jokers must be registered with a unique tag.\n'
+        'Use: Circus.summon<T>(tag: "your_unique_tag")',
       );
     }
+
     final joker = Joker<T>(initialValue);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
   }
 
-  /// Creates and registers a manually-notifying Joker in the CircusRing
+  /// Registers a manual Joker (non-autoNotify) into the [CircusRing].
   ///
-  /// [initialValue]: Starting value for the Joker
-  /// [tag]: Unique identifier for this Joker (required)
+  /// Same as [summon] but requires manual [yell()] to trigger listeners.
   ///
-  /// Returns the created Joker instance
-  /// Throws [CircusRingException] if tag is empty
+  /// Throws [CircusRingException] if the tag is empty.
   Joker<T> recruit<T>(
     T initialValue, {
     required String tag,
   }) {
     if (tag.isEmpty) {
       throw CircusRingException(
-        'To avoid conflicts, Jokers must be registered with a unique tag. '
-        'Use: Circus.recruit<T>(tag: "unique_tag")',
+        'To avoid conflicts, Jokers must be registered with a unique tag.\n'
+        'Use: Circus.recruit<T>(tag: "your_unique_tag")',
       );
     }
+
     final joker = Joker<T>(initialValue, autoNotify: false);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
   }
 
-  /// Retrieves a registered Joker from the CircusRing
+  /// Finds a registered Joker by [tag] from [CircusRing].
   ///
-  /// [tag]: Unique identifier for the Joker to retrieve
+  /// [tag]: Unique identifier used when [summon] or [recruit] was called.
   ///
-  /// Returns the Joker instance if found
-  /// Throws [CircusRingException] if tag is empty or Joker not found
+  /// Throws [CircusRingException] if Joker not found or tag is empty.
   Joker<T> spotlight<T>({required String tag}) {
     if (tag.isEmpty) {
       throw CircusRingException(
-          'All Jokers must be registered with a unique tag. '
-          'Please add tag to spotlight a Joker.');
+        'All Jokers must be registered with a unique tag.\n'
+        'Please provide tag when calling Circus.spotlight<T>(tag: "...")',
+      );
     }
+
     return find<Joker<T>>(tag);
   }
 
-  /// Attempts to retrieve a registered Joker from the CircusRing
+  /// Tries to find a registered Joker safely by [tag].
   ///
-  /// [tag]: Unique identifier for the Joker to retrieve
-  ///
-  /// Returns the Joker instance if found, or null if not found
+  /// Returns null if not found instead of throwing exception.
   Joker<T>? trySpotlight<T>({required String tag}) {
     return tryFind<Joker<T>>(tag);
   }
 
-  /// Removes and disposes a registered Joker from the CircusRing
+  /// Removes and disposes the Joker tied to [tag].
   ///
-  /// [tag]: Unique identifier for the Joker to remove
+  /// Returns true if successful, false if tag not found.
   ///
-  /// Returns true if the Joker was found and removed, false otherwise
-  /// Throws [CircusRingException] if tag is empty
+  /// Throws [CircusRingException] if tag is empty.
   bool vanish<T>({required String tag}) {
     if (tag.isEmpty) {
       throw CircusRingException(
-          'All Jokers must be registered with a unique tag. '
-          'Please add tag to vanish a Joker.');
+        'All Jokers must be registered with a unique tag to be vanished.\n'
+        'Please provide a tag for vanish<T>(tag: "...")',
+      );
     }
+
     return fire<Joker<T>>(tag: tag);
   }
 }
