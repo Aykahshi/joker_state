@@ -197,6 +197,13 @@ extension JokerRingExtension on CircusRing {
   ///
   /// Returns null if not found instead of throwing exception.
   Joker<T>? trySpotlight<T>({required String tag}) {
+    if (tag.isEmpty) {
+      throw CircusRingException(
+        'All Jokers must be registered with a unique tag.\n'
+        'Please provide tag when calling Circus.trySpotlight<T>(tag: "...")',
+      );
+    }
+    
     return tryFind<Joker<T>>(tag);
   }
 
