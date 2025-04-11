@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:joker_state/src/di/circus_ring/circus_ring.dart';
-import 'package:joker_state/src/state_management/joker/joker.dart';
+import 'package:joker_state/joker_state.dart';
 
 void main() {
   setUp(() {
