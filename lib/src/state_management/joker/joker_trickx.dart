@@ -102,7 +102,7 @@ extension JokerFrameExtension<T> on Joker<T> {
 /// typedef UserRecord = (String, int, bool);
 ///
 /// [name, age, active].assemble<UserRecord>(
-///   converter: (values) => (values[0], values[1], values[2]),
+///   converter: (values) => (values[0] as String, values[1] as int, values[2] as bool),
 ///   builder: (context, user) {
 ///     final (name, age, active) = user;
 ///     return Text('$name | $age | $active');
