@@ -158,13 +158,6 @@ extension JokerRingExtension on CircusRing {
     T initialValue, {
     required String tag,
   }) {
-    if (tag.isEmpty) {
-      throw CircusRingException(
-        'To avoid conflicts, Jokers must be registered with a unique tag.\n'
-        'Use: Circus.summon<T>(tag: "your_unique_tag")',
-      );
-    }
-
     final joker = Joker<T>(initialValue);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
@@ -179,13 +172,6 @@ extension JokerRingExtension on CircusRing {
     T initialValue, {
     required String tag,
   }) {
-    if (tag.isEmpty) {
-      throw CircusRingException(
-        'To avoid conflicts, Jokers must be registered with a unique tag.\n'
-        'Use: Circus.recruit<T>(tag: "your_unique_tag")',
-      );
-    }
-
     final joker = Joker<T>(initialValue, autoNotify: false);
     hire<Joker<T>>(joker, tag: tag);
     return joker;

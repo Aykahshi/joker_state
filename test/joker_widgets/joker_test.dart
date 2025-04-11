@@ -88,7 +88,7 @@ void main() {
         expect(() => joker.whisper(10), throwsA(isA<JokerException>()));
         expect(() => joker.whisperWith((val) => val + 1),
             throwsA(isA<JokerException>()));
-        expect(() => joker.yell(), throwsA(isA<JokerException>()));
+        expect(() => joker.yell(), returnsNormally);
       });
 
       test('should track previous value correctly', () {

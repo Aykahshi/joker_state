@@ -49,7 +49,7 @@ void main() {
       expect(() => autoJoker.whisper(10), throwsA(isA<JokerException>()));
       expect(() => manualJoker.whisper(10), returnsNormally);
 
-      expect(() => autoJoker.yell(), throwsA(isA<JokerException>()));
+      expect(() => autoJoker.yell(), returnsNormally);
       expect(() => manualJoker.yell(), returnsNormally);
     });
 

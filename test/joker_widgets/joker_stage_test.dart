@@ -203,7 +203,8 @@ void main() {
             children: [
               JokerStage<int>(
                 joker: joker,
-                autoDispose: false, // Important: only one should auto-dispose
+                autoDispose: false,
+                // Important: only one should auto-dispose
                 builder: (context, value) => Text('First: $value'),
               ),
               JokerStage<int>(

@@ -22,7 +22,9 @@ CircusRing get Circus => CircusRing.instance;
 class CircusRing {
   // Singleton pattern
   CircusRing._internal();
+
   static final CircusRing _instance = CircusRing._internal();
+
   factory CircusRing() => _instance;
 
   /// Direct access to instance shorthand
@@ -40,6 +42,12 @@ class CircusRing {
   /// Container for storing lazy async factory methods
   final _lazyAsyncSingleton = <String, AsyncFactoryFunc>{};
 
+  /// Container for storing dependents
+  final _dependents = <String, Set<String>>{};
+
+  /// Container for storing dependencies
+  final _dependencies = <String, Set<String>>{};
+
   /// Whether to enable debug logs
   bool _enableLogs = false;
 
@@ -48,6 +56,28 @@ class CircusRing {
   /// [enableLogs]: Whether to enable debug logging
   void config({bool? enableLogs}) {
     if (enableLogs != null) _enableLogs = enableLogs;
+  }
+
+  /// Establishes a dependency relationship between two registered instances.
+  ///
+  /// Call this when one type (T) depends on another (D). This ensures the
+  /// depended-on instance cannot be removed while its dependents are still registered.
+  ///
+  /// Example:
+  /// ```dart
+  /// Circus.bindDependency<UserRepo, ApiService>();
+  /// ```
+  ///
+  /// [tagT]: Optional tag for dependent (type T)
+  /// [tagD]: Optional tag for dependency (type D)
+  void bindDependency<T, D>({String? tagT, String? tagD}) {
+    final tKey = _getKey(T, tagT);
+    final dKey = _getKey(D, tagD);
+
+    _dependencies.putIfAbsent(tKey, () => {}).add(dKey);
+    _dependents.putIfAbsent(dKey, () => {}).add(tKey);
+
+    _log('[🧷] Bound $tKey → $dKey');
   }
 
   /// Generate unique instance key
@@ -198,6 +228,7 @@ extension CircusRingHiring on CircusRing {
     }
     _factories.remove(key);
     _lazyFactories.remove(key);
+    _clearDependenciesFor(key);
     return false;
   }
 
@@ -212,14 +243,22 @@ extension CircusRingHiring on CircusRing {
         await instance.dispose();
       } else if (instance is Disposable) {
         instance.dispose();
+      } else if (instance is ChangeNotifier) {
+        instance.dispose();
       }
+
       _instances.remove(key);
       _log('Instance deleted asynchronously: $key');
+
+      _clearDependenciesFor(key);
+
       return true;
     }
+
     _factories.remove(key);
     _lazyFactories.remove(key);
     _lazyAsyncSingleton.remove(key);
+
     return false;
   }
 }
@@ -345,17 +384,39 @@ extension CircusRingFind on CircusRing {
   /// Returns true if an instance was removed
   bool fire<T>({String? tag}) {
     final key = _getKey(T, tag);
-    return _deleteSingle<T>(key: key);
+
+    if (_dependents.containsKey(key) && _dependents[key]!.isNotEmpty) {
+      throw CircusRingException(
+        'Cannot remove $key, it is still depended on by: ${_dependents[key]!.join(', ')}',
+      );
+    }
+
+    final success = _deleteSingle<T>(key: key);
+    if (success) _clearDependenciesFor(key);
+    return success;
   }
 
-  /// Delete an instance asynchronously
+  /// Delete an instance asynchronously, including dependency check.
   ///
-  /// Asynchronously removes an instance from the container and disposes of resources
-  /// [tag]: Optional name to distinguish between instances of the same type
-  /// Returns true if an instance was removed
+  /// Removes an object registered in the container and invokes [dispose] / [asyncDispose]
+  /// when appropriate. If the given instance is still required by other registered components
+  /// (via [bindDependency]), this will throw [CircusRingException].
+  ///
+  /// [tag]: Optional name to distinguish between different instances of type T
+  ///
+  /// Returns true if successfully removed, false otherwise.
   Future<bool> fireAsync<T>({String? tag}) async {
     final key = _getKey(T, tag);
-    return await _deleteSingleAsync<T>(key: key);
+
+    if (_dependents.containsKey(key) && _dependents[key]!.isNotEmpty) {
+      throw CircusRingException(
+        'Cannot asynchronously remove $key because it is still depended on by: ${_dependents[key]!.join(', ')}',
+      );
+    }
+
+    final success = await _deleteSingleAsync<T>(key: key);
+    if (success) _clearDependenciesFor(key);
+    return success;
   }
 
   /// Delete all instances
@@ -399,6 +460,29 @@ extension CircusRingFind on CircusRing {
     _lazyFactories.clear();
     _lazyAsyncSingleton.clear();
     _log('Force deleted all instances and factories asynchronously');
+  }
+
+  /// Remove all registered dependency relations linked to [key].
+  ///
+  /// Clears both the dependencies and dependents maps of any reference to [key].
+  void _clearDependenciesFor(String key) {
+    final dependencies = _dependencies[key] ?? {};
+    for (final dep in dependencies) {
+      _dependents[dep]?.remove(key);
+      if (_dependents[dep]!.isEmpty) {
+        _dependents.remove(dep);
+      }
+    }
+    _dependencies.remove(key);
+
+    final dependents = _dependents[key] ?? {};
+    for (final dep in dependents) {
+      _dependencies[dep]?.remove(key);
+      if (_dependencies[dep]!.isEmpty) {
+        _dependencies.remove(dep);
+      }
+    }
+    _dependents.remove(key);
   }
 }
 
