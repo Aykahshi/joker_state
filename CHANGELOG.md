@@ -1,6 +1,6 @@
-## 1.0.2
+## 1.0.2+1
 
-* JokerTrap, JokerReveal (Useful widget/extension)
+* fix lint warning
 
 ## 1.0.1
 
