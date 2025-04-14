@@ -86,7 +86,7 @@ extension JokerFrameExtension<T> on Joker<T> {
   }
 }
 
-/// Extension for List<Joker> to quickly create a [JokerTroupe] widget.
+/// Extension for List of Jokers to quickly create a [JokerTroupe] widget.
 ///
 /// Allows merging multiple Jokers into a single Record via [converter] and
 /// building UI accordingly.
@@ -165,7 +165,7 @@ extension JokerRingExtension on CircusRing {
 
   /// Registers a manual Joker (non-autoNotify) into the [CircusRing].
   ///
-  /// Same as [summon] but requires manual [yell()] to trigger listeners.
+  /// Same as [summon] but requires manual [Joker.yell] to trigger listeners.
   ///
   /// Throws [CircusRingException] if the tag is empty.
   Joker<T> recruit<T>(
@@ -203,7 +203,7 @@ extension JokerRingExtension on CircusRing {
         'Please provide tag when calling Circus.trySpotlight<T>(tag: "...")',
       );
     }
-    
+
     return tryFind<Joker<T>>(tag);
   }
 

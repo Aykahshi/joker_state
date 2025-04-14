@@ -13,6 +13,7 @@ typedef FactoryFunc<T> = T Function();
 typedef AsyncFactoryFunc<T> = Future<T> Function();
 
 /// Global access point for the CircusRing dependency injection container
+// ignore: non_constant_identifier_names
 CircusRing get Circus => CircusRing.instance;
 
 /// A lightweight dependency injection container for Flutter applications
@@ -442,7 +443,7 @@ extension CircusRingFind on CircusRing {
 
   /// Delete an instance asynchronously, including dependency check.
   ///
-  /// Removes an object registered in the container and invokes [dispose] / [asyncDispose]
+  /// Removes an object registered in the container and invokes dispose / asyncDispose
   /// when appropriate. If the given instance is still required by other registered components
   /// (via [bindDependency]), this will throw [CircusRingException].
   ///

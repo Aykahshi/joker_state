@@ -1,3 +1,4 @@
+// Custom Exception for CircusRing
 class CircusRingException implements Exception {
   final String message;
 

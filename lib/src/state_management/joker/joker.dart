@@ -182,7 +182,7 @@ class JokerBatch<T> {
     return this;
   }
 
-  /// Commits and triggers [notifyListeners] if any change occurred.
+  /// Commits and triggers force update if any change occurred.
   void commit() {
     if (_joker.state != _originalState) {
       _joker.yell();
