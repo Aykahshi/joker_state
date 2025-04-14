@@ -8,7 +8,7 @@ typedef JokerListener<T> = void Function(T? previous, T current);
 /// A predicate to determine whether to trigger a [JokerListener].
 typedef JokerListenCondition<T> = bool Function(T? previous, T current);
 
-/// Extension methods on Joker<T> to support side-effect listeners.
+/// Extension methods on Joker to support side-effect listeners.
 extension JokerListenerExtension<T> on Joker<T> {
   /// Listen to all state changes of a Joker.
   ///

@@ -22,7 +22,7 @@ typedef JokerTroupeConverter<T> = T Function(List states);
 /// JokerTroupe - Combines multiple [Joker]s using Dart Records into a single widget.
 ///
 /// This widget listens to any number of [Joker]s, and rebuilds whenever any of them
-/// updates. All Joker states are passed to a [converter] that transforms a List<dynamic>
+/// updates. All Joker states are passed to a [converter] that transforms a List of dynamic
 /// into a strongly-typed Dart record T, enabling safe and expressive UI updates.
 ///
 /// This is a powerful way to bind multiple reactive states into a single widget tree.

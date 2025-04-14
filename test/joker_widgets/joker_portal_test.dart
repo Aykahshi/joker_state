@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
-import 'package:joker_state/src/state_management/joker_portal/joker_portal.dart';
 
 void main() {
   group('JokerPortal<T>', () {
