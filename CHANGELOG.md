@@ -1,3 +1,6 @@
-## 0.0.1
+## 1.0.0
 
-* TODO: Describe initial release.
+* Initial release
+* Joker, JokerCast, JokerFrame, JokerListener, JokerPortal, JokerStage, JokerTroupe (State
+  Management)
+* CircusRing (Dependency Injection)

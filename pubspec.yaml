@@ -1,11 +1,11 @@
 name: joker_state
 description: "A Flutter Style lightweight state management package."
-version: 0.0.1
+version: 1.0.0
 homepage:
 
 environment:
-  sdk: ^3.6.2
-  flutter: ">=3.27.0"
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.24.0"
 
 dependencies:
   flutter:
