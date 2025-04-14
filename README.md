@@ -1,3 +1,5 @@
+[![Chinese](https://img.shields.io/badge/Language-English-blueviolet?style=for-the-badge)](README-zh.md)
+
 # 🃏 JokerState
 
 A lightweight, reactive state management solution for Flutter that integrates dependency injection seamlessly. JokerState provides flexible state containers with minimal boilerplate through its `Joker` API and companion widgets.

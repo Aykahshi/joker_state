@@ -1,3 +1,5 @@
+[![English](https://img.shields.io/badge/Language-Chinese-blueviolet?style=for-the-badge)](README.md)
+
 # 🃏 JokerState
 
 一個輕量級的 Flutter 響應式狀態管理解決方案，無縫整合依賴注入。JokerState 通過其 `Joker` API 和配套小部件提供靈活的狀態容器，且需要的樣板代碼極少。
