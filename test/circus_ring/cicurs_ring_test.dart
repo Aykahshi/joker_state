@@ -145,6 +145,22 @@ void main() {
       expect(instance2, same(instance));
     });
 
+    test('fenix rebirth after dispose returns new instance', () {
+      int counter = 0;
+
+      Circus.hireLazily<int>(() {
+        counter++;
+        return counter;
+      }, tag: 'auto', fenix: true);
+
+      final first = Circus.find<int>('auto');
+      expect(first, 1);
+
+      Circus.fire<int>(tag: 'auto');
+      final reborn = Circus.find<int>('auto');
+      expect(reborn, 2);
+    });
+
     test('contract should register a factory', () {
       // Arrange
       int count = 0;

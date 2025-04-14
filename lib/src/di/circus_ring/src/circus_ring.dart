@@ -48,6 +48,12 @@ class CircusRing {
   /// Container for storing dependencies
   final _dependencies = <String, Set<String>>{};
 
+  /// Stores fenix builders for auto-rebind after dispose.
+  final _fenixBuilders = <String, FactoryFunc>{};
+
+  /// Stores fenix async builders for auto-rebind after dispose.
+  final _fenixAsyncBuilders = <String, AsyncFactoryFunc>{};
+
   /// Whether to enable debug logs
   bool _enableLogs = false;
 
@@ -104,8 +110,7 @@ extension CircusRingHiring on CircusRing {
   /// Registers an instance that will be shared throughout the app.
   /// [instance]: The object to register
   /// [tag]: Optional name to distinguish between instances of the same type
-  /// [permanent]: Whether this instance should persist until manually removed
-  T hire<T>(T instance, {String? tag, bool permanent = true}) {
+  T hire<T>(T instance, {String? tag}) {
     // Verify that Joker instances must use summon or provide a tag
     if (instance is Joker && (tag == null || tag.isEmpty)) {
       throw CircusRingException(
@@ -128,9 +133,10 @@ extension CircusRingHiring on CircusRing {
   /// Registers a dependency that will be created asynchronously
   /// [asyncBuilder]: Function that returns a Future of the instance
   /// [tag]: Optional name to distinguish between instances of the same type
-  /// [permanent]: Whether this instance should persist until manually removed
-  Future<T> hireAsync<T>(AsyncFactoryFunc<T> asyncBuilder,
-      {String? tag, bool permanent = true}) async {
+  Future<T> hireAsync<T>(
+    AsyncFactoryFunc<T> asyncBuilder, {
+    String? tag,
+  }) async {
     final key = _getKey(T, tag);
     if (_instances.containsKey(key)) {
       _log('Replacing existing async instance: $key');
@@ -148,15 +154,26 @@ extension CircusRingHiring on CircusRing {
   /// Registers a dependency that will be created only when first requested
   /// [builder]: Function that creates the instance
   /// [tag]: Optional name to distinguish between instances of the same type
-  /// [fenix]: Whether to recreate the instance if it was removed
-  void hireLazily<T>(FactoryFunc<T> builder,
-      {String? tag, bool fenix = false}) {
+  /// [fenix]: Whether to fenix the instance if it was removed
+  void hireLazily<T>(
+    FactoryFunc<T> builder, {
+    String? tag,
+    bool fenix = false,
+  }) {
     final key = _getKey(T, tag);
+
     if (_lazyFactories.containsKey(key) || _instances.containsKey(key)) {
       _log('Instance $key already exists, will be replaced');
       _deleteSingle<T>(key: key);
     }
+
     _lazyFactories[key] = builder;
+
+    if (fenix) {
+      _fenixBuilders[key] = builder;
+      _log('Respawn (auto-rebind) registered for: $key');
+    }
+
     _log('Lazy instance $key registered');
   }
 
@@ -165,15 +182,26 @@ extension CircusRingHiring on CircusRing {
   /// Registers a dependency that will be created asynchronously when first requested
   /// [asyncBuilder]: Function that returns a Future of the instance
   /// [tag]: Optional name to distinguish between instances of the same type
-  /// [fenix]: Whether to recreate the instance if it was removed
-  void hireLazilyAsync<T>(AsyncFactoryFunc<T> asyncBuilder,
-      {String? tag, bool fenix = false}) {
+  /// [fenix]: Whether to fenix the instance if it was removed
+  void hireLazilyAsync<T>(
+    AsyncFactoryFunc<T> builder, {
+    String? tag,
+    bool fenix = false,
+  }) {
     final key = _getKey(T, tag);
+
     if (_lazyAsyncSingleton.containsKey(key) || _instances.containsKey(key)) {
       _log('$key already registered, will be replaced');
       _deleteSingle<T>(key: key);
     }
-    _lazyAsyncSingleton[key] = asyncBuilder;
+
+    _lazyAsyncSingleton[key] = builder;
+
+    if (fenix) {
+      _fenixAsyncBuilders[key] = builder;
+      _log('Respawn (auto-rebind async) registered for: $key');
+    }
+
     _log('Async lazy instance registered: $key');
   }
 
@@ -296,6 +324,22 @@ extension CircusRingFind on CircusRing {
     if (_factories.containsKey(key)) {
       _log('Creating from factory: $key');
       return _factories[key]!() as T;
+    }
+
+    // 5. Check if there's a fenix object
+    if (_fenixBuilders.containsKey(key)) {
+      final reborn = _fenixBuilders[key]!();
+      _instances[key] = reborn;
+      _log('Fenix reborn singleton: $key');
+      return reborn;
+    }
+
+    // If not found in any of the above, and it's in lazy async singleton or fenix async builders, throw
+    if (_lazyAsyncSingleton.containsKey(key) ||
+        _fenixAsyncBuilders.containsKey(key)) {
+      throw CircusRingException(
+        'Key $key registered as async. Use findAsync<$T>() instead.',
+      );
     }
 
     throw CircusRingException(
