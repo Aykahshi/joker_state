@@ -1,3 +1,7 @@
+## 1.2.0
+* CueGate(Debouncer/throttler) added
+* CueGateMixin for StatefulWidget
+
 ## 1.1.1
 * fix lint warning
 * remove useless test case
