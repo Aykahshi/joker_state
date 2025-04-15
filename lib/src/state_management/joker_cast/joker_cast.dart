@@ -13,26 +13,27 @@ typedef JokerCastBuilder<T> = Widget Function(BuildContext context, T value);
 /// Example:
 /// ```dart
 /// JokerCast<int>(
+///   tag: 'counter',
 ///   builder: (context, count) => Text('$count'),
 /// )
 /// ```
 class JokerCast<T> extends StatelessWidget {
   final JokerCastBuilder<T> builder;
+  final String? tag;
 
   const JokerCast({
     super.key,
     required this.builder,
+    this.tag,
   });
 
   @override
   Widget build(BuildContext context) {
-    final joker = JokerPortal.of<T>(context);
+    final joker = JokerPortal.of<T>(context, tag: tag);
 
     return AnimatedBuilder(
       animation: joker,
-      builder: (context, _) {
-        return builder(context, joker.state);
-      },
+      builder: (context, _) => builder(context, joker.state),
     );
   }
 }
