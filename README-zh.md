@@ -16,6 +16,8 @@
 - 🔄 **批次更新** - 將多個狀態變更分組為單一通知
 - 🏗️ **Record 支援** - 使用 Dart Records 組合多個狀態
 - 🧩 **模組化設計** - 可以只使用您需要的功能或整個生態系統
+- 📢 **Event Bus 系統** - 使用 RingCueMaster 的類型安全事件
+- 🎪 **特殊 Widgets** - 額外的實用Widget，如 JokerReveal 和 JokerTrap
 
 ## 開始使用
 
@@ -185,6 +187,76 @@ JokerCast<int>(
 Text('Count: ${context.joker<int>().state}')
 ```
 
+### 🎪 特殊小部件
+
+#### JokerReveal
+
+根據布爾表達式有條件地顯示小部件：
+
+```dart
+// 直接小部件
+JokerReveal(
+  condition: isLoggedIn,
+  whenTrue: ProfileScreen(),
+  whenFalse: LoginScreen(),
+)
+
+// 延遲構建
+JokerReveal.lazy(
+  condition: isLoading,
+  whenTrueBuilder: (context) => LoadingIndicator(),
+  whenFalseBuilder: (context) => ContentView(),
+)
+
+// 或使用擴展方法在布爾值上
+isLoggedIn.reveal(
+  whenTrue: ProfileScreen(),
+  whenFalse: LoginScreen(),
+)
+```
+
+#### JokerTrap
+
+當小部件從樹中移除時自動處理控制器的釋放：
+
+```dart
+// 單個控制器
+textController.trapeze(
+  TextField(controller: textController),
+)
+
+// 多個控制器
+[textController, scrollController, animationController].trapeze(
+  ComplexWidget(),
+)
+```
+
+### 📢 RingCueMaster：事件總線系統
+
+用於組件之間通信的類型安全事件總線：
+
+```dart
+// 定義事件類型
+class UserLoggedIn extends Cue {
+  final User user;
+  UserLoggedIn(this.user);
+}
+
+// 訪問全局事件總線
+final cueMaster = Circus.ringMaster();
+
+// 監聽事件
+final subscription = Circus.onCue<UserLoggedIn>((event) {
+  print('用戶 ${event.user.name} 在 ${event.timestamp} 登入');
+});
+
+// 發送事件
+Circus.cue(UserLoggedIn(currentUser));
+
+// 完成後取消訂閱
+subscription.cancel();
+```
+
 ## 進階功能
 
 ### 🔄 副作用
@@ -296,6 +368,8 @@ JokerState 設計為輕量級、靈活且強大 - 在一個連貫的套件中提
 - 您需要在必要時進行手動控制的靈活性
 - 您需要整合的依賴管理
 - 您偏好清晰、直接的狀態操作，而不是抽象概念
+- 您需要一個類型安全的事件總線用於解耦通信
+- 您需要與狀態管理良好配合的實用小部件
 
 ## 授權
 

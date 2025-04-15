@@ -16,6 +16,8 @@ A lightweight, reactive state management solution for Flutter that integrates de
 - 🔄 **Batch Updates** - Group multiple state changes into a single notification
 - 🏗️ **Record Support** - Combine multiple states using Dart Records
 - 🧩 **Modular Design** - Use just what you need or the entire ecosystem
+- 📢 **Event Bus System** - Type-safe events with RingCueMaster
+- 🎪 **Special Widgets** - Additional utility widgets like JokerReveal and JokerTrap
 
 ## Getting Started
 
@@ -185,6 +187,76 @@ JokerCast<int>(
 Text('Count: ${context.joker<int>().state}')
 ```
 
+### 🎪 Special Widgets
+
+#### JokerReveal
+
+Conditionally display widgets based on a boolean expression:
+
+```dart
+// Direct widgets
+JokerReveal(
+  condition: isLoggedIn,
+  whenTrue: ProfileScreen(),
+  whenFalse: LoginScreen(),
+)
+
+// Lazy construction
+JokerReveal.lazy(
+  condition: isLoading,
+  whenTrueBuilder: (context) => LoadingIndicator(),
+  whenFalseBuilder: (context) => ContentView(),
+)
+
+// Or use the extension method on boolean
+isLoggedIn.reveal(
+  whenTrue: ProfileScreen(),
+  whenFalse: LoginScreen(),
+)
+```
+
+#### JokerTrap
+
+Automatically dispose controllers when a widget is removed from the tree:
+
+```dart
+// Single controller
+textController.trapeze(
+  TextField(controller: textController),
+)
+
+// Multiple controllers
+[textController, scrollController, animationController].trapeze(
+  ComplexWidget(),
+)
+```
+
+### 📢 RingCueMaster: Event Bus System
+
+A type-safe event bus for communication between components:
+
+```dart
+// Define event types
+class UserLoggedIn extends Cue {
+  final User user;
+  UserLoggedIn(this.user);
+}
+
+// Access the global event bus
+final cueMaster = Circus.ringMaster();
+
+// Listen for events
+final subscription = Circus.onCue<UserLoggedIn>((event) {
+  print('User ${event.user.name} logged in at ${event.timestamp}');
+});
+
+// Send events
+Circus.cue(UserLoggedIn(currentUser));
+
+// Cancel subscription when done
+subscription.cancel();
+```
+
 ## Advanced Features
 
 ### 🔄 Side-Effects
@@ -296,6 +368,8 @@ JokerState is designed to be lightweight, flexible, and powerful - providing rea
 - You want the flexibility of manual control when needed
 - You need integrated dependency management
 - You prefer clear, direct state manipulation without abstract concepts
+- You want a type-safe event bus for decoupled communication
+- You need utility widgets that work well with your state management
 
 ## License
 

@@ -1,3 +1,11 @@
+## 1.1.0
+
+* RingCueMaster(event bus) support
+* JokerTrap(auto-dispose controllers) support
+* JokerReveal(conditional display) support
+* Update README
+* Add Example for RingCueMaster
+
 ## 1.0.3
 
 * make JokerPortal/JokerCast can be link to Joker by tag
