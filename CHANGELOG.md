@@ -1,3 +1,7 @@
+## 1.0.2+2
+
+* fix export missing
+
 ## 1.0.2+1
 
 * fix lint warning
