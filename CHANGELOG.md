@@ -1,3 +1,6 @@
+## 1.1.0+2
+* adjusting key condition way in CircusRing
+
 ## 1.1.0+1
 
 * make Circus.ringMaster() can be use with CustomCueMaster
