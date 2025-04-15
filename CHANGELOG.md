@@ -1,5 +1,6 @@
-## 1.1.0+3
+## 1.1.1
 * fix lint warning
+* remove useless test case
 
 ## 1.1.0+2
 * adjusting key condition way in CircusRing
