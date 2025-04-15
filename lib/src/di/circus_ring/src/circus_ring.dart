@@ -91,8 +91,17 @@ class CircusRing {
   ///
   /// Creates a unique identifier for each registered dependency
   /// based on its type and optional tag
-  String _getKey(Type type, [String? tag]) =>
-      tag != null ? '${type.toString()}_$tag' : type.toString();
+  String _getKey(Type type, [String? tag]) {
+    /// If CueMaster, just use CueMaster_$tag
+    /// because there might be some class like CustomCueMaster
+    /// and if we use CustomCueMaster_$tag, it will be conflict
+    /// Circus.ringMaster() can not find the CustomCueMaster
+    if (type.toString().contains('CueMaster')) {
+      return 'CueMaster_$tag';
+    }
+
+    return tag != null ? '${type.toString()}_$tag' : type.toString();
+  }
 
   /// Log output
   ///

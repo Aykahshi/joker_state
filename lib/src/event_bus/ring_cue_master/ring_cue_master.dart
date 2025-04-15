@@ -61,15 +61,17 @@ class RingCueMaster implements CueMaster {
 
 /// 🎪 Extension to access the RingMaster — singleton cue controller for the entire app.
 extension RingMasterExtension on CircusRing {
-  /// Returns or initializes the global [RingCueMaster].
+  /// Returns or initializes the global [CueMaster] implement as [RingCueMaster].
   /// if not found, it will be hired with the tag "ringMaster"
-  /// and if you want to implement your own, you can use hire() instead
-  /// e.g. Circus.hire(CustomCueMaster(), tag: 'customMaster')
-  RingCueMaster ringMaster([String tag = 'ringMaster']) {
-    if (!isHired<RingCueMaster>(tag)) {
+  /// it will be registered with key "CueMaster_$tag" in CircusRing
+  /// you can implement your own, and pass the unique tag
+  /// e.g. Circus.hire(CustomCueMaster(), tag: 'customMaster') or
+  /// Circus.ringMaster(tag: 'customMaster')
+  CueMaster ringMaster([String tag = 'ringMaster']) {
+    if (!isHired<CueMaster>(tag)) {
       hire(RingCueMaster(), tag: tag);
     }
-    return find<RingCueMaster>(tag);
+    return find<CueMaster>(tag);
   }
 
   /// Triggers a cue (typed signal) through the master.
