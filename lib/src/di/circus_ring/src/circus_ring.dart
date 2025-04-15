@@ -125,8 +125,8 @@ extension CircusRingHiring on CircusRing {
     // Verify that Joker instances must use summon or provide a tag
     if (instance is Joker && (tag == null || tag.isEmpty)) {
       throw CircusRingException(
-        'Joker instances must be registered using summon() or provide a non-empty tag. ' +
-            'Use: Circus.summon<T>(tag: "unique_tag") or Circus.hire<Joker<T>>(joker, tag: "unique_tag")',
+        'Joker instances must be registered using summon() or provide a non-empty tag. '
+        'Use: Circus.summon<T>(tag: "unique_tag") or Circus.hire<Joker<T>>(joker, tag: "unique_tag")',
       );
     }
     final key = _getKey(T, tag);

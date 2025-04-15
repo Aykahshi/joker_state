@@ -480,12 +480,16 @@ class _User {
   static _User fromJson(Map<String, dynamic> json) {
     return _User(json['name'], json['age']);
   }
+
+  @override
+  int get hashCode => name.hashCode ^ age.hashCode;
 }
 
 // Helper Tracker to tracking dispose calls
 class _DisposableTracker<T> extends Joker<T> {
   bool isDisposed = false;
 
+  // ignore: use_super_parameters
   _DisposableTracker(T initialValue, {String? tag})
       : super(initialValue, tag: tag);
 

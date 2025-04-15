@@ -32,11 +32,11 @@ class JokerPortal<T> extends InheritedNotifier<Joker<T>> {
   final String? tag;
 
   const JokerPortal({
-    Key? key,
+    super.key,
     required Joker<T> joker,
-    required Widget child,
+    required super.child,
     this.tag,
-  }) : super(key: key, notifier: joker, child: child);
+  }) : super(notifier: joker);
 
   /// Find a Joker with a specific type and optional tag
   static Joker<T> of<T>(BuildContext context, {String? tag}) {

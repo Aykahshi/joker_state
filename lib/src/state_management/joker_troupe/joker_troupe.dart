@@ -94,7 +94,7 @@ class JokerTroupe<T extends Record> extends StatefulWidget {
   final bool autoDispose;
 
   @override
-  _JokerTroupeState<T> createState() => _JokerTroupeState<T>();
+  State<JokerTroupe<T>> createState() => _JokerTroupeState<T>();
 }
 
 /// Internal state of [JokerTroupe].
@@ -125,7 +125,7 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
       final joker = widget.jokers[i];
       final index = i;
 
-      final listener = () {
+      listener() {
         if (mounted) {
           setState(() {
             if (index < _states.length) {
@@ -133,7 +133,7 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
             }
           });
         }
-      };
+      }
 
       _listeners[joker] = listener;
       joker.addListener(listener);

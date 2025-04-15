@@ -66,7 +66,7 @@ void main() {
           builder: (context) {
             final foundJoker =
                 JokerPortal.maybeOf<String>(context, tag: 'nonexistent');
-            return Text('${foundJoker == null ? 'not found' : 'found'}',
+            return Text(foundJoker == null ? 'not found' : 'found',
                 textDirection: TextDirection.ltr);
           },
         ),

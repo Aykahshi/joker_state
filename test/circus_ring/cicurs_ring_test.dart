@@ -81,7 +81,7 @@ void main() {
 
     test('hireAsync should register an asynchronous singleton', () async {
       // Arrange
-      final builder = () async => _TestClass('async');
+      builder() async => _TestClass('async');
 
       // Act
       final result = await Circus.hireAsync<_TestClass>(builder);
@@ -94,10 +94,10 @@ void main() {
     test('hireLazily should register a lazy singleton', () {
       // Arrange
       int count = 0;
-      final builder = () {
+      builder() {
         count++;
         return _TestClass('lazy');
-      };
+      }
 
       // Act
       Circus.hireLazily<_TestClass>(builder);
@@ -121,10 +121,10 @@ void main() {
     test('hireLazilyAsync should register an async lazy singleton', () async {
       // Arrange
       int count = 0;
-      final builder = () async {
+      builder() async {
         count++;
         return _TestClass('async lazy');
-      };
+      }
 
       // Act
       Circus.hireLazilyAsync<_TestClass>(builder);
@@ -164,10 +164,10 @@ void main() {
     test('contract should register a factory', () {
       // Arrange
       int count = 0;
-      final builder = () {
+      builder() {
         count++;
         return _TestClass('factory');
-      };
+      }
 
       // Act
       Circus.contract<_TestClass>(builder);
@@ -197,7 +197,7 @@ void main() {
 
     test('draft should create instance without registration', () {
       // Arrange
-      final builder = () => _TestClass('draft');
+      builder() => _TestClass('draft');
 
       // Act
       final result = Circus.draft<_TestClass>(builder: builder);

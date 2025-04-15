@@ -1,3 +1,6 @@
+## 1.1.0+3
+* fix lint warning
+
 ## 1.1.0+2
 * adjusting key condition way in CircusRing
 

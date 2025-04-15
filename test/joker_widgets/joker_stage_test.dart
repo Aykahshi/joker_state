@@ -269,7 +269,7 @@ class _JokerSwitcher extends StatefulWidget {
   final Joker<String> initialJoker;
   final Joker<String> secondJoker;
 
-  _JokerSwitcher({
+  const _JokerSwitcher({
     required this.initialJoker,
     required this.secondJoker,
   });

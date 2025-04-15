@@ -92,7 +92,7 @@ void main() {
                 padding: const EdgeInsets.all(8),
                 child: Row(
                   children: [
-                    Container(
+                    SizedBox(
                       width: 100,
                       height: 50,
                       child: JokerCast<int>(

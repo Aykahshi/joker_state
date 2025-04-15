@@ -12,7 +12,7 @@ abstract class CueMaster {
 
   bool sendCue<T>(T cue);
 
-  StreamSubscription<T> listen<T>(void Function(T cue));
+  StreamSubscription<T> listen<T>(void Function(T cue) fn);
   bool hasListeners<T>();
   bool reset<T>();
 

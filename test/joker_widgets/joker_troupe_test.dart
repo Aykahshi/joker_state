@@ -332,7 +332,7 @@ class _JokerSwapController extends StatefulWidget {
   _JokerSwapController({required this.initialJokers});
 
   @override
-  _JokerSwapControllerState createState() => state;
+  State<_JokerSwapController> createState() => _JokerSwapControllerState();
 }
 
 class _JokerSwapControllerState extends State<_JokerSwapController> {
