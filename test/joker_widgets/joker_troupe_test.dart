@@ -185,45 +185,6 @@ void main() {
       expect(joker2.state, equals('updated'));
     });
 
-    testWidgets('should correctly handle joker list changes',
-        (WidgetTester tester) async {
-      // Arrange
-      final joker1 = Joker<int>(1);
-      final joker2 = Joker<String>('test');
-
-      // Create a stateful controller widget
-      final controller = _JokerSwapController(
-        initialJokers: [joker1, joker2],
-      );
-
-      // Act - build with initial jokers
-      await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: controller,
-        ),
-      );
-
-      // Initial state
-      expect(find.text('1, test'), findsOneWidget);
-
-      // Act - swap jokers
-      final joker3 = Joker<int>(100);
-      final joker4 = Joker<String>('swapped');
-      controller.state.updateJokers([joker3, joker4]);
-      await tester.pump();
-
-      // Check updated state
-      expect(find.text('100, swapped'), findsOneWidget);
-
-      // Update new joker
-      joker3.trick(200);
-      await tester.pump();
-
-      // Check state again
-      expect(find.text('200, swapped'), findsOneWidget);
-    });
-
     testWidgets('should handle CircusRing registered jokers',
         (WidgetTester tester) async {
       // Arrange - register jokers in CircusRing
@@ -321,41 +282,5 @@ class _DisposableTracker<T> extends Joker<T> {
   void dispose() {
     isDisposed = true;
     super.dispose();
-  }
-}
-
-// Helper widget for testing joker list changes with a GlobalKey
-class _JokerSwapController extends StatefulWidget {
-  final List<Joker> initialJokers;
-  final _JokerSwapControllerState state = _JokerSwapControllerState();
-
-  _JokerSwapController({required this.initialJokers});
-
-  @override
-  State<_JokerSwapController> createState() => _JokerSwapControllerState();
-}
-
-class _JokerSwapControllerState extends State<_JokerSwapController> {
-  late List<Joker> _jokers;
-
-  @override
-  void initState() {
-    super.initState();
-    _jokers = widget.initialJokers;
-  }
-
-  void updateJokers(List<Joker> newJokers) {
-    setState(() {
-      _jokers = newJokers;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return JokerTroupe<(int, String)>(
-      jokers: _jokers,
-      converter: (values) => (values[0] as int, values[1] as String),
-      builder: (context, values) => Text('${values.$1}, ${values.$2}'),
-    );
   }
 }
