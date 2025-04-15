@@ -1,3 +1,6 @@
+## 1.2.1
+* Update README.md
+
 ## 1.2.0
 * CueGate(Debouncer/throttler) added
 * CueGateMixin for StatefulWidget

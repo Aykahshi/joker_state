@@ -18,6 +18,7 @@
 - 🧩 **模組化設計** - 可以只使用您需要的功能或整個生態系統
 - 📢 **Event Bus 系統** - 使用 RingCueMaster 的類型安全事件
 - 🎪 **特殊 Widgets** - 額外的實用Widget，如 JokerReveal 和 JokerTrap
+- ⏱️ **時間控制** - 用於控制操作執行的防抖動和節流機制
 
 ## 開始使用
 
@@ -255,6 +256,52 @@ Circus.cue(UserLoggedIn(currentUser));
 
 // 完成後取消訂閱
 subscription.cancel();
+```
+
+### ⏱️ CueGate：時間控制
+
+使用防抖動和節流機制管理操作的時間：
+
+```dart
+// 創建一個防抖動閘門
+final debouncer = CueGate.debounce(delay: Duration(milliseconds: 300));
+
+// 在事件處理器中使用
+TextField(
+  onChanged: (value) {
+    debouncer.trigger(() => performSearch(value));
+  },
+),
+// 創建一個節流閘門
+final throttler = CueGate.throttle(interval: Duration(seconds: 1));
+
+// 限制 UI 更新
+scrollController.addListener(() {
+  throttler.trigger(() => updatePositionIndicator());
+});
+
+// 在 StatefulWidget 中，使用 mixin 自動清理
+class SearchView extends StatefulWidget {
+// ...
+}
+
+class _SearchViewState extends State<SearchView> with CueGateMixin {
+  void _handleSearchInput(String query) {
+    debounceTrigger(
+      () => _performSearch(query),
+      Duration(milliseconds: 300),
+    );
+  }
+
+  void _handleScroll() {
+    throttleTrigger(
+      () => _updateScrollPosition(),
+      Duration(milliseconds: 100),
+    );
+  }
+
+// 清理由 mixin 自動處理
+}
 ```
 
 ## 進階功能

@@ -18,6 +18,7 @@ A lightweight, reactive state management solution for Flutter that integrates de
 - 🧩 **Modular Design** - Use just what you need or the entire ecosystem
 - 📢 **Event Bus System** - Type-safe events with RingCueMaster
 - 🎪 **Special Widgets** - Additional utility widgets like JokerReveal and JokerTrap
+- ⏱️ **Timing Controls** - Debounce and throttle mechanisms for controlling action execution
 
 ## Getting Started
 
@@ -255,6 +256,53 @@ Circus.cue(UserLoggedIn(currentUser));
 
 // Cancel subscription when done
 subscription.cancel();
+```
+
+### ⏱️ CueGate: Timing Controls
+
+Manage the timing of actions with debounce and throttle mechanisms:
+
+```dart
+// Create a debounce gate
+final debouncer = CueGate.debounce(delay: Duration(milliseconds: 300));
+
+// Use in event handlers
+TextField(
+  onChanged: (value) {
+    debouncer.trigger(() => performSearch(value));
+  },
+),
+
+// Create a throttle gate
+final throttler = CueGate.throttle(interval: Duration(seconds: 1));
+
+// Limit UI updates
+scrollController.addListener(() {
+  throttler.trigger(() => updatePositionIndicator());
+});
+
+// In StatefulWidgets, use the mixin for automatic cleanup
+class SearchView extends StatefulWidget {
+// ...
+}
+
+class _SearchViewState extends State<SearchView> with CueGateMixin {
+  void _handleSearchInput(String query) {
+    debounceTrigger(
+      () => _performSearch(query),
+      Duration(milliseconds: 300),
+    );
+  }
+
+  void _handleScroll() {
+    throttleTrigger(
+      () => _updateScrollPosition(),
+      Duration(milliseconds: 100),
+  );
+}
+
+// Cleanup handled automatically by mixin
+}
 ```
 
 ## Advanced Features
