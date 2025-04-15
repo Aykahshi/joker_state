@@ -1,3 +1,7 @@
+## 1.0.3
+
+* make JokerPortal/JokerCast can be link to Joker by tag
+
 ## 1.0.2+2
 
 * fix export missing

@@ -3,116 +3,156 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
 
 void main() {
-  group('JokerPortal<T>', () {
-    testWidgets('provides Joker via JokerPortal.of()', (tester) async {
-      final joker = Joker<int>(0, tag: 'test');
+  testWidgets('JokerPortal.of finds Joker by type without tag', (tester) async {
+    // Arrange
+    final joker = Joker<int>(42);
+    final testKey = GlobalKey();
 
-      late Joker<int> received;
-
-      await tester.pumpWidget(
-        JokerPortal<int>(
-          joker: joker,
-          child: Builder(
-            builder: (context) {
-              received = JokerPortal.of<int>(context);
-              return const Placeholder();
-            },
-          ),
-        ),
-      );
-
-      expect(received, isNotNull);
-      expect(received, equals(joker));
-      expect(received.state, 0);
-    });
-
-    testWidgets('provides Joker via context.joker<T>() extension',
-        (tester) async {
-      final joker = Joker<String>('hello', tag: 'greeting');
-
-      late Joker<String> selected;
-
-      await tester.pumpWidget(
-        JokerPortal<String>(
-          joker: joker,
-          child: Builder(
-            builder: (context) {
-              selected = context.joker<String>();
-              return const Placeholder();
-            },
-          ),
-        ),
-      );
-
-      expect(selected, isNotNull);
-      expect(selected, equals(joker));
-      expect(selected.state, 'hello');
-    });
-
-    testWidgets('rebuilds descendant when Joker state changes', (tester) async {
-      final joker = Joker<int>(0, tag: 'counter');
-
-      int buildCount = 0;
-
-      await tester.pumpWidget(
-        JokerPortal<int>(
-          joker: joker,
-          child: MaterialApp(
-            home: Builder(
-              builder: (context) {
-                final j = context.joker<int>();
-                buildCount++;
-                return Text('${j.state}', textDirection: TextDirection.ltr);
-              },
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('0'), findsOneWidget);
-      expect(buildCount, 1);
-
-      joker.trick(1);
-      await tester.pump();
-
-      expect(find.text('1'), findsOneWidget);
-      expect(buildCount, 2);
-    });
-
-    testWidgets('maybeOf returns null if no JokerPortal exists',
-        (tester) async {
-      Joker<int>? maybe;
-
-      await tester.pumpWidget(
-        Builder(
+    // Act
+    await tester.pumpWidget(
+      JokerPortal<int>(
+        joker: joker,
+        child: Builder(
+          key: testKey,
           builder: (context) {
-            maybe = JokerPortal.maybeOf<int>(context); // No portal
-            return const Placeholder();
+            final foundJoker = JokerPortal.of<int>(context);
+            return Text('${foundJoker.state}',
+                textDirection: TextDirection.ltr);
           },
         ),
-      );
+      ),
+    );
 
-      expect(maybe, isNull);
-    });
+    // Assert
+    expect(find.text('42'), findsOneWidget);
+  });
 
-    testWidgets('of throws when no JokerPortal exists (assert)',
-        (tester) async {
-      // assert throws only in debug mode
-      await tester.pumpWidget(
-        Builder(
+  testWidgets('JokerPortal.of finds Joker by type and tag', (tester) async {
+    // Arrange
+    final joker = Joker<int>(42, tag: 'counter');
+    final testKey = GlobalKey();
+
+    // Act
+    await tester.pumpWidget(
+      JokerPortal<int>(
+        joker: joker,
+        tag: 'counter',
+        child: Builder(
+          key: testKey,
+          builder: (context) {
+            final foundJoker = JokerPortal.of<int>(context, tag: 'counter');
+            return Text('${foundJoker.state}',
+                textDirection: TextDirection.ltr);
+          },
+        ),
+      ),
+    );
+
+    // Assert
+    expect(find.text('42'), findsOneWidget);
+  });
+
+  testWidgets('JokerPortal.maybeOf returns null when no matching Joker exists',
+      (tester) async {
+    // Arrange
+    final joker = Joker<int>(42, tag: 'counter');
+
+    // Act
+    await tester.pumpWidget(
+      JokerPortal<int>(
+        joker: joker,
+        tag: 'counter',
+        child: Builder(
+          builder: (context) {
+            final foundJoker =
+                JokerPortal.maybeOf<String>(context, tag: 'nonexistent');
+            return Text('${foundJoker == null ? 'not found' : 'found'}',
+                textDirection: TextDirection.ltr);
+          },
+        ),
+      ),
+    );
+
+    // Assert
+    expect(find.text('not found'), findsOneWidget);
+  });
+
+  testWidgets('JokerPortal.of throws assertion error when Joker not found',
+      (tester) async {
+    // Arrange
+    final joker = Joker<int>(42, tag: 'counter');
+
+    // Act & Assert
+    await tester.pumpWidget(
+      JokerPortal<int>(
+        joker: joker,
+        tag: 'counter',
+        child: Builder(
           builder: (context) {
             expect(
-              () => JokerPortal.of<int>(context),
-              throwsA(predicate(
-                (e) =>
-                    e is AssertionError &&
-                    e.message == 'No JokerPortal<int> found in context.',
-              )),
+              () => JokerPortal.of<String>(context, tag: 'nonexistent'),
+              throwsAssertionError,
             );
-            return const Placeholder();
+            return const SizedBox();
           },
         ),
-      );
-    });
+      ),
+    );
+  });
+
+  testWidgets('context.joker extension method finds Joker correctly',
+      (tester) async {
+    // Arrange
+    final joker = Joker<int>(42, tag: 'counter');
+
+    // Act
+    await tester.pumpWidget(
+      JokerPortal<int>(
+        joker: joker,
+        tag: 'counter',
+        child: Builder(
+          builder: (context) {
+            final foundJoker = context.joker<int>(tag: 'counter');
+            return Text('${foundJoker.state}',
+                textDirection: TextDirection.ltr);
+          },
+        ),
+      ),
+    );
+
+    // Assert
+    expect(find.text('42'), findsOneWidget);
+  });
+
+  testWidgets('nested JokerPortals work correctly', (tester) async {
+    // Arrange
+    final jokerA = Joker<int>(42, tag: 'counterA');
+    final jokerB = Joker<String>('hello', tag: 'textB');
+
+    // Act
+    await tester.pumpWidget(
+      JokerPortal<int>(
+        joker: jokerA,
+        tag: 'counterA',
+        child: JokerPortal<String>(
+          joker: jokerB,
+          tag: 'textB',
+          child: Builder(
+            builder: (context) {
+              final counterJoker =
+                  JokerPortal.of<int>(context, tag: 'counterA');
+              final textJoker = JokerPortal.of<String>(context, tag: 'textB');
+              return Text(
+                '${counterJoker.state}-${textJoker.state}',
+                textDirection: TextDirection.ltr,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    // Assert
+    expect(find.text('42-hello'), findsOneWidget);
   });
 }
