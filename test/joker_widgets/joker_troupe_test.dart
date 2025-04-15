@@ -275,6 +275,7 @@ void main() {
 class _DisposableTracker<T> extends Joker<T> {
   bool isDisposed = false;
 
+  // ignore: use_super_parameters
   _DisposableTracker(T initialValue, {String? tag})
       : super(initialValue, tag: tag);
 
