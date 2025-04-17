@@ -1,3 +1,6 @@
+## 1.2.2
+* fix Circus.ringMaster cannot find correct CueMaster error
+
 ## 1.2.1
 * Update README.md
 

@@ -2,7 +2,6 @@ import 'dart:developer';
 
 import 'package:flutter/widgets.dart';
 
-import '../../../event_bus/ring_cue_master/cue_master.dart';
 import '../../../state_management/joker/joker.dart';
 import 'circus_ring_exception.dart';
 import 'disposable.dart';
@@ -97,7 +96,7 @@ class CircusRing {
     /// because there might be some class like CustomCueMaster
     /// and if we use CustomCueMaster_$tag, it will be conflict
     /// Circus.ringMaster() can not find the CustomCueMaster
-    if (type is CueMaster) {
+    if (type.toString().contains('CueMaster')) {
       return 'CueMaster_$tag';
     }
 

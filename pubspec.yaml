@@ -1,6 +1,6 @@
 name: joker_state
 description: "Joker is a lightweight, reactive state management solution for Flutter that brings the fun of the circus to your codebase with simple, flexible, and type-safe state handling."
-version: 1.2.1
+version: 1.2.2
 homepage: https://github.com/Aykahshi/joker_state
 repository: https://github.com/Aykahshi/joker_state
 
