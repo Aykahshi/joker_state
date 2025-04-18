@@ -79,11 +79,32 @@ class JokerPortal<T> extends InheritedNotifier<Joker<T>> {
     String errorMessage;
 
     if (tag == null) {
-      final portal =
-          context.dependOnInheritedWidgetOfExactType<JokerPortal<T>>();
-      joker = portal?.notifier;
+      // --- Ambiguity Check --- Find ALL portals of type T
+      final allPortals = _findAllPortalsOfType<T>(context);
+      if (allPortals.length > 1) {
+        // Ambiguous case: Multiple portals found without a tag
+        errorMessage = 'Found multiple JokerPortal<$T> widgets in ancestors. ';
+        errorMessage +=
+            'You must provide a unique `tag` to JokerPortal.of<$T>() ';
+        errorMessage += 'to identify which Joker instance you want.';
+        assert(false, errorMessage);
+        // The assert(false) will throw in debug mode.
+        // In release mode, we might fall through, so throw explicitly.
+        throw FlutterError(errorMessage);
+      } else if (allPortals.isNotEmpty) {
+        // Found exactly one portal, establish dependency on it
+        final portal = allPortals.first;
+        final element =
+            context.getElementForInheritedWidgetOfExactType<JokerPortal<T>>();
+        if (element != null) {
+          context.dependOnInheritedElement(element);
+        }
+        joker = portal.notifier;
+      }
+      // If allPortals is empty, joker remains null, handled by assert below
+
       errorMessage = 'No JokerPortal<$T> found in context. ';
-      // Add a hint if type might be ambiguous
+      // Add hint if type might be common
       if (T == int ||
           T == String ||
           T == bool ||
@@ -97,29 +118,43 @@ class JokerPortal<T> extends InheritedNotifier<Joker<T>> {
             'Ensure a JokerPortal<$T> exists above this widget in the tree.';
       }
     } else {
+      // --- Tagged Lookup --- Find specific portal by tag
       final portal = _findPortalByTag<T>(context, tag);
       joker = portal?.notifier;
       errorMessage =
           'No JokerPortal<$T> with tag "$tag" found in context. Ensure a JokerPortal<$T> with this exact tag exists above this widget.';
     }
 
+    // Final check: Ensure a joker was actually found (either tagged or unambiguous untagged)
     assert(joker != null, errorMessage);
     return joker!;
   }
 
   /// Finds the nearest ancestor `JokerPortal<T>` widget and returns its [Joker],
-  /// or `null` if not found.
+  /// or `null` if not found or if multiple untagged portals exist (ambiguity).
   ///
-  /// Use this if the Joker might not be present in the tree.
+  /// Use this if the Joker might not be present or if ambiguity should result in null.
   /// See [of] for details on using the [tag].
   static Joker<T>? maybeOf<T>(BuildContext context, {String? tag}) {
     if (tag == null) {
-      // Note: dependOnInheritedWidgetOfExactType is correct here even for maybeOf,
-      // as it establishes the dependency link if found.
-      return context
-          .dependOnInheritedWidgetOfExactType<JokerPortal<T>>()
-          ?.notifier;
+      // --- Ambiguity Check --- Find ALL portals of type T
+      final allPortals = _findAllPortalsOfType<T>(context);
+      if (allPortals.length > 1) {
+        // Ambiguous case: Return null
+        return null;
+      } else if (allPortals.isNotEmpty) {
+        // Found exactly one portal, establish dependency and return notifier
+        final element =
+            context.getElementForInheritedWidgetOfExactType<JokerPortal<T>>();
+        if (element != null) {
+          context.dependOnInheritedElement(element);
+        }
+        return allPortals.first.notifier;
+      }
+      // No portals found
+      return null;
     } else {
+      // --- Tagged Lookup ---
       return _findPortalByTag<T>(context, tag)?.notifier;
     }
   }
@@ -151,6 +186,18 @@ class JokerPortal<T> extends InheritedNotifier<Joker<T>> {
       return true; // Continue visiting
     });
     return result;
+  }
+
+  /// Helper function to find all ancestor portals of a specific type T
+  static List<JokerPortal<T>> _findAllPortalsOfType<T>(BuildContext context) {
+    final List<JokerPortal<T>> portals = [];
+    context.visitAncestorElements((element) {
+      if (element.widget is JokerPortal<T>) {
+        portals.add(element.widget as JokerPortal<T>);
+      }
+      return true; // Continue visiting
+    });
+    return portals;
   }
 
   @override
