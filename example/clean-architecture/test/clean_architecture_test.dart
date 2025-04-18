@@ -80,9 +80,9 @@ void main() {
     Circus.ringMaster();
   });
 
-  tearDown(() {
+  tearDown(() async {
     // Clean up CircusRing after each test.
-    Circus.fireAll();
+    await Circus.fireAll();
   });
 
   testWidgets('Counter starts at 0 after initialization',

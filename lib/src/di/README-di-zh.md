@@ -96,11 +96,8 @@ Circus.fire<UserRepository>();
 // 非同步移除
 await Circus.fireAsync<NetworkService>();
 
-// 移除全部依賴
-Circus.fireAll();
-
-// 非同步清理全部
-await Circus.fireAllAsync();
+// 移除全部依賴（會處理非同步清理）
+await Circus.fireAll();
 ```
 
 ### 🃏 Joker 整合

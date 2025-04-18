@@ -5,6 +5,19 @@ import 'package:joker_state_todo_example/main.dart';
 import 'package:joker_state_todo_example/todo_item.dart';
 
 void main() {
+  // Add setUp and tearDown for state isolation
+  setUp(() async {
+    // Ensure clean state before each test
+    await Circus.fireAll();
+    // Initialize necessary Jokers if main() isn't run
+    Circus.summon<List<TodoItem>>([], tag: 'todos');
+  });
+
+  tearDown(() async {
+    // Clean up after each test
+    await Circus.fireAll();
+  });
+
   testWidgets('displays empty message when no todos', (tester) async {
     await tester.pumpWidget(const MyApp());
 

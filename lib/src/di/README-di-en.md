@@ -96,11 +96,8 @@ Circus.fire<UserRepository>();
 // Remove asynchronously (for async disposables)
 await Circus.fireAsync<NetworkService>();
 
-// Remove all dependencies
-Circus.fireAll();
-
-// Remove all dependencies with async cleanup
-await Circus.fireAllAsync();
+// Remove all dependencies (handles async cleanup)
+await Circus.fireAll();
 ```
 
 ### 🃏 Joker Integration

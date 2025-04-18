@@ -109,12 +109,33 @@ class CircusRing {
   /// Conditionally calls `dispose` on the removed instance if it implements
   /// `Disposable` or `ChangeNotifier`, **unless** it is a `Joker` instance.
   /// `Joker` instances manage their own lifecycle.
+  /// Throws [CircusRingException] if trying to dispose an [AsyncDisposable] synchronously.
   bool fire<T extends Object>({String? tag}) {
     _checkDisposed();
     final key = _getKey(T, tag);
 
     final instance = _instances[key];
     if (instance == null) {
+      // Also check factories etc. to allow removing non-instantiated bindings
+      final factoryRemoved = _factories.remove(key) != null;
+      final lazyFactoryRemoved = _lazyFactories.remove(key) != null;
+      final fenixRemoved = _fenixBuilders.remove(key) != null;
+      final lazyAsyncRemoved =
+          _lazyAsyncSingleton.remove(key) != null; // Check async lazy too
+      final fenixAsyncRemoved =
+          _fenixAsyncBuilders.remove(key) != null; // Check async fenix too
+
+      if (factoryRemoved ||
+          lazyFactoryRemoved ||
+          fenixRemoved ||
+          lazyAsyncRemoved ||
+          fenixAsyncRemoved) {
+        _log('Binding removed (was not instantiated): $key');
+        // Clear dependencies even if not instantiated
+        _clearDependenciesFor(key);
+        return true;
+      }
+      // If neither instance nor any factory/builder found
       return false;
     }
 
@@ -141,6 +162,13 @@ class CircusRing {
     _log('Instance removed: $key');
 
     // --- Conditionally dispose ---
+    // Check for AsyncDisposable FIRST and throw if found in sync fire()
+    if (instance is AsyncDisposable) {
+      throw CircusRingException(
+        'Cannot synchronously dispose $key (Type: ${instance.runtimeType}). '
+        'It implements AsyncDisposable. Use fireAsync<$T>(tag: "$tag") instead.',
+      );
+    }
     // Only dispose if it's NOT a Joker and implements Disposable or ChangeNotifier
     if (instance is! Joker) {
       if (instance is Disposable) {
@@ -170,6 +198,7 @@ class CircusRing {
   /// Removes an instance by its tag (type is inferred or doesn't matter).
   /// Returns `true` if an instance with the tag was found and removed.
   /// Conditionally calls `dispose` (excluding Jokers).
+  /// Handles both [Disposable] and [AsyncDisposable] appropriately.
   bool fireByTag(String tag) {
     _checkDisposed();
     if (tag.isEmpty) {
@@ -223,6 +252,13 @@ class CircusRing {
     _log('Instance removed by tag: $tag (key: $keyToRemove)');
 
     // --- Conditionally dispose ---
+    // Check for AsyncDisposable FIRST and throw
+    if (instanceToRemove is AsyncDisposable) {
+      throw CircusRingException(
+        'Cannot synchronously dispose instance with tag "$tag" (key: $keyToRemove, Type: ${instanceToRemove.runtimeType}). '
+        'It implements AsyncDisposable. Use fireAsyncByTag(tag: "$tag") or fireAsync<Type>(tag: "$tag") instead.',
+      );
+    }
     if (instanceToRemove is! Joker) {
       if (instanceToRemove is Disposable) {
         try {
@@ -259,15 +295,23 @@ class CircusRing {
 
   /// Clears all registered instances and dependencies.
   /// Conditionally calls `dispose` on instances (excluding Jokers).
-  void fireAll() {
+  /// Handles both [Disposable] and [AsyncDisposable] appropriately.
+  Future<void> fireAll() async {
     _checkDisposed();
     final keys = _instances.keys.toList(); // Get keys before iterating
     for (final key in keys) {
       final instance = _instances.remove(key);
       if (instance != null) {
-        // --- Conditionally dispose ---
+        // --- Conditionally dispose (Async first) ---
         if (instance is! Joker) {
-          if (instance is Disposable) {
+          if (instance is AsyncDisposable) {
+            try {
+              _log('fireAll: Disposing AsyncDisposable: $key');
+              await instance.dispose();
+            } catch (e, s) {
+              _log('fireAll: Error disposing AsyncDisposable $key: $e\n$s');
+            }
+          } else if (instance is Disposable) {
             try {
               _log('fireAll: Disposing Disposable: $key');
               instance.dispose();
@@ -296,15 +340,16 @@ class CircusRing {
     _fenixAsyncBuilders.clear();
     _dependencies.clear();
     _dependents.clear(); // Clear dependents map as well
-    _log('Cleared all instances, factories, and dependencies.');
+    _log('Cleared all instances, factories, and dependencies asynchronously.');
   }
 
   /// Disposes the CircusRing itself, making it unusable.
-  /// Calls [fireAll] first to clear internal state.
-  void dispose() {
+  /// Calls [fireAll] first to clear internal state asynchronously.
+  Future<void> dispose() async {
     if (!_isDisposed) {
-      fireAll(); // Clear instances first (conditionally disposing non-Jokers)
+      await fireAll(); // Clear instances first (conditionally disposing non-Jokers)
       _isDisposed = true;
+      _log('CircusRing disposed.');
     }
   }
 
@@ -793,58 +838,6 @@ extension CircusRingFind on CircusRing {
     // if (success) _clearDependenciesFor(key);
     return success;
   }
-
-  /// Delete all instances asynchronously
-  ///
-  /// Asynchronously removes all registered instances and factories from the container
-  /// properly disposing of async resources (excluding Jokers).
-  Future<void> fireAllAsync() async {
-    _checkDisposed();
-    final keys = _instances.keys.toList(); // Get keys before iterating
-    for (final key in keys) {
-      final instance = _instances.remove(key);
-      if (instance != null) {
-        // --- Conditionally dispose (Async first) ---
-        if (instance is! Joker) {
-          if (instance is AsyncDisposable) {
-            try {
-              _log('fireAllAsync: Disposing AsyncDisposable: $key');
-              await instance.dispose();
-            } catch (e, s) {
-              _log(
-                  'fireAllAsync: Error disposing AsyncDisposable $key: $e\n$s');
-            }
-          } else if (instance is Disposable) {
-            try {
-              _log('fireAllAsync: Disposing Disposable: $key');
-              instance.dispose();
-            } catch (e, s) {
-              _log('fireAllAsync: Error disposing Disposable $key: $e\n$s');
-            }
-          } else if (instance is ChangeNotifier) {
-            try {
-              _log('fireAllAsync: Disposing ChangeNotifier: $key');
-              instance.dispose();
-            } catch (e, s) {
-              _log('fireAllAsync: Error disposing ChangeNotifier $key: $e\n$s');
-            }
-          }
-        } else {
-          _log('fireAllAsync: Skipping dispose for Joker: $key');
-        }
-        // --- End Conditionally dispose ---
-      }
-    }
-    // Clear remaining containers
-    _factories.clear();
-    _lazyFactories.clear();
-    _lazyAsyncSingleton.clear();
-    _fenixBuilders.clear();
-    _fenixAsyncBuilders.clear();
-    _dependencies.clear();
-    _dependents.clear();
-    _log('Cleared all instances, factories, and dependencies asynchronously.');
-  }
 }
 
 /// Extension for tag-based operations in CircusRing
@@ -941,5 +934,5 @@ extension CircusRingTagFind on CircusRing {
     }
   }
 
-  // Note: fireByTag was already updated earlier to conditionally dispose
+  // Note: fireByTag was already updated earlier to conditionally dispose and throw for AsyncDisposable
 }

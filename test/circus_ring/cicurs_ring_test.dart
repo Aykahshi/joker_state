@@ -8,9 +8,9 @@ class UniqueType {
 }
 
 void main() {
-  setUp(() {
+  setUp(() async {
     // Reset CircusRing before each test
-    Circus.fireAll();
+    await Circus.fireAll();
     // Removed Circus.config call, logging now tied to kDebugMode
     // Circus.config(enableLogs: false);
   });
@@ -466,17 +466,17 @@ void main() {
     });
 
     test(
-        'fireAllAsync should delete all instances and dispose non-Jokers (sync and async)',
+        'fireAll should delete all instances and dispose non-Jokers (sync and async)',
         () async {
       // Arrange
       final disposable = _DisposableObject();
       final asyncDisposable = _AsyncDisposableObject();
-      final joker = Joker<int>(1, tag: 'jokerAsync');
+      final joker = Joker<int>(1, tag: 'joker');
       final normal = _TestClass('test');
 
       Circus.hire<_DisposableObject>(disposable);
       Circus.hire<_AsyncDisposableObject>(asyncDisposable);
-      Circus.hire<Joker<int>>(joker, tag: 'jokerAsync');
+      Circus.hire<Joker<int>>(joker, tag: 'joker');
       Circus.hire<_TestClass>(normal);
 
       expect(disposable.isDisposed, isFalse);
@@ -484,17 +484,18 @@ void main() {
       expect(joker.isDisposed, isFalse);
 
       // Act
-      await Circus.fireAllAsync();
+      await Circus.fireAll();
 
       // Assert
       expect(Circus.isHired<_DisposableObject>(), isFalse);
       expect(Circus.isHired<_AsyncDisposableObject>(), isFalse);
-      expect(Circus.isHired<Joker<int>>('jokerAsync'), isFalse);
+      expect(Circus.isHired<Joker<int>>('joker'), isFalse);
       expect(Circus.isHired<_TestClass>(), isFalse);
 
       expect(disposable.isDisposed, isTrue); // Disposed
-      expect(asyncDisposable.isDisposed, isTrue); // Disposed
-      expect(joker.isDisposed, isFalse); // Joker NOT disposed
+      expect(
+          asyncDisposable.isDisposed, isTrue); // Async Disposable also disposed
+      expect(joker.isDisposed, isFalse); // Joker NOT disposed by fireAll
 
       // Manual cleanup
       joker.dispose();

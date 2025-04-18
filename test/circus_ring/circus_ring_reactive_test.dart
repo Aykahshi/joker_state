@@ -5,9 +5,9 @@ void main() {
   group('CircusRing with Reactive Jokers', () {
     late CircusRing circus;
 
-    setUp(() {
+    setUp(() async {
       circus = Circus;
-      circus.fireAll(); // Clear all instances before each test
+      await circus.fireAll(); // Await the async fireAll
     });
 
     test('should maintain reactivity of registered Joker', () {

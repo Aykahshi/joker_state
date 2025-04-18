@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:joker_state/joker_state.dart'; // Import JokerState for Circus
 import 'package:joker_state_infinite_scroll_pagination_example/main.dart';
 
 Future<void> scrollToVisibleItem(WidgetTester tester, String text) async {
@@ -23,6 +24,19 @@ Future<void> scrollToVisibleItem(WidgetTester tester, String text) async {
 }
 
 void main() {
+  // Add setUp and tearDown for state isolation
+  setUp(() async {
+    await Circus.fireAll();
+    // Initialize necessary Jokers if main() isn't run
+    // Assuming ItemPaginationJoker is initialized in main.dart
+    // If not, initialize it here similar to todos_test.dart
+    // e.g., Circus.summon<ItemPaginationState>(...)
+  });
+
+  tearDown(() async {
+    await Circus.fireAll();
+  });
+
   testWidgets('initially loads 20 items and displays one of them',
       (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
