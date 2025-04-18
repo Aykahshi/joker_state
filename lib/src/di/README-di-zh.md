@@ -129,12 +129,12 @@ counter.trick(1);
 Circus.vanish<int>(tag: 'counter');
 ```
 
-## ⚙️ 配置
+## ⚙️ 日誌記錄
 
-```dart
-// 啟用除錯日誌
-Circus.config(enableLogs: true);
-```
+CircusRing 包含用於註冊、檢索和釋放事件的內部日誌記錄。
+
+- **自動日誌**: 當您的應用程序在調試模式下運行時（`kDebugMode` 為 true），日誌記錄會自動啟用，在 profile/release 模式下則會禁用。
+- **無需配置**: 不再需要手動配置日誌記錄。
 
 ## 💡 最佳實踐
 

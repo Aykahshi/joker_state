@@ -1,6 +1,7 @@
 import 'dart:developer';
 
-import 'package:flutter/widgets.dart';
+// Import foundation for kDebugMode
+import 'package:flutter/foundation.dart';
 
 import '../../../state_management/joker/joker.dart';
 import 'circus_ring_exception.dart';
@@ -55,14 +56,14 @@ class CircusRing {
   /// Stores fenix async builders for auto-rebind after dispose.
   final _fenixAsyncBuilders = <String, AsyncFactoryFunc>{};
 
-  /// Whether to enable debug logs
-  bool _enableLogs = false;
-
-  /// Configure CircusRing
+  /// Log output
   ///
-  /// [enableLogs]: Whether to enable debug logging
-  void config({bool? enableLogs}) {
-    if (enableLogs != null) _enableLogs = enableLogs;
+  /// Prints debug information if kDebugMode is true.
+  void _log(String message) {
+    // Directly check kDebugMode instead of _enableLogs
+    if (kDebugMode) {
+      log('[🃏CircusRing] $message');
+    }
   }
 
   /// Establishes a dependency relationship between two registered instances.
@@ -103,13 +104,360 @@ class CircusRing {
     return tag != null ? '${type.toString()}_$tag' : type.toString();
   }
 
-  /// Log output
-  ///
-  /// Prints debug information if logging is enabled
-  void _log(String message) {
-    if (_enableLogs) {
-      log('[🃏CircusRing] $message');
+  /// Removes an instance of type [T] with the specified [tag] from the registry.
+  /// Returns `true` if the instance was found and removed, `false` otherwise.
+  /// Conditionally calls `dispose` on the removed instance if it implements
+  /// `Disposable` or `ChangeNotifier`, **unless** it is a `Joker` instance.
+  /// `Joker` instances manage their own lifecycle.
+  bool fire<T extends Object>({String? tag}) {
+    _checkDisposed();
+    final key = _getKey(T, tag);
+
+    final instance = _instances[key];
+    if (instance == null) {
+      return false;
     }
+
+    // Prevent removal if this instance is depended on by others
+    if (_dependents.containsKey(key) &&
+        (_dependents[key]?.isNotEmpty ?? false)) {
+      final activeDependents = _dependents[key]!
+          .where((depKey) => _instances.containsKey(depKey))
+          .toList();
+      if (activeDependents.isNotEmpty) {
+        throw CircusRingException(
+          "Cannot remove $key. It is still depended on by: ${activeDependents.join(", ")}",
+        );
+      }
+      // If dependents list exists but all are inactive, clean it up.
+      _dependents.remove(key);
+    }
+
+    // Also clear its own dependencies from others dependents lists
+    _clearDependenciesFor(key);
+
+    // Remove the instance first
+    _instances.remove(key);
+    _log('Instance removed: $key');
+
+    // --- Conditionally dispose ---
+    // Only dispose if it's NOT a Joker and implements Disposable or ChangeNotifier
+    if (instance is! Joker) {
+      if (instance is Disposable) {
+        try {
+          _log('Disposing Disposable: $key');
+          instance.dispose();
+        } catch (e, s) {
+          _log('Error disposing Disposable instance $key: $e\n$s');
+        }
+      } else if (instance is ChangeNotifier) {
+        // Dispose ChangeNotifier as a fallback if not Disposable
+        try {
+          _log('Disposing ChangeNotifier: $key');
+          instance.dispose();
+        } catch (e, s) {
+          _log('Error disposing ChangeNotifier instance $key: $e\n$s');
+        }
+      }
+    } else {
+      _log('Skipping dispose for Joker instance: $key (manages own lifecycle)');
+    }
+    // --- End Conditionally dispose ---
+
+    return true;
+  }
+
+  /// Removes an instance by its tag (type is inferred or doesn't matter).
+  /// Returns `true` if an instance with the tag was found and removed.
+  /// Conditionally calls `dispose` (excluding Jokers).
+  bool fireByTag(String tag) {
+    _checkDisposed();
+    if (tag.isEmpty) {
+      throw CircusRingException('Tag cannot be empty for fireByTag.');
+    }
+
+    String? keyToRemove;
+    dynamic instanceToRemove;
+
+    // Find the key and instance first
+    for (final key in _instances.keys) {
+      // Improved tag matching logic
+      final typeAndTag = key.split('_');
+      if (typeAndTag.length > 1 && typeAndTag.last == tag) {
+        keyToRemove = key;
+        instanceToRemove = _instances[key];
+        break;
+      } else if (typeAndTag.length == 1 && key == tag) {
+        // Handle cases with no type prefix (less common)
+        keyToRemove = key;
+        instanceToRemove = _instances[key];
+        break;
+      }
+    }
+
+    if (keyToRemove == null || instanceToRemove == null) {
+      _log('Instance with tag "$tag" not found for removal.');
+      return false;
+    }
+
+    // Prevent removal if this instance is depended on by others
+    if (_dependents.containsKey(keyToRemove) &&
+        (_dependents[keyToRemove]?.isNotEmpty ?? false)) {
+      final activeDependents = _dependents[keyToRemove]!
+          .where((depKey) => _instances.containsKey(depKey))
+          .toList();
+      if (activeDependents.isNotEmpty) {
+        throw CircusRingException(
+          "Cannot remove $keyToRemove (tag: $tag). It is still depended on by: ${activeDependents.join(", ")}",
+        );
+      }
+      // If dependents list exists but all are inactive, clean it up.
+      _dependents.remove(keyToRemove);
+    }
+
+    // Also clear its own dependencies from others dependents lists
+    _clearDependenciesFor(keyToRemove);
+
+    // Remove the instance
+    _instances.remove(keyToRemove);
+    _log('Instance removed by tag: $tag (key: $keyToRemove)');
+
+    // --- Conditionally dispose ---
+    if (instanceToRemove is! Joker) {
+      if (instanceToRemove is Disposable) {
+        try {
+          _log('Disposing Disposable by tag: $tag');
+          instanceToRemove.dispose();
+        } catch (e, s) {
+          _log(
+              'Error disposing Disposable instance (tag: $tag) $keyToRemove: $e\n$s');
+        }
+      } else if (instanceToRemove is ChangeNotifier) {
+        try {
+          _log('Disposing ChangeNotifier by tag: $tag');
+          instanceToRemove.dispose();
+        } catch (e, s) {
+          _log(
+              'Error disposing ChangeNotifier instance (tag: $tag) $keyToRemove: $e\n$s');
+        }
+      }
+    } else {
+      _log('Skipping dispose for Joker instance by tag: $tag');
+    }
+    // --- End Conditionally dispose ---
+
+    return true;
+  }
+
+  void _removeReverseDependencies(String removedKey) {
+    _dependencies.removeWhere((dependentKey, dependencySet) {
+      dependencySet.remove(removedKey);
+      // Remove the entry entirely if the set becomes empty
+      return dependencySet.isEmpty;
+    });
+  }
+
+  void _checkDisposed() {
+    if (_isDisposed) {
+      throw StateError(
+        'This CircusRing instance has been disposed and cannot be used anymore.',
+      );
+    }
+  }
+
+  /// Clears all registered instances and dependencies.
+  /// Conditionally calls `dispose` on instances (excluding Jokers).
+  void fireAll() {
+    _checkDisposed();
+    final keys = _instances.keys.toList(); // Get keys before iterating
+    for (final key in keys) {
+      final instance = _instances.remove(key);
+      if (instance != null) {
+        // --- Conditionally dispose ---
+        if (instance is! Joker) {
+          if (instance is Disposable) {
+            try {
+              _log('fireAll: Disposing Disposable: $key');
+              instance.dispose();
+            } catch (e, s) {
+              _log('fireAll: Error disposing Disposable $key: $e\n$s');
+            }
+          } else if (instance is ChangeNotifier) {
+            try {
+              _log('fireAll: Disposing ChangeNotifier: $key');
+              instance.dispose();
+            } catch (e, s) {
+              _log('fireAll: Error disposing ChangeNotifier $key: $e\n$s');
+            }
+          }
+        } else {
+          _log('fireAll: Skipping dispose for Joker: $key');
+        }
+        // --- End Conditionally dispose ---
+      }
+    }
+    // Clear remaining containers
+    _factories.clear();
+    _lazyFactories.clear();
+    _lazyAsyncSingleton.clear();
+    _fenixBuilders.clear();
+    _fenixAsyncBuilders.clear();
+    _dependencies.clear();
+    _dependents.clear(); // Clear dependents map as well
+    _log('Cleared all instances, factories, and dependencies.');
+  }
+
+  /// Disposes the CircusRing itself, making it unusable.
+  /// Calls [fireAll] first to clear internal state.
+  void dispose() {
+    if (!_isDisposed) {
+      fireAll(); // Clear instances first (conditionally disposing non-Jokers)
+      _isDisposed = true;
+    }
+  }
+
+  bool _isDisposed = false;
+
+  // --- Internal Helper for Replacing/Deleting Single Instance ---
+  // This method is called internally when replacing an existing registration.
+  // It should also apply the conditional dispose logic.
+  bool _deleteSingle<T extends Object>(
+      {required String key, bool isReplacing = false}) {
+    final instance = _instances.remove(key);
+    final factoryRemoved = _factories.remove(key) != null;
+    final lazyFactoryRemoved = _lazyFactories.remove(key) != null;
+    final fenixRemoved = _fenixBuilders.remove(key) != null;
+
+    bool instanceRemoved = instance != null;
+
+    if (instanceRemoved) {
+      _log('${isReplacing ? "Replacing" : "Deleting"} instance: $key');
+      // --- Conditionally dispose removed instance ---
+      if (instance is! Joker) {
+        if (instance is Disposable) {
+          try {
+            instance.dispose();
+          } catch (e, s) {
+            _log(
+                'Error disposing Disposable during delete/replace $key: $e\n$s');
+          }
+        } else if (instance is ChangeNotifier) {
+          try {
+            instance.dispose();
+          } catch (e, s) {
+            _log(
+                'Error disposing ChangeNotifier during delete/replace $key: $e\n$s');
+          }
+        }
+      } else {
+        _log('Skipping dispose for Joker during delete/replace: $key');
+      }
+      // --- End Conditionally dispose ---
+    } else if (factoryRemoved) {
+      _log('${isReplacing ? "Replacing" : "Deleting"} factory: $key');
+    } else if (lazyFactoryRemoved) {
+      _log('${isReplacing ? "Replacing" : "Deleting"} lazy factory: $key');
+    } else if (fenixRemoved) {
+      _log('${isReplacing ? "Replacing" : "Deleting"} fenix builder: $key');
+    }
+
+    // Clear dependencies only if actually deleting, not just replacing
+    // if (!isReplacing && (instanceRemoved || factoryRemoved || lazyFactoryRemoved || fenixRemoved)) {
+    //   _clearDependenciesFor(key);
+    // }
+    // Correction: Dependencies should be cleared regardless, as the old binding is gone.
+    if (instanceRemoved ||
+        factoryRemoved ||
+        lazyFactoryRemoved ||
+        fenixRemoved) {
+      _clearDependenciesFor(key);
+    }
+
+    return instanceRemoved ||
+        factoryRemoved ||
+        lazyFactoryRemoved ||
+        fenixRemoved;
+  }
+
+  // Async version of _deleteSingle
+  Future<bool> _deleteSingleAsync<T extends Object>(
+      {required String key, bool isReplacing = false}) async {
+    final instance = _instances.remove(key);
+    final lazyAsyncRemoved = _lazyAsyncSingleton.remove(key) != null;
+    final fenixAsyncRemoved = _fenixAsyncBuilders.remove(key) != null;
+
+    bool instanceRemoved = instance != null;
+
+    if (instanceRemoved) {
+      _log('${isReplacing ? "Replacing" : "Deleting"} async instance: $key');
+      // --- Conditionally dispose removed instance (Async first) ---
+      if (instance is! Joker) {
+        if (instance is AsyncDisposable) {
+          try {
+            await instance.dispose();
+          } catch (e, s) {
+            _log(
+                'Error disposing AsyncDisposable during async delete/replace $key: $e\n$s');
+          }
+        } else if (instance is Disposable) {
+          try {
+            instance.dispose();
+          } catch (e, s) {
+            _log(
+                'Error disposing Disposable during async delete/replace $key: $e\n$s');
+          }
+        } else if (instance is ChangeNotifier) {
+          try {
+            instance.dispose();
+          } catch (e, s) {
+            _log(
+                'Error disposing ChangeNotifier during async delete/replace $key: $e\n$s');
+          }
+        }
+      } else {
+        _log('Skipping dispose for Joker during async delete/replace: $key');
+      }
+      // --- End Conditionally dispose ---
+    } else if (lazyAsyncRemoved) {
+      _log(
+          '${isReplacing ? "Replacing" : "Deleting"} async lazy factory: $key');
+    } else if (fenixAsyncRemoved) {
+      _log(
+          '${isReplacing ? "Replacing" : "Deleting"} async fenix builder: $key');
+    }
+
+    // Clear dependencies only if actually deleting, not just replacing
+    // if (!isReplacing && (instanceRemoved || lazyAsyncRemoved || fenixAsyncRemoved)) {
+    //   _clearDependenciesFor(key);
+    // }
+    // Correction: Dependencies should be cleared regardless
+    if (instanceRemoved || lazyAsyncRemoved || fenixAsyncRemoved) {
+      _clearDependenciesFor(key);
+    }
+
+    return instanceRemoved || lazyAsyncRemoved || fenixAsyncRemoved;
+  }
+
+  // Helper to clear dependencies AND dependents for a removed key
+  void _clearDependenciesFor(String removedKey) {
+    // Remove from dependency lists of others
+    final dependents = _dependents.remove(removedKey) ?? {};
+    for (final dependentKey in dependents) {
+      _dependencies[dependentKey]?.remove(removedKey);
+      if (_dependencies[dependentKey]?.isEmpty ?? false) {
+        _dependencies.remove(dependentKey);
+      }
+    }
+
+    // Remove its own dependencies from others' dependent lists
+    final dependencies = _dependencies.remove(removedKey) ?? {};
+    for (final dependencyKey in dependencies) {
+      _dependents[dependencyKey]?.remove(removedKey);
+      if (_dependents[dependencyKey]?.isEmpty ?? false) {
+        _dependents.remove(dependencyKey);
+      }
+    }
+    _log('Cleared dependencies for: $removedKey');
   }
 }
 
@@ -120,7 +468,8 @@ extension CircusRingHiring on CircusRing {
   /// Registers an instance that will be shared throughout the app.
   /// [instance]: The object to register
   /// [tag]: Optional name to distinguish between instances of the same type
-  T hire<T>(T instance, {String? tag}) {
+  T hire<T extends Object>(T instance, {String? tag}) {
+    _checkDisposed();
     // Verify that Joker instances must use summon or provide a tag
     if (instance is Joker && (tag == null || tag.isEmpty)) {
       throw CircusRingException(
@@ -129,9 +478,11 @@ extension CircusRingHiring on CircusRing {
       );
     }
     final key = _getKey(T, tag);
-    if (_instances.containsKey(key)) {
-      _log('Instance $key already exists, will be replaced');
-      _deleteSingle<T>(key: key);
+    if (_instances.containsKey(key) ||
+        _lazyFactories.containsKey(key) ||
+        _factories.containsKey(key)) {
+      _log('Instance/Factory $key already exists, will be replaced');
+      _deleteSingle<T>(key: key, isReplacing: true);
     }
     _instances[key] = instance;
     _log('Instance $key registered');
@@ -143,14 +494,15 @@ extension CircusRingHiring on CircusRing {
   /// Registers a dependency that will be created asynchronously
   /// [asyncBuilder]: Function that returns a Future of the instance
   /// [tag]: Optional name to distinguish between instances of the same type
-  Future<T> hireAsync<T>(
+  Future<T> hireAsync<T extends Object>(
     AsyncFactoryFunc<T> asyncBuilder, {
     String? tag,
   }) async {
+    _checkDisposed();
     final key = _getKey(T, tag);
-    if (_instances.containsKey(key)) {
-      _log('Replacing existing async instance: $key');
-      await _deleteSingleAsync<T>(key: key);
+    if (_instances.containsKey(key) || _lazyAsyncSingleton.containsKey(key)) {
+      _log('Replacing existing async instance/factory: $key');
+      await _deleteSingleAsync<T>(key: key, isReplacing: true);
     }
     _log('Creating async instance: $key');
     final instance = await asyncBuilder();
@@ -165,23 +517,27 @@ extension CircusRingHiring on CircusRing {
   /// [builder]: Function that creates the instance
   /// [tag]: Optional name to distinguish between instances of the same type
   /// [fenix]: Whether to fenix the instance if it was removed
-  void hireLazily<T>(
+  void hireLazily<T extends Object>(
     FactoryFunc<T> builder, {
     String? tag,
     bool fenix = false,
   }) {
+    _checkDisposed();
     final key = _getKey(T, tag);
 
-    if (_lazyFactories.containsKey(key) || _instances.containsKey(key)) {
-      _log('Instance $key already exists, will be replaced');
-      _deleteSingle<T>(key: key);
+    if (_lazyFactories.containsKey(key) ||
+        _instances.containsKey(key) ||
+        _factories.containsKey(key) ||
+        _fenixBuilders.containsKey(key)) {
+      _log('Instance/Factory/Fenix $key already exists, will be replaced');
+      _deleteSingle<T>(key: key, isReplacing: true);
     }
 
     _lazyFactories[key] = builder;
 
     if (fenix) {
       _fenixBuilders[key] = builder;
-      _log('Respawn (auto-rebind) registered for: $key');
+      _log('Fenix (auto-rebind) registered for: $key');
     }
 
     _log('Lazy instance $key registered');
@@ -193,23 +549,27 @@ extension CircusRingHiring on CircusRing {
   /// [asyncBuilder]: Function that returns a Future of the instance
   /// [tag]: Optional name to distinguish between instances of the same type
   /// [fenix]: Whether to fenix the instance if it was removed
-  void hireLazilyAsync<T>(
+  void hireLazilyAsync<T extends Object>(
     AsyncFactoryFunc<T> builder, {
     String? tag,
     bool fenix = false,
   }) {
+    _checkDisposed();
     final key = _getKey(T, tag);
 
-    if (_lazyAsyncSingleton.containsKey(key) || _instances.containsKey(key)) {
-      _log('$key already registered, will be replaced');
-      _deleteSingle<T>(key: key);
+    if (_lazyAsyncSingleton.containsKey(key) ||
+        _instances.containsKey(key) ||
+        _fenixAsyncBuilders.containsKey(key)) {
+      _log(
+          'Async Instance/Factory/Fenix $key already registered, will be replaced');
+      _deleteSingleAsync<T>(key: key, isReplacing: true);
     }
 
     _lazyAsyncSingleton[key] = builder;
 
     if (fenix) {
       _fenixAsyncBuilders[key] = builder;
-      _log('Respawn (auto-rebind async) registered for: $key');
+      _log('Fenix (auto-rebind async) registered for: $key');
     }
 
     _log('Async lazy instance registered: $key');
@@ -220,10 +580,14 @@ extension CircusRingHiring on CircusRing {
   /// Instead of sharing a single instance, creates a new one each time it's requested
   /// [builder]: Function that creates the instance
   /// [tag]: Optional name to distinguish between factories of the same type
-  void contract<T>(FactoryFunc<T> builder, {String? tag}) {
+  void contract<T extends Object>(FactoryFunc<T> builder, {String? tag}) {
+    _checkDisposed();
     final key = _getKey(T, tag);
-    if (_factories.containsKey(key) || _instances.containsKey(key)) {
-      _deleteSingle<T>(key: key);
+    if (_factories.containsKey(key) ||
+        _instances.containsKey(key) ||
+        _lazyFactories.containsKey(key)) {
+      _log('Instance/LazyFactory $key already exists, will be replaced');
+      _deleteSingle<T>(key: key, isReplacing: true);
     }
     _factories[key] = builder;
     _log('Factory instance $key registered');
@@ -234,70 +598,18 @@ extension CircusRingHiring on CircusRing {
   /// Alternative name for [hire] with identical functionality
   /// [instance]: The object to register
   /// [tag]: Optional name to distinguish between instances of the same type
-  T appoint<T>(T instance, {String? tag}) => hire<T>(instance, tag: tag);
+  T appoint<T extends Object>(T instance, {String? tag}) =>
+      hire<T>(instance, tag: tag);
 
   /// Create a new instance directly without storing it
   ///
   /// Creates an instance on demand without registering it in the container
   /// [builder]: Function that creates the instance
   /// [tag]: Optional tag for logging purposes
-  T draft<T>({required FactoryFunc<T> builder, String? tag}) {
-    _log('Creating new instance: ${_getKey(T, tag)}');
+  T draft<T extends Object>({required FactoryFunc<T> builder, String? tag}) {
+    _checkDisposed();
+    _log('Drafting new instance: ${_getKey(T, tag)}');
     return builder();
-  }
-
-  /// Delete a single instance
-  ///
-  /// Internal method to remove an instance from the container
-  /// and properly dispose of resources if necessary
-  bool _deleteSingle<T>({required String key}) {
-    if (_instances.containsKey(key)) {
-      final instance = _instances[key];
-      // Handle ChangeNotifier-based instances
-      if (instance is ChangeNotifier) {
-        instance.dispose();
-      }
-      if (instance is Disposable) {
-        instance.dispose();
-      }
-      _instances.remove(key);
-      _log('Instance deleted: $key');
-      return true;
-    }
-    _factories.remove(key);
-    _lazyFactories.remove(key);
-    _clearDependenciesFor(key);
-    return false;
-  }
-
-  /// Asynchronously delete an instance
-  ///
-  /// Internal method to asynchronously remove an instance from the container
-  /// and properly dispose of resources if necessary
-  Future<bool> _deleteSingleAsync<T>({required String key}) async {
-    if (_instances.containsKey(key)) {
-      final instance = _instances[key];
-      if (instance is AsyncDisposable) {
-        await instance.dispose();
-      } else if (instance is Disposable) {
-        instance.dispose();
-      } else if (instance is ChangeNotifier) {
-        instance.dispose();
-      }
-
-      _instances.remove(key);
-      _log('Instance deleted asynchronously: $key');
-
-      _clearDependenciesFor(key);
-
-      return true;
-    }
-
-    _factories.remove(key);
-    _lazyFactories.remove(key);
-    _lazyAsyncSingleton.remove(key);
-
-    return false;
   }
 }
 
@@ -308,7 +620,8 @@ extension CircusRingFind on CircusRing {
   /// Retrieves a registered instance or creates it if lazy loaded
   /// [tag]: Optional name to distinguish between instances of the same type
   /// Throws [CircusRingException] if the dependency is not found
-  T find<T>([String? tag]) {
+  T find<T extends Object>([String? tag]) {
+    _checkDisposed();
     final key = _getKey(T, tag);
 
     // 1. Check if instance already exists
@@ -321,39 +634,34 @@ extension CircusRingFind on CircusRing {
       final instance = _lazyFactories[key]!() as T;
       _instances[key] = instance;
       _log('Lazy instance instantiated: $key');
+      // Remove the factory now that it's instantiated
+      _lazyFactories.remove(key);
       return instance;
     }
 
-    // 3. Check if there's an async lazy factory, but warn this is a sync call
-    if (_lazyAsyncSingleton.containsKey(key)) {
+    // 3. Check if there's a fenix builder (if instance was removed)
+    if (_fenixBuilders.containsKey(key)) {
+      _log('Fenix instance re-instantiating: $key');
+      final instance = _fenixBuilders[key]!() as T;
+      _instances[key] = instance; // Re-register the instance
+      return instance;
+    }
+
+    // 4. Check if there's an async lazy factory, but warn this is a sync call
+    if (_lazyAsyncSingleton.containsKey(key) ||
+        _fenixAsyncBuilders.containsKey(key)) {
       throw CircusRingException(
           'Type $key is registered asynchronously, please use findAsync<$T>() to access it');
     }
 
-    // 4. Check if there's a factory
+    // 5. Check if there's a regular factory
     if (_factories.containsKey(key)) {
       _log('Creating from factory: $key');
       return _factories[key]!() as T;
     }
 
-    // 5. Check if there's a fenix object
-    if (_fenixBuilders.containsKey(key)) {
-      final reborn = _fenixBuilders[key]!();
-      _instances[key] = reborn;
-      _log('Fenix reborn singleton: $key');
-      return reborn;
-    }
-
-    // If not found in any of the above, and it's in lazy async singleton or fenix async builders, throw
-    if (_lazyAsyncSingleton.containsKey(key) ||
-        _fenixAsyncBuilders.containsKey(key)) {
-      throw CircusRingException(
-        'Key $key registered as async. Use findAsync<$T>() instead.',
-      );
-    }
-
     throw CircusRingException(
-        'Type not found: $key, please register it first using put, lazyPut, or factory');
+        'Type not found: $key. Please register it first using hire, hireLazily, or contract.');
   }
 
   /// Find or create an instance asynchronously
@@ -361,7 +669,8 @@ extension CircusRingFind on CircusRing {
   /// Retrieves a registered instance or creates it if lazy loaded, with async support
   /// [tag]: Optional name to distinguish between instances of the same type
   /// Throws [CircusRingException] if the dependency is not found
-  Future<T> findAsync<T>([String? tag]) async {
+  Future<T> findAsync<T extends Object>([String? tag]) async {
+    _checkDisposed();
     final key = _getKey(T, tag);
 
     // 1. Check if instance already exists
@@ -374,34 +683,60 @@ extension CircusRingFind on CircusRing {
       _log('Async lazy instance instantiating: $key');
       final instance = await _lazyAsyncSingleton[key]!() as T;
       _instances[key] = instance;
+      // Remove the factory now that it's instantiated
+      _lazyAsyncSingleton.remove(key);
       return instance;
     }
 
-    // 3. Check if there's a regular lazy factory
+    // 3. Check if there's an async fenix builder
+    if (_fenixAsyncBuilders.containsKey(key)) {
+      _log('Async Fenix instance re-instantiating: $key');
+      final instance = await _fenixAsyncBuilders[key]!() as T;
+      _instances[key] = instance; // Re-register the instance
+      return instance;
+    }
+
+    // 4. Check if there's a regular lazy factory (sync)
     if (_lazyFactories.containsKey(key)) {
       final instance = _lazyFactories[key]!() as T;
       _instances[key] = instance;
-      _log('Lazy instance instantiated: $key');
+      _log('Lazy instance instantiated (via findAsync): $key');
+      _lazyFactories.remove(key);
       return instance;
     }
 
-    // 4. Check if there's a factory
+    // 5. Check if there's a regular fenix builder (sync)
+    if (_fenixBuilders.containsKey(key)) {
+      _log('Fenix instance re-instantiating (via findAsync): $key');
+      final instance = _fenixBuilders[key]!() as T;
+      _instances[key] = instance; // Re-register the instance
+      return instance;
+    }
+
+    // 6. Check if there's a regular factory (sync)
     if (_factories.containsKey(key)) {
-      _log('Creating from factory: $key');
+      _log('Creating from factory (via findAsync): $key');
       return _factories[key]!() as T;
     }
 
     throw CircusRingException(
-        'Type not found: $key, please register it first using put, putAsync, lazyPut, or lazyPutAsync');
+        'Type not found: $key. Please register it first using hire, hireAsync, hireLazily, hireLazilyAsync, or contract.');
   }
 
   /// Try to find an instance, return null if not found
   ///
   /// Safe version of [find] that returns null instead of throwing an exception
   /// [tag]: Optional name to distinguish between instances of the same type
-  T? tryFind<T>([String? tag]) {
+  T? tryFind<T extends Object>([String? tag]) {
+    _checkDisposed();
     try {
       return find<T>(tag);
+    } on CircusRingException catch (e) {
+      if (e.message.contains('Type not found')) {
+        return null;
+      } else {
+        rethrow;
+      }
     } catch (_) {
       return null;
     }
@@ -411,9 +746,16 @@ extension CircusRingFind on CircusRing {
   ///
   /// Safe version of [findAsync] that returns null instead of throwing an exception
   /// [tag]: Optional name to distinguish between instances of the same type
-  Future<T?> tryFindAsync<T>([String? tag]) async {
+  Future<T?> tryFindAsync<T extends Object>([String? tag]) async {
+    _checkDisposed();
     try {
       return await findAsync<T>(tag);
+    } on CircusRingException catch (e) {
+      if (e.message.contains('Type not found')) {
+        return null;
+      } else {
+        rethrow;
+      }
     } catch (_) {
       return null;
     }
@@ -423,120 +765,93 @@ extension CircusRingFind on CircusRing {
   ///
   /// Returns true if the instance exists or can be created
   /// [tag]: Optional name to distinguish between instances of the same type
-  bool isHired<T>([String? tag]) {
+  bool isHired<T extends Object>([String? tag]) {
+    _checkDisposed();
     final key = _getKey(T, tag);
     return _instances.containsKey(key) ||
         _lazyFactories.containsKey(key) ||
         _lazyAsyncSingleton.containsKey(key) ||
-        _factories.containsKey(key);
-  }
-
-  /// Delete an instance
-  ///
-  /// Removes an instance from the container and disposes of resources if necessary
-  /// [tag]: Optional name to distinguish between instances of the same type
-  /// Returns true if an instance was removed
-  bool fire<T>({String? tag}) {
-    final key = _getKey(T, tag);
-
-    if (_dependents.containsKey(key) && _dependents[key]!.isNotEmpty) {
-      throw CircusRingException(
-        'Cannot remove $key, it is still depended on by: ${_dependents[key]!.join(', ')}',
-      );
-    }
-
-    final success = _deleteSingle<T>(key: key);
-    if (success) _clearDependenciesFor(key);
-    return success;
+        _factories.containsKey(key) ||
+        _fenixBuilders.containsKey(key) ||
+        _fenixAsyncBuilders.containsKey(key);
   }
 
   /// Delete an instance asynchronously, including dependency check.
   ///
   /// Removes an object registered in the container and invokes dispose / asyncDispose
-  /// when appropriate. If the given instance is still required by other registered components
-  /// (via [bindDependency]), this will throw [CircusRingException].
+  /// when appropriate (excluding Jokers). If the given instance is still required by other
+  /// registered components (via [bindDependency]), this will throw [CircusRingException].
   ///
   /// [tag]: Optional name to distinguish between different instances of type T
   ///
   /// Returns true if successfully removed, false otherwise.
-  Future<bool> fireAsync<T>({String? tag}) async {
+  Future<bool> fireAsync<T extends Object>({String? tag}) async {
+    _checkDisposed();
     final key = _getKey(T, tag);
 
-    if (_dependents.containsKey(key) && _dependents[key]!.isNotEmpty) {
+    if (_dependents.containsKey(key) &&
+        (_dependents[key]?.isNotEmpty ?? false)) {
       throw CircusRingException(
         'Cannot asynchronously remove $key because it is still depended on by: ${_dependents[key]!.join(', ')}',
       );
     }
 
     final success = await _deleteSingleAsync<T>(key: key);
-    if (success) _clearDependenciesFor(key);
+    // Dependencies are now cleared within _deleteSingleAsync
+    // if (success) _clearDependenciesFor(key);
     return success;
-  }
-
-  /// Delete all instances
-  ///
-  /// Removes all registered instances and factories from the container
-  void fireAll() {
-    for (final key in _instances.keys.toList()) {
-      final instance = _instances[key];
-      if (instance is ChangeNotifier) {
-        instance.dispose();
-      }
-      if (instance is Disposable) {
-        instance.dispose();
-      }
-    }
-    _instances.clear();
-    _factories.clear();
-    _lazyFactories.clear();
-    _lazyAsyncSingleton.clear();
-    _log('Force deleted all instances and factories');
   }
 
   /// Delete all instances asynchronously
   ///
   /// Asynchronously removes all registered instances and factories from the container
-  /// properly disposing of async resources
+  /// properly disposing of async resources (excluding Jokers).
   Future<void> fireAllAsync() async {
-    for (final key in _instances.keys) {
-      final instance = _instances[key];
-      if (instance is ChangeNotifier) {
-        instance.dispose();
-      }
-      if (instance is AsyncDisposable) {
-        await instance.dispose();
-      } else if (instance is Disposable) {
-        instance.dispose();
+    _checkDisposed();
+    final keys = _instances.keys.toList(); // Get keys before iterating
+    for (final key in keys) {
+      final instance = _instances.remove(key);
+      if (instance != null) {
+        // --- Conditionally dispose (Async first) ---
+        if (instance is! Joker) {
+          if (instance is AsyncDisposable) {
+            try {
+              _log('fireAllAsync: Disposing AsyncDisposable: $key');
+              await instance.dispose();
+            } catch (e, s) {
+              _log(
+                  'fireAllAsync: Error disposing AsyncDisposable $key: $e\n$s');
+            }
+          } else if (instance is Disposable) {
+            try {
+              _log('fireAllAsync: Disposing Disposable: $key');
+              instance.dispose();
+            } catch (e, s) {
+              _log('fireAllAsync: Error disposing Disposable $key: $e\n$s');
+            }
+          } else if (instance is ChangeNotifier) {
+            try {
+              _log('fireAllAsync: Disposing ChangeNotifier: $key');
+              instance.dispose();
+            } catch (e, s) {
+              _log('fireAllAsync: Error disposing ChangeNotifier $key: $e\n$s');
+            }
+          }
+        } else {
+          _log('fireAllAsync: Skipping dispose for Joker: $key');
+        }
+        // --- End Conditionally dispose ---
       }
     }
-    _instances.clear();
+    // Clear remaining containers
     _factories.clear();
     _lazyFactories.clear();
     _lazyAsyncSingleton.clear();
-    _log('Force deleted all instances and factories asynchronously');
-  }
-
-  /// Remove all registered dependency relations linked to [key].
-  ///
-  /// Clears both the dependencies and dependents maps of any reference to [key].
-  void _clearDependenciesFor(String key) {
-    final dependencies = _dependencies[key] ?? {};
-    for (final dep in dependencies) {
-      _dependents[dep]?.remove(key);
-      if (_dependents[dep]!.isEmpty) {
-        _dependents.remove(dep);
-      }
-    }
-    _dependencies.remove(key);
-
-    final dependents = _dependents[key] ?? {};
-    for (final dep in dependents) {
-      _dependencies[dep]?.remove(key);
-      if (_dependencies[dep]!.isEmpty) {
-        _dependencies.remove(dep);
-      }
-    }
-    _dependents.remove(key);
+    _fenixBuilders.clear();
+    _fenixAsyncBuilders.clear();
+    _dependencies.clear();
+    _dependents.clear();
+    _log('Cleared all instances, factories, and dependencies asynchronously.');
   }
 }
 
@@ -548,41 +863,70 @@ extension CircusRingTagFind on CircusRing {
   /// [tag]: The tag to search for
   /// Returns null if no matching instance is found
   dynamic findByTag(String tag) {
+    _checkDisposed();
     // Traverse all possible containers that may hold an instance
-    // 1. Check already instantiate objects first
+    // 1. Check already instantiated objects first
     for (final entry in _instances.entries) {
-      if (entry.key.endsWith('_$tag')) {
+      // Improved tag matching
+      final keyParts = entry.key.split('_');
+      if (keyParts.length > 1 && keyParts.last == tag) {
+        return entry.value;
+      } else if (keyParts.length == 1 && entry.key == tag) {
         return entry.value;
       }
     }
 
     // 2. Check lazy factories
     for (final entry in _lazyFactories.entries) {
-      if (entry.key.endsWith('_$tag')) {
+      final keyParts = entry.key.split('_');
+      if (keyParts.length > 1 && keyParts.last == tag) {
         final instance = entry.value() as dynamic;
         _instances[entry.key] = instance;
+        _lazyFactories.remove(entry.key);
         _log('Lazy instance instantiated by tag: $tag');
         return instance;
       }
     }
 
-    // 3. Check asynchronous lazy factories (but do not invoke them)
+    // 3. Check fenix builders
+    for (final entry in _fenixBuilders.entries) {
+      final keyParts = entry.key.split('_');
+      if (keyParts.length > 1 && keyParts.last == tag) {
+        _log('Fenix instance re-instantiating by tag: $tag');
+        final instance = entry.value() as dynamic;
+        _instances[entry.key] = instance; // Re-register
+        return instance;
+      }
+    }
+
+    // 4. Check asynchronous lazy factories (but do not invoke them)
     for (final entry in _lazyAsyncSingleton.entries) {
-      if (entry.key.endsWith('_$tag')) {
+      final keyParts = entry.key.split('_');
+      if (keyParts.length > 1 && keyParts.last == tag) {
         throw CircusRingException(
             'Instance with tag $tag is registered asynchronously, please use findAsyncByTag() to access it');
       }
     }
+    // 5. Check async fenix builders (do not invoke)
+    for (final entry in _fenixAsyncBuilders.entries) {
+      final keyParts = entry.key.split('_');
+      if (keyParts.length > 1 && keyParts.last == tag) {
+        throw CircusRingException(
+            'Instance with tag $tag is registered as async fenix, please use findAsyncByTag() to access it');
+      }
+    }
 
-    // 4. Check factories
+    // 6. Check factories
     for (final entry in _factories.entries) {
-      if (entry.key.endsWith('_$tag')) {
+      final keyParts = entry.key.split('_');
+      if (keyParts.length > 1 && keyParts.last == tag) {
         _log('Creating from factory by tag: $tag');
         return entry.value() as dynamic;
       }
     }
 
-    return null; // Return null instead of throwing if instance not found
+    _log('Instance with tag "$tag" not found.');
+    return null; // Return null if not found
   }
 
   /// Try to find any instance by its tag, return null if not found
@@ -590,45 +934,20 @@ extension CircusRingTagFind on CircusRing {
   /// Safe version of [findByTag] that returns null instead of throwing an exception
   /// [tag]: The tag to search for
   dynamic tryFindByTag(String tag) {
+    _checkDisposed();
     try {
       return findByTag(tag);
+    } on CircusRingException catch (e) {
+      if (e.message.contains('registered asynchronously')) {
+        // If it requires async access, return null in tryFind
+        return null;
+      }
+      // We expect findByTag to return null if not found, so other exceptions are unexpected
+      rethrow;
     } catch (_) {
       return null;
     }
   }
 
-  /// Delete any instance by its tag without specifying concrete type
-  ///
-  /// Removes all instances registered with the given tag across all types
-  /// [tag]: The tag to search for
-  /// Returns true if any instance was removed
-  bool fireByTag(String tag) {
-    // Find all instance keys that match the tag
-    final keysToDelete = <String>[];
-    for (final entry in _instances.entries) {
-      if (entry.key.endsWith('_$tag')) {
-        keysToDelete.add(entry.key);
-      }
-    }
-
-    if (keysToDelete.isEmpty) {
-      return false;
-    }
-
-    // Delete all found instances
-    bool anyDeleted = false;
-    for (final key in keysToDelete) {
-      final instance = _instances[key];
-      if (instance is Disposable) {
-        instance.dispose();
-      } else if (instance is ChangeNotifier) {
-        instance.dispose();
-      }
-      _instances.remove(key);
-      anyDeleted = true;
-      _log('Instance deleted by tag: $tag');
-    }
-
-    return anyDeleted;
-  }
+  // Note: fireByTag was already updated earlier to conditionally dispose
 }

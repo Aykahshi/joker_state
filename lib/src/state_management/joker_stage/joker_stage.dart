@@ -2,7 +2,6 @@ import 'package:flutter/widgets.dart';
 
 import '../../di/circus_ring/circus_ring.dart';
 import '../joker/joker.dart';
-import '../joker/joker_trickx.dart';
 
 /// Builder function for [JokerStage].
 ///
@@ -57,11 +56,11 @@ class JokerStage<T> extends StatefulWidget {
   ///
   /// The [builder] receives the current state and should return a widget.
   /// If [autoDispose] is true, the Joker is removed from the [CircusRing] or disposed when unmounted.
+  /// The `autoDispose` parameter is removed, as Joker now manages its own lifecycle.
   const JokerStage({
     super.key,
     required this.joker,
     required this.builder,
-    this.autoDispose = true,
   });
 
   /// The Joker instance to observe.
@@ -69,9 +68,6 @@ class JokerStage<T> extends StatefulWidget {
 
   /// The builder function that rebuilds on any state change.
   final JokerStageBuilder<T> builder;
-
-  /// Whether to automatically dispose the Joker on widget unmount.
-  final bool autoDispose;
 
   @override
   State<JokerStage<T>> createState() => _JokerStageState<T>();
@@ -111,24 +107,6 @@ class _JokerStageState<T> extends State<JokerStage<T>> {
   @override
   void dispose() {
     widget.joker.removeListener(_updateState);
-
-    if (widget.autoDispose) {
-      final tag = widget.joker.tag;
-      if (tag != null && tag.isNotEmpty) {
-        try {
-          final registeredJoker = Circus.spotlight<T>(tag: tag);
-          if (identical(registeredJoker, widget.joker)) {
-            Circus.vanish<T>(tag: tag);
-          } else {
-            widget.joker.dispose();
-          }
-        } catch (_) {
-          widget.joker.dispose();
-        }
-      } else {
-        widget.joker.dispose();
-      }
-    }
 
     super.dispose();
   }

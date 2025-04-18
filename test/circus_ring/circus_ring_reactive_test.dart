@@ -6,7 +6,7 @@ void main() {
     late CircusRing circus;
 
     setUp(() {
-      circus = CircusRing();
+      circus = Circus;
       circus.fireAll(); // Clear all instances before each test
     });
 
@@ -48,10 +48,14 @@ void main() {
 
       expect(() => autoJoker.yell(), returnsNormally);
       expect(() => manualJoker.yell(), returnsNormally);
+
+      // Clean up
+      autoJoker.dispose();
+      manualJoker.dispose();
     });
 
     test('should preserve listeners when accessing Joker multiple times', () {
-      // Arrange - create an auto joker with a listener
+      // Arrange - create an auto joker with listener
       final joker = Joker<int>(0);
       int callCount = 0;
 
@@ -82,6 +86,9 @@ void main() {
       // The listener should be called again
       expect(callCount, equals(2));
       expect(joker.state, equals(20));
+
+      // Clean up
+      joker.dispose();
     });
 
     test('should notify correctly with auto jokers', () {
@@ -103,6 +110,9 @@ void main() {
       // Assert - should have notified again
       expect(joker.state, equals(20));
       expect(countNotified, equals(2));
+
+      // Clean up
+      joker.dispose();
     });
 
     test('should notify correctly with manual jokers', () {
@@ -123,6 +133,9 @@ void main() {
 
       // Assert - should notify now
       expect(countNotified, equals(1));
+
+      // Clean up
+      joker.dispose();
     });
 
     test('should batch update and notify only once', () {
@@ -142,6 +155,9 @@ void main() {
       // Assert
       expect(joker.state, equals(5)); // Final value
       expect(countNotified, equals(1)); // Only notified once at commit
+
+      // Clean up
+      joker.dispose();
     });
 
     test('should discard batch changes if needed', () {
@@ -153,6 +169,9 @@ void main() {
 
       // Assert - value should remain unchanged
       expect(joker.state, equals(10));
+
+      // Clean up
+      joker.dispose();
     });
 
     test('should summon and spotlight Jokers through CircusRing extension', () {
@@ -170,9 +189,29 @@ void main() {
       final spotlightedJoker = circus.spotlight<int>(tag: 'answer');
       expect(spotlightedJoker.state, equals(100));
 
-      // Vanish should remove the joker
-      circus.vanish<int>(tag: 'answer');
+      // Clean up
+      joker.dispose();
+    });
+
+    test('vanish should remove Joker from ring but NOT dispose it', () {
+      // Arrange - summon a joker
+      final joker = circus.summon<int>(42, tag: 'answer');
+      expect(circus.isHired<Joker<int>>('answer'), isTrue);
+      expect(joker.isDisposed, isFalse);
+
+      // Act - vanish the joker
+      final result = circus.vanish<int>(tag: 'answer');
+
+      // Assert - should be removed from ring
+      expect(result, isTrue);
       expect(circus.isHired<Joker<int>>('answer'), isFalse);
+
+      // Assert - Joker itself should NOT be disposed by vanish
+      expect(joker.isDisposed, isFalse);
+
+      // Manually dispose for cleanup
+      joker.dispose();
+      expect(joker.isDisposed, isTrue);
     });
 
     test('should recruit manual jokers through CircusRing extension', () {
@@ -193,6 +232,9 @@ void main() {
       // Yell to notify
       joker.yell();
       expect(notifications, equals(1));
+
+      // Clean up
+      joker.dispose();
     });
   });
 }

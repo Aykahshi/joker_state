@@ -13,6 +13,9 @@ counter.trick(1);  // 更新為1並通知監聽器
 final manualCounter = Joker<int>(0, autoNotify: false);
 manualCounter.whisper(42);  // 靜默更新
 manualCounter.yell();       // 手動通知
+
+// 即使沒有監聽器也讓 Joker 保持活動狀態
+final persistentJoker = Joker<String>("data", keepAlive: true);
 ```
 
 ### 在Flutter中使用Joker
@@ -197,12 +200,21 @@ userJoker.observe<String>(
 );
 ```
 
+## 🧹 生命週期管理 (新增章節)
+
+- **基於監聽器的釋放**: 預設情況下 (`keepAlive: false`)，當最後一個監聽器被移除時，Joker 會通過微任務 (microtask) 自動安排自身的釋放。
+- **取消釋放**: 如果在微任務執行之前再次添加監聽器，則釋放會被取消。
+- **keepAlive**: 將 `keepAlive: true` 設置為 true 可以阻止這種自動釋放，使 Joker 實例保持活動狀態，直到手動釋放或通過 CircusRing 移除（如果已註冊）。
+- **手動釋放**: 您始終可以手動調用 `joker.dispose()`。
+- **Widget 整合**: 像 `JokerStage`、`JokerFrame` 等小部件會內部管理監聽器。當小部件從樹中移除時，其監聽器會被移除，如果 `keepAlive` 為 false，這可能會觸發 Joker 的自動釋放機制。
+
 ## 🧪 最佳實踐
 
 1. **使用選擇器**：通過只選擇需要的狀態部分來最小化重建
 2. **批量更新**：將相關變更分組以避免多次重建
 3. **標記Joker**：使用CircusRing時始終使用標記
-4. **自動釋放**：啟用autoDispose（默認）進行自動清理
+4. **`keepAlive`**: 對於需要獨立於 UI 監聽器而持久存在的 Joker（例如，全局應用程序狀態），請使用 `keepAlive: true`。
+5. **顯式釋放**: 對於不由小部件或 CircusRing 管理的 Joker，尤其是在 `keepAlive` 為 true 的情況下，請手動調用 `dispose()`。
 
 ## 🏆 與其他解決方案的比較
 

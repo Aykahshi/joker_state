@@ -71,6 +71,10 @@ void main() {
     expect(nameBuildCount, 2);
     expect(find.text('Count(2): 99'), findsOneWidget);
     expect(find.text('Name(2): Dart'), findsOneWidget);
+
+    // Clean up
+    counterJoker.dispose();
+    nameJoker.dispose();
   });
 
   testWidgets('JokerCast works with complex widget hierarchies',
@@ -123,5 +127,8 @@ void main() {
     // Assert - Only dynamic part updated
     expect(find.text('Static Text'), findsOneWidget);
     expect(find.text('Count: 42'), findsOneWidget);
+
+    // Clean up
+    counterJoker.dispose();
   });
 }

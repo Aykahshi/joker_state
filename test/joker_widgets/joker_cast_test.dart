@@ -2,8 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
 
+// Define a unique class for testing type-based lookup without tag
+class UniqueType {
+  final String value;
+  UniqueType(this.value);
+}
+
 void main() {
-  testWidgets('JokerCast rebuilds when Joker state changes', (tester) async {
+  testWidgets(
+      'JokerCast rebuilds when Joker state changes (common type with tag)',
+      (tester) async {
     // Arrange
     final joker = Joker<int>(0, tag: 'counter');
 
@@ -13,7 +21,7 @@ void main() {
         joker: joker,
         tag: 'counter',
         child: JokerCast<int>(
-          tag: 'counter',
+          tag: 'counter', // Tag provided to JokerCast
           builder: (context, value) =>
               Text('Count: $value', textDirection: TextDirection.ltr),
         ),
@@ -29,49 +37,94 @@ void main() {
 
     // Assert - Updated state
     expect(find.text('Count: 42'), findsOneWidget);
+    joker.dispose();
   });
 
-  testWidgets('JokerCast works without explicit tag if type is unique',
-      (tester) async {
+  testWidgets('JokerCast works with unique type without tag', (tester) async {
     // Arrange
-    final joker = Joker<int>(0);
+    final joker = Joker<UniqueType>(UniqueType('init'));
 
     // Act
     await tester.pumpWidget(
-      JokerPortal<int>(
-        joker: joker,
-        child: JokerCast<int>(
+      JokerPortal<UniqueType>(
+        joker: joker, // No tag needed for JokerPortal with unique type
+        child: JokerCast<UniqueType>(
+          // No tag needed for JokerCast
           builder: (context, value) =>
-              Text('Count: $value', textDirection: TextDirection.ltr),
+              Text('Val: ${value.value}', textDirection: TextDirection.ltr),
         ),
       ),
     );
 
     // Assert - Initial state
-    expect(find.text('Count: 0'), findsOneWidget);
+    expect(find.text('Val: init'), findsOneWidget);
 
     // Act - Change state
-    joker.trick(99);
+    joker.trick(UniqueType('updated'));
     await tester.pump();
 
     // Assert - Updated state
-    expect(find.text('Count: 99'), findsOneWidget);
+    expect(find.text('Val: updated'), findsOneWidget);
+    joker.dispose();
   });
 
   testWidgets(
-    'JokerCast throws assertion error when no matching Joker is found',
+    'JokerCast throws assertion error when no matching Joker (wrong type)',
     (tester) async {
-      await tester.pumpWidget(
-        JokerCast<int>(
-          tag: 'nonexistent',
-          builder: (context, value) => SizedBox(),
+      final joker = Joker<int>(1);
+      await tester.pumpWidget(JokerPortal<int>(
+        joker: joker,
+        child: JokerCast<String>(
+          // Expecting String, but Portal provides int
+          builder: (context, value) => const SizedBox(),
         ),
-      );
+      ));
       expect(tester.takeException(), isAssertionError);
+      joker.dispose();
     },
   );
 
-  testWidgets('Multiple JokerCast widgets can listen to the same Joker',
+  testWidgets(
+    'JokerCast throws assertion error when no matching Joker (wrong tag)',
+    (tester) async {
+      final joker = Joker<int>(1, tag: 'correct');
+      await tester.pumpWidget(JokerPortal<int>(
+        joker: joker,
+        tag: 'correct',
+        child: JokerCast<int>(
+          tag: 'wrong', // Using wrong tag
+          builder: (context, value) => const SizedBox(),
+        ),
+      ));
+      expect(tester.takeException(), isAssertionError);
+      joker.dispose();
+    },
+  );
+
+  testWidgets(
+    'JokerCast throws assertion error for common type WITHOUT tag when ambiguous',
+    (tester) async {
+      final joker1 = Joker<int>(1, tag: 'c1');
+      final joker2 = Joker<int>(2, tag: 'c2');
+      await tester.pumpWidget(JokerPortal<int>(
+        joker: joker1,
+        tag: 'c1',
+        child: JokerPortal<int>(
+          joker: joker2,
+          tag: 'c2',
+          child: JokerCast<int>(
+            // No tag provided!
+            builder: (context, value) => const SizedBox(),
+          ),
+        ),
+      ));
+      expect(tester.takeException(), isAssertionError);
+      joker1.dispose();
+      joker2.dispose();
+    },
+  );
+
+  testWidgets('Multiple JokerCast widgets listen correctly with tags',
       (tester) async {
     // Arrange
     final joker = Joker<int>(0, tag: 'counter');
@@ -84,12 +137,12 @@ void main() {
         child: Column(
           children: [
             JokerCast<int>(
-              tag: 'counter',
+              tag: 'counter', // Tag specified
               builder: (context, value) =>
                   Text('First: $value', textDirection: TextDirection.ltr),
             ),
             JokerCast<int>(
-              tag: 'counter',
+              tag: 'counter', // Tag specified
               builder: (context, value) =>
                   Text('Second: $value', textDirection: TextDirection.ltr),
             ),
@@ -109,9 +162,11 @@ void main() {
     // Assert - Updated state
     expect(find.text('First: 42'), findsOneWidget);
     expect(find.text('Second: 42'), findsOneWidget);
+    joker.dispose();
   });
 
-  testWidgets('JokerCast with multiple portals and different types',
+  testWidgets(
+      'JokerCast with multiple portals and different types works with tags',
       (tester) async {
     // Arrange
     final counterJoker = Joker<int>(0, tag: 'counter');
@@ -128,12 +183,12 @@ void main() {
           child: Column(
             children: [
               JokerCast<int>(
-                tag: 'counter',
+                tag: 'counter', // Tag specified
                 builder: (context, value) =>
                     Text('Count: $value', textDirection: TextDirection.ltr),
               ),
               JokerCast<String>(
-                tag: 'name',
+                tag: 'name', // Tag specified
                 builder: (context, value) =>
                     Text('Name: $value', textDirection: TextDirection.ltr),
               ),
@@ -155,5 +210,7 @@ void main() {
     // Assert - Updated state
     expect(find.text('Count: 99'), findsOneWidget);
     expect(find.text('Name: Dart'), findsOneWidget);
+    counterJoker.dispose();
+    nameJoker.dispose();
   });
 }

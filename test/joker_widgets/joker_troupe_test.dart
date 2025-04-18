@@ -1,10 +1,11 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
 
 void main() {
   group('JokerTroupe', () {
     setUp(() {
+      // Clean up CircusRing before each test
       Circus.fireAll();
     });
 
@@ -16,9 +17,8 @@ void main() {
 
       // Act
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerTroupe<(int, String)>(
+        MaterialApp(
+          home: JokerTroupe<(int, String)>(
             jokers: [joker1, joker2],
             converter: (values) => (values[0] as int, values[1] as String),
             builder: (context, values) {
@@ -47,9 +47,8 @@ void main() {
 
       // Act - build the widget
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerTroupe<(int, bool)>(
+        MaterialApp(
+          home: JokerTroupe<(int, bool)>(
             jokers: [joker1, joker2],
             converter: (values) => (values[0] as int, values[1] as bool),
             builder: (context, values) {
@@ -98,9 +97,8 @@ void main() {
 
       // Act - build widget
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerTroupe<(int, String, bool)>(
+        MaterialApp(
+          home: JokerTroupe<(int, String, bool)>(
             jokers: [joker1, joker2, joker3],
             converter: (values) =>
                 (values[0] as int, values[1] as String, values[2] as bool),
@@ -124,19 +122,20 @@ void main() {
       expect(find.text('42, hello, true'), findsOneWidget);
     });
 
-    testWidgets('should dispose jokers when autoDispose is true',
+    testWidgets(
+        'Jokers with keepAlive=false should dispose after troupe removal',
         (WidgetTester tester) async {
-      // Arrange - Using DisposableTracker to tracking dispose calls
-      final joker1 = _DisposableTracker<int>(1);
-      final joker2 = _DisposableTracker<String>('test');
+      // Arrange
+      final joker1 = Joker<int>(1, keepAlive: false); // Default, but explicit
+      final joker2 = Joker<String>('test', keepAlive: false);
+      expect(joker1.isDisposed, isFalse);
+      expect(joker2.isDisposed, isFalse);
 
       // Act - build and then remove widget
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerTroupe<(int, String)>(
+        MaterialApp(
+          home: JokerTroupe<(int, String)>(
             jokers: [joker1, joker2],
-            autoDispose: true,
             converter: (values) => (values[0] as int, values[1] as String),
             builder: (context, values) => Text('${values.$1}, ${values.$2}'),
           ),
@@ -144,26 +143,27 @@ void main() {
       );
 
       await tester.pumpWidget(Container()); // Remove widget
-      await tester.pump(); // Ensure dispose completes
+      await tester.pumpAndSettle(); // Wait for dispose timers
 
       // Assert
       expect(joker1.isDisposed, isTrue);
       expect(joker2.isDisposed, isTrue);
     });
 
-    testWidgets('should not dispose jokers when autoDispose is false',
+    testWidgets(
+        'Jokers with keepAlive=true should NOT dispose after troupe removal',
         (WidgetTester tester) async {
-      // Arrange - Using DisposableTracker to tracking dispose calls
-      final joker1 = _DisposableTracker<int>(1);
-      final joker2 = _DisposableTracker<String>('test');
+      // Arrange
+      final joker1 = Joker<int>(1, keepAlive: true);
+      final joker2 = Joker<String>('test', keepAlive: true);
+      expect(joker1.isDisposed, isFalse);
+      expect(joker2.isDisposed, isFalse);
 
       // Act - build and then remove widget
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerTroupe<(int, String)>(
+        MaterialApp(
+          home: JokerTroupe<(int, String)>(
             jokers: [joker1, joker2],
-            autoDispose: false,
             converter: (values) => (values[0] as int, values[1] as String),
             builder: (context, values) => Text('${values.$1}, ${values.$2}'),
           ),
@@ -171,34 +171,59 @@ void main() {
       );
 
       await tester.pumpWidget(Container()); // Remove widget
-      await tester.pump(); // Ensure any dispose would complete
+      await tester.pumpAndSettle(); // Wait potential dispose time
 
       // Assert - should not be disposed
       expect(joker1.isDisposed, isFalse);
       expect(joker2.isDisposed, isFalse);
 
       // Verify jokers still work
-      joker1.trick(100);
-      joker2.trick('updated');
-
+      expect(() => joker1.trick(100), returnsNormally);
+      expect(() => joker2.trick('updated'), returnsNormally);
       expect(joker1.state, equals(100));
       expect(joker2.state, equals('updated'));
     });
 
-    testWidgets('should handle CircusRing registered jokers',
+    testWidgets('Mixed keepAlive Jokers dispose correctly after troupe removal',
         (WidgetTester tester) async {
-      // Arrange - register jokers in CircusRing
-      final joker1 = Joker<int>(10, tag: 'joker1');
-      final joker2 = Joker<String>('hello', tag: 'joker2');
+      // Arrange
+      final disposeJoker = Joker<int>(1, keepAlive: false);
+      final keepJoker = Joker<String>('keep', keepAlive: true);
+      expect(disposeJoker.isDisposed, isFalse);
+      expect(keepJoker.isDisposed, isFalse);
 
-      Circus.hire<Joker<int>>(joker1, tag: 'joker1');
-      Circus.hire<Joker<String>>(joker2, tag: 'joker2');
+      // Act
+      await tester.pumpWidget(
+        MaterialApp(
+          home: JokerTroupe<(int, String)>(
+            jokers: [disposeJoker, keepJoker],
+            converter: (values) => (values[0] as int, values[1] as String),
+            builder: (context, values) => Text('${values.$1}, ${values.$2}'),
+          ),
+        ),
+      );
+      await tester.pumpWidget(Container());
+      await tester.pumpAndSettle();
+
+      // Assert
+      expect(disposeJoker.isDisposed, isTrue); // Should be disposed
+      expect(keepJoker.isDisposed, isFalse); // Should NOT be disposed
+    });
+
+    testWidgets('should handle CircusRing registered jokers correctly',
+        (WidgetTester tester) async {
+      // Arrange - register jokers in CircusRing (one keepAlive, one not)
+      final joker1 = Circus.summon<int>(10, tag: 'joker1', keepAlive: false);
+      final joker2 =
+          Circus.summon<String>('hello', tag: 'joker2', keepAlive: true);
+
+      expect(Circus.isHired<Joker<int>>('joker1'), isTrue);
+      expect(Circus.isHired<Joker<String>>('joker2'), isTrue);
 
       // Act - build with registered jokers
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerTroupe<(int, String)>(
+        MaterialApp(
+          home: JokerTroupe<(int, String)>(
             jokers: [joker1, joker2],
             converter: (values) => (values[0] as int, values[1] as String),
             builder: (context, values) => Text('${values.$1}, ${values.$2}'),
@@ -206,26 +231,56 @@ void main() {
         ),
       );
 
-      // Assert
+      // Assert initial state
       expect(find.text('10, hello'), findsOneWidget);
 
       // Update through original jokers
       joker1.trick(20);
       await tester.pump();
-
       expect(find.text('20, hello'), findsOneWidget);
-
-      // Check jokers are still registered
-      expect(Circus.isHired<Joker<int>>('joker1'), isTrue);
-      expect(Circus.isHired<Joker<String>>('joker2'), isTrue);
 
       // Remove widget
       await tester.pumpWidget(Container());
-      await tester.pump();
+      await tester.pumpAndSettle(); // Wait for dispose timers
 
-      // Check jokers were removed from CircusRing
-      expect(Circus.isHired<Joker<int>>('joker1'), isFalse);
-      expect(Circus.isHired<Joker<String>>('joker2'), isFalse);
+      // Assert: Both should still be in CircusRing (widget removal doesn't unregister)
+      expect(Circus.isHired<Joker<int>>('joker1'), isTrue);
+      expect(Circus.isHired<Joker<String>>('joker2'), isTrue);
+
+      // Assert: Only the non-keepAlive joker should be disposed internally
+      expect(joker1.isDisposed, isTrue);
+      expect(joker2.isDisposed, isFalse);
+
+      // Clean up manually
+      Circus.vanish<int>(tag: 'joker1');
+      Circus.vanish<String>(tag: 'joker2');
+    });
+
+    testWidgets('assemble() extension builds and reacts correctly',
+        (WidgetTester tester) async {
+      // Arrange
+      final name = Joker<String>('Alice');
+      final age = Joker<int>(30);
+
+      // Act - Use assemble extension
+      await tester.pumpWidget(
+        MaterialApp(
+          home: [name, age].assemble<(String, int)>(
+            converter: (values) => (values[0] as String, values[1] as int),
+            builder: (context, data) {
+              return Text('${data.$1} - ${data.$2}');
+            },
+          ),
+        ),
+      );
+
+      // Assert initial
+      expect(find.text('Alice - 30'), findsOneWidget);
+
+      // Update age
+      age.trick(31);
+      await tester.pump();
+      expect(find.text('Alice - 31'), findsOneWidget);
     });
 
     testWidgets('should properly convert complex record types',
@@ -238,14 +293,13 @@ void main() {
 
       // Act - build with complex record type
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerTroupe<(int, String, (bool, double))>(
+        MaterialApp(
+          home: JokerTroupe<(int, String, (bool, double))>(
             jokers: [joker1, joker2, joker3, joker4],
             converter: (values) => (
               values[0] as int,
               values[1] as String,
-              (values[2] as bool, values[3] as double)
+              (values[2] as bool, values[3] as double) // Nested record
             ),
             builder: (context, values) {
               final (count, message, (isActive, rating)) = values;
@@ -269,19 +323,4 @@ void main() {
       expect(find.text('Rating: 3.14'), findsOneWidget);
     });
   });
-}
-
-// Helper Tracker to tracking dispose calls
-class _DisposableTracker<T> extends Joker<T> {
-  bool isDisposed = false;
-
-  // ignore: use_super_parameters
-  _DisposableTracker(T initialValue, {String? tag})
-      : super(initialValue, tag: tag);
-
-  @override
-  void dispose() {
-    isDisposed = true;
-    super.dispose();
-  }
 }

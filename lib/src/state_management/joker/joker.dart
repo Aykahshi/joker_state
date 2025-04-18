@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../joker_exception.dart';
@@ -14,6 +16,11 @@ import '../joker_exception.dart';
 ///
 /// Use with companion widgets like [JokerStage], [JokerFrame], and [JokerTroupe]
 /// for efficient UI updates.
+///
+/// Joker instances manage their own lifecycle based on listeners and the [keepAlive] flag.
+/// When the last listener is removed and [keepAlive] is false, the Joker will
+/// schedule itself for disposal after a short delay. Adding a listener before
+/// disposal cancels the process.
 ///
 /// 🎮 Basic example (auto-notify mode):
 ///
@@ -49,9 +56,13 @@ class Joker<T> extends ChangeNotifier {
   /// If [autoNotify] is true, all mutations will auto-call [notifyListeners()].
   ///
   /// Optional [tag] may be used for identification in CircusRing or debugging.
+  ///
+  /// If [keepAlive] is true, the Joker will not be automatically disposed
+  /// when it has no listeners. Defaults to false.
   Joker(
     T initialState, {
     this.autoNotify = true,
+    this.keepAlive = false,
     this.tag,
   })  : _state = initialState,
         _previousState = initialState;
@@ -61,6 +72,9 @@ class Joker<T> extends ChangeNotifier {
 
   /// Controls whether [trick] and friends automatically call [notifyListeners].
   final bool autoNotify;
+
+  /// If true, prevents the Joker from being auto-disposed when listeners drop to zero.
+  final bool keepAlive;
 
   /// The current state.
   T _state;
@@ -76,12 +90,76 @@ class Joker<T> extends ChangeNotifier {
   /// Returns the previous state.
   T? get previousState => _previousState;
 
+  // Flag to track if dispose has been called explicitly or internally
+  bool _isDisposed = false;
+
+  // Flag to track if a microtask for disposal has been scheduled
+  bool _isDisposalScheduled = false;
+
+  @override
+  void addListener(VoidCallback listener) {
+    if (_isDisposed) {
+      throw JokerException(
+          'Cannot add listener to a disposed Joker (tag: $tag)');
+    }
+    // Cancel any pending disposal microtask by resetting the flag
+    _isDisposalScheduled = false;
+    super.addListener(listener);
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    // Don't try to remove listener if already disposed
+    if (_isDisposed) return;
+
+    super.removeListener(listener);
+
+    // If no listeners left, not kept alive, and disposal not already scheduled
+    if (!hasListeners && !keepAlive && !_isDisposalScheduled) {
+      _scheduleDispose();
+    }
+  }
+
+  // Schedules disposal via a microtask.
+  void _scheduleDispose() {
+    // Set flag first
+    _isDisposalScheduled = true;
+    // Schedule microtask
+    Future.microtask(_disposeIfUnused);
+  }
+
+  // Disposes the Joker if it's still unused and disposal was scheduled.
+  void _disposeIfUnused() {
+    // Only dispose if the microtask was scheduled and conditions still hold
+    if (_isDisposalScheduled && !hasListeners && !keepAlive && !_isDisposed) {
+      dispose();
+    }
+    // Reset the flag regardless of whether dispose was called
+    _isDisposalScheduled = false;
+  }
+
+  @override
+  void dispose() {
+    if (!_isDisposed) {
+      _isDisposed = true;
+      _isDisposalScheduled = false; // Ensure flag is reset on explicit dispose
+      super.dispose();
+    }
+  }
+
+  /// Returns true if the Joker has been disposed.
+  bool get isDisposed => _isDisposed;
+
   // ----------------- Auto-notify APIs -----------------
 
   /// Updates state and automatically calls [notifyListeners].
   ///
   /// Only usable in autoNotify mode.
+  /// Throws [JokerException] if called on a disposed Joker.
   void trick(T newState) {
+    if (_isDisposed)
+      throw JokerException(
+          'Cannot call trick() on a disposed Joker (tag: $tag)');
     if (!autoNotify) {
       throw JokerException(
         'trick() called on manual Joker. Use whisper() and yell() instead.',
@@ -93,7 +171,11 @@ class Joker<T> extends ChangeNotifier {
   }
 
   /// Updates state using a transform function and notifies.
+  /// Throws [JokerException] if called on a disposed Joker.
   void trickWith(T Function(T currentState) performer) {
+    if (_isDisposed)
+      throw JokerException(
+          'Cannot call trickWith() on a disposed Joker (tag: $tag)');
     if (!autoNotify) {
       throw JokerException(
         'trickWith(): Use whisperWith() in manual mode.',
@@ -107,7 +189,11 @@ class Joker<T> extends ChangeNotifier {
   /// Async version of [trickWith].
   ///
   /// Waits for value transformation then notifies listeners.
+  /// Throws [JokerException] if called on a disposed Joker.
   Future<void> trickAsync(Future<T> Function(T current) performer) async {
+    if (_isDisposed)
+      throw JokerException(
+          'Cannot call trickAsync() on a disposed Joker (tag: $tag)');
     if (!autoNotify) {
       throw JokerException(
         'trickAsync(): Use whisperWith() and yell() in manual mode.',
@@ -123,7 +209,11 @@ class Joker<T> extends ChangeNotifier {
   /// Updates state silently (no notify).
   ///
   /// Only usable when [autoNotify] is false.
+  /// Throws [JokerException] if called on a disposed Joker.
   T whisper(T newState) {
+    if (_isDisposed)
+      throw JokerException(
+          'Cannot call whisper() on a disposed Joker (tag: $tag)');
     if (autoNotify) {
       throw JokerException('whisper() is not allowed in autoNotify mode.');
     }
@@ -133,7 +223,11 @@ class Joker<T> extends ChangeNotifier {
   }
 
   /// Functor version of [whisper].
+  /// Throws [JokerException] if called on a disposed Joker.
   T whisperWith(T Function(T currentState) updater) {
+    if (_isDisposed)
+      throw JokerException(
+          'Cannot call whisperWith() on a disposed Joker (tag: $tag)');
     if (autoNotify) {
       throw JokerException('whisperWith() is not allowed in autoNotify mode.');
     }
@@ -145,6 +239,16 @@ class Joker<T> extends ChangeNotifier {
   /// Manually triggers all registered listeners.
   ///
   /// Used in manual mode after one or more silent updates ([whisper]).
+  /// Does nothing if the Joker is disposed.
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
+
+  /// Alias for [notifyListeners] specific to manual mode clarity.
+  /// Does nothing if the Joker is disposed.
   void yell() {
     notifyListeners();
   }
@@ -155,7 +259,13 @@ class Joker<T> extends ChangeNotifier {
   /// Begins a batch update session.
   ///
   /// Use [JokerBatch.commit] to notify once after multiple updates.
-  JokerBatch<T> batch() => JokerBatch<T>(this);
+  /// Throws [JokerException] if called on a disposed Joker.
+  JokerBatch<T> batch() {
+    if (_isDisposed)
+      throw JokerException(
+          'Cannot start batch on a disposed Joker (tag: $tag)');
+    return JokerBatch<T>(this);
+  }
 }
 
 /// A batch update session for a [Joker].
@@ -173,6 +283,9 @@ class JokerBatch<T> {
 
   /// Applies a field-level change to the Joker state.
   JokerBatch<T> apply(T Function(T state) updater) {
+    if (_joker.isDisposed)
+      throw JokerException(
+          'Cannot apply batch update to a disposed Joker (tag: ${_joker.tag})');
     if (_isAutoNotify) {
       final newState = updater(_joker.state);
       (_joker as dynamic)._state = newState;
@@ -184,6 +297,7 @@ class JokerBatch<T> {
 
   /// Commits and triggers force update if any change occurred.
   void commit() {
+    if (_joker.isDisposed) return; // Do nothing if disposed
     if (_joker.state != _originalState) {
       _joker.yell();
     }
@@ -191,6 +305,7 @@ class JokerBatch<T> {
 
   /// Restores original snapshot and discards any changes.
   void discard() {
+    if (_joker.isDisposed) return; // Do nothing if disposed
     if (_isAutoNotify) {
       (_joker as dynamic)._state = _originalState;
     } else {

@@ -129,12 +129,12 @@ counter.trick(1);
 Circus.vanish<int>(tag: 'counter');
 ```
 
-## ⚙️ Configuration
+## ⚙️ Logging (Previously Configuration)
 
-```dart
-// Enable debug logging
-Circus.config(enableLogs: true);
-```
+CircusRing includes internal logging for registration, retrieval, and disposal events.
+
+- **Automatic Logging**: Logging is automatically enabled when your application is run in debug mode (`kDebugMode` is true) and disabled in profile/release modes.
+- **No Configuration Needed**: There is no need to manually configure logging anymore.
 
 ## 💡 Best Practices
 

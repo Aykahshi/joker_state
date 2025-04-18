@@ -103,8 +103,6 @@ class _InfiniteScrollExampleState extends State<InfiniteScrollExample> {
         title: const Text('Infinite Scroll Pagination Example'),
       ),
       body: listJoker.perform(
-        // Disable auto-dispose to make testing easier
-        autoDispose: false,
         builder: (context, items) {
           return ListView.builder(
             controller: scrollController,

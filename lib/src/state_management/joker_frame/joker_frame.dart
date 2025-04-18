@@ -1,8 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-import '../../di/circus_ring/circus_ring.dart';
 import '../joker/joker.dart';
-import '../joker/joker_trickx.dart';
 
 /// Builder function for [JokerFrame].
 ///
@@ -66,7 +64,6 @@ class JokerFrame<T, S> extends StatefulWidget {
     required this.joker,
     required this.selector,
     required this.builder,
-    this.autoDispose = true,
   });
 
   /// Joker instance to observe.
@@ -77,9 +74,6 @@ class JokerFrame<T, S> extends StatefulWidget {
 
   /// Builder called when the selected value changes.
   final JokerFrameBuilder<S> builder;
-
-  /// Whether to auto-dispose the Joker on unmount.
-  final bool autoDispose;
 
   @override
   State<JokerFrame<T, S>> createState() => _JokerFrameState<T, S>();
@@ -111,24 +105,6 @@ class _JokerFrameState<T, S> extends State<JokerFrame<T, S>> {
   @override
   void dispose() {
     widget.joker.removeListener(_onChange);
-
-    if (widget.autoDispose) {
-      final tag = widget.joker.tag;
-      if (tag != null && tag.isNotEmpty) {
-        try {
-          final spotlight = Circus.spotlight<T>(tag: tag);
-          if (identical(spotlight, widget.joker)) {
-            Circus.vanish<T>(tag: tag);
-          } else {
-            widget.joker.dispose();
-          }
-        } catch (_) {
-          widget.joker.dispose();
-        }
-      } else {
-        widget.joker.dispose();
-      }
-    }
 
     super.dispose();
   }

@@ -19,9 +19,6 @@ void main() {
 
 // Sets up dependency injection using CircusRing.
 void _setupDependencies() {
-  // Enable logging for CircusRing (optional)
-  Circus.config(enableLogs: true);
-
   // Register a dummy logger instance (replace with a real logger if needed)
   Circus.hire<Logger>(Logger());
 

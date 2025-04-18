@@ -1,6 +1,8 @@
-[![English](https://img.shields.io/badge/Language-Chinese-blueviolet?style=for-the-badge)](README.md)
+[![English](https://img.shields.io/badge/Language-English-blueviolet?style=for-the-badge)](README.md)
 
 # 🃏 JokerState
+
+**⚠️ Breaking Changes in v2.0.0:** Joker 生命週期和 CircusRing 釋放行為有重大變更。升級前請查閱 [變更日誌](CHANGELOG.md) 和下方更新後的文檔。
 
 一個輕量級的 Flutter 響應式狀態管理解決方案，無縫整合依賴注入。JokerState 通過其 `Joker` API 和配套小部件提供靈活的狀態容器，且需要的樣板代碼極少。
 
@@ -39,7 +41,7 @@ import 'package:joker_state/joker_state.dart';
 
 ### 🎭 Joker：響應式狀態容器
 
-`Joker<T>` 是一個繼承自 `ChangeNotifier` 的響應式狀態容器：
+`Joker<T>` 是一個繼承自 `ChangeNotifier` 的響應式狀態容器。其生命週期現在主要由其監聽器和 `keepAlive` 標誌管理。
 
 ```dart
 // 創建一個自動通知的 Joker（預設）
@@ -56,6 +58,9 @@ counter.batch()
   .apply((s) => s * 2)
   .apply((s) => s + 10)
   .commit();
+
+// 創建一個即使沒有監聽器也保持活動狀態的 Joker
+final persistentState = Joker<String>("initial", keepAlive: true);
 ```
 
 要進行精細控制，請使用手動通知模式：
@@ -72,16 +77,18 @@ manualCounter.whisperWith((s) => s + 1);
 manualCounter.yell();
 ```
 
+**生命週期：** 預設情況下 (`keepAlive: false`)，當最後一個監聽器被移除時，Joker 會通過 `Future.microtask` 自動安排自身的釋放。再次添加監聽器會取消此安排。設置 `keepAlive: true` 可禁用此自動釋放。
+
 ### 🎪 CircusRing：依賴注入
 
-CircusRing 是一個輕量級的依賴容器，用於 Jokers 和其他服務：
+CircusRing 是一個輕量級的依賴容器。其 `fire*` 方法現在執行**條件式釋放 (conditional disposal)**。
 
 ```dart
 // 全局單例訪問器
 final ring = Circus;
 
-// 註冊一個單例
-ring.hire(UserRepository());
+// 註冊一個單例 (Disposable 範例)
+ring.hire(MyDisposableService());
 
 // 註冊一個延遲加載的單例
 ring.hireLazily(() => NetworkService());
@@ -90,7 +97,7 @@ ring.hireLazily(() => NetworkService());
 ring.contract(() => ApiClient());
 
 // 之後尋找實例
-final repo = Circus.find<UserRepository>();
+final service = Circus.find<MyDisposableService>();
 ```
 
 CircusRing 與 Joker 的整合：
@@ -102,9 +109,13 @@ Circus.summon<int>(0, tag: 'counter');
 // 尋找已註冊的 Joker
 final counter = Circus.spotlight<int>(tag: 'counter');
 
-// 完成後移除 Joker
-Circus.vanish<int>(tag: 'counter');
+// 移除一個 Joker（僅從註冊表中移除，不會釋放 Joker）
+Circus.vanish<int>(tag: 'counter'); 
+
+// Joker 自身的生命週期（監聽器/keepAlive）決定了它何時釋放。
 ```
+
+**釋放：** `Circus.fire*` 方法 **僅會** 釋放**非 Joker** 且實現了 `Disposable`、`AsyncDisposable` 或 `ChangeNotifier` 的實例。`Joker` 實例**永遠不會**被 CircusRing 釋放；它們管理自己的生命週期。
 
 ### 🎭 UI 整合
 
@@ -170,22 +181,24 @@ typedef UserRecord = (String name, int age, bool active);
 
 #### JokerPortal 和 JokerCast
 
-通過小部件樹提供和訪問 Jokers：
+通過小部件樹提供和訪問 Jokers。**請記住，在提供/訪問像 `int` 或 `String` 這樣的通用類型時，使用 `tag` 以避免歧義。**
 
 ```dart
 // 將 Joker 插入小部件樹
 JokerPortal<int>(
   joker: counterJoker,
+  tag: 'counter', // Tag 在此至關重要！
   child: MyApp(),
 )
 
 // 之後，從任何後代訪問它
 JokerCast<int>(
+  tag: 'counter', // 使用相同的 tag！
   builder: (context, count) => Text('Count: $count'),
 )
 
 // 或使用擴展直接訪問
-Text('Count: ${context.joker<int>().state}')
+Text('Count: ${context.joker<int>(tag: 'counter').state}')
 ```
 
 ### 🎪 特殊小部件
@@ -339,19 +352,26 @@ Circus.bindDependency<UserRepository, ApiService>();
 
 ### 🧹 資源管理
 
-Joker 和 CircusRing 都處理適當的清理：
+- **Joker**：基於監聽器和 `keepAlive` 管理自己的生命週期。
+- **CircusRing**：在移除時有條件地釋放非 Joker 資源。
+- **手動清理**：務必手動 `dispose()` 未由其他地方管理的 Jokers 或其他資源（尤其是 `keepAlive: true` 的 Jokers）。
 
 ```dart
-// 當小部件被移除時自動清理
-JokerStage<User>(
-  joker: userJoker,
-  autoDispose: true, // 預設
-  builder: (context, user) => Text(user.name),
-)
+// Joker 範例
+final persistentJoker = Joker<int>(0, keepAlive: true);
+// ... 使用 joker ...
+persistentJoker.dispose(); // 需要手動釋放
 
-// 手動清理
-userJoker.dispose();
-Circus.fire<ApiClient>();
+// CircusRing 範例 (Disposable)
+Circus.hire(MyDisposableService());
+// ... 使用 service ...
+Circus.fire<MyDisposableService>(); // Service 會被 fire() 釋放
+
+// CircusRing 範例 (Joker)
+final managedJoker = Circus.summon<int>(0, tag: 'temp');
+// ... 使用 joker ...
+Circus.vanish<int>(tag: 'temp'); // 僅從 ring 中移除
+// 如果沒有剩餘的監聽器，managedJoker 會自行釋放 (預設 keepAlive: false)
 ```
 
 ## 範例

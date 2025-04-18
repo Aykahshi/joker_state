@@ -40,8 +40,6 @@ class TodoScreen extends StatelessWidget {
         backgroundColor: Colors.blue,
       ),
       body: todosJoker.perform(
-        // Disable auto-dispose to make testing easier
-        autoDispose: false,
         builder: (context, todos) {
           if (todos.isEmpty) {
             return const Center(

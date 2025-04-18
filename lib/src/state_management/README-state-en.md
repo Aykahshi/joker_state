@@ -13,6 +13,9 @@ counter.trick(1);  // Updates to 1 and notifies listeners
 final manualCounter = Joker<int>(0, autoNotify: false);
 manualCounter.whisper(42);  // Silent update
 manualCounter.yell();       // Manual notification
+
+// Keep Joker alive even with no listeners
+final persistentJoker = Joker<String>("data", keepAlive: true);
 ```
 
 ### Using Joker with Flutter
@@ -197,12 +200,21 @@ userJoker.observe<String>(
 );
 ```
 
+## 🧹 Lifecycle Management (New Section)
+
+- **Listener-Based Disposal**: By default (`keepAlive: false`), a Joker schedules itself for disposal via a microtask when its last listener is removed.
+- **Cancellation**: If a listener is added again before the microtask executes, the disposal is cancelled.
+- **keepAlive**: Setting `keepAlive: true` prevents this automatic disposal, keeping the Joker instance alive until manually disposed or removed via CircusRing (if registered).
+- **Manual Disposal**: You can always call `joker.dispose()` manually.
+- **Widget Integration**: Widgets like `JokerStage`, `JokerFrame`, etc., manage listeners internally. When the widget is removed from the tree, its listener is removed, potentially triggering the Joker's auto-disposal mechanism if `keepAlive` is false.
+
 ## 🧪 Best Practices
 
 1. **Use Selectors**: Minimize rebuilds by selecting only needed state slices
 2. **Batch Updates**: Group related changes to avoid multiple rebuilds
 3. **Tagged Jokers**: Always use tags when working with CircusRing
-4. **Auto-Dispose**: Enable autoDispose (default) for automatic cleanup
+4. **`keepAlive`**: Use `keepAlive: true` for Jokers that need to persist independently of UI listeners (e.g., global application state).
+5. **Explicit Disposal**: Manually `dispose()` Jokers that are not managed by widgets or CircusRing, especially if `keepAlive` is true.
 
 ## 🏆 Comparison with Other Solutions
 

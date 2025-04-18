@@ -12,8 +12,6 @@ class CounterDisplay extends StatelessWidget {
   Widget build(BuildContext context) {
     // Observe the Joker<Counter> state directly using the tag.
     return Circus.spotlight<Counter>(tag: COUNTER_JOKER_TAG).observe<int>(
-      // Prevent the frame from disposing the Joker managed by the test setup.
-      autoDispose: false,
       // Select the integer value from the Counter state.
       selector: (counter) => counter.value,
       builder: (context, count) {

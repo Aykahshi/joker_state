@@ -23,24 +23,26 @@ import 'joker.dart';
 ///   builder: (context, count) => Text('$count'),
 /// );
 /// ```
+///
+/// Note: The `autoDispose` parameter has been removed as Joker now manages
+/// its own lifecycle based on listeners and the `keepAlive` flag.
 extension JokerStageExtension<T> on Joker<T> {
   /// Creates a [JokerStage] that watches the entire state changes of this Joker.
   ///
   /// The [builder] will be rebuilt whenever this Joker calls notifyListeners().
   ///
   /// [autoDispose]: Whether to automatically remove/dispose the Joker when the widget is removed.
+  /// The Joker now manages its own lifecycle. This parameter is removed.
   ///
   /// Returns a [JokerStage] widget.
   JokerStage<T> perform({
     Key? key,
     required JokerStageBuilder<T> builder,
-    bool autoDispose = true,
   }) {
     return JokerStage<T>(
       key: key,
       joker: this,
       builder: builder,
-      autoDispose: autoDispose,
     );
   }
 }
@@ -62,26 +64,28 @@ extension JokerStageExtension<T> on Joker<T> {
 ///   builder: (context, name) => Text('Hi $name'),
 /// );
 /// ```
+///
+/// Note: The `autoDispose` parameter has been removed as Joker now manages
+/// its own lifecycle based on listeners and the `keepAlive` flag.
 extension JokerFrameExtension<T> on Joker<T> {
   /// Creates a [JokerFrame] that observes a selected portion of the Joker state.
   ///
   /// [selector]: Function to extract the slice of state to observe.
   /// [builder]: Function called when the selected value changes.
   /// [autoDispose]: Whether to automatically dispose the Joker when removed.
+  /// The Joker now manages its own lifecycle. This parameter is removed.
   ///
   /// Returns a [JokerFrame] widget that only rebuilds when selector result changes.
   JokerFrame<T, S> observe<S>({
     Key? key,
     required JokerFrameSelector<T, S> selector,
     required JokerFrameBuilder<S> builder,
-    bool autoDispose = true,
   }) {
     return JokerFrame<T, S>(
       key: key,
       joker: this,
       selector: selector,
       builder: builder,
-      autoDispose: autoDispose,
     );
   }
 }
@@ -109,26 +113,28 @@ extension JokerFrameExtension<T> on Joker<T> {
 ///   },
 /// );
 /// ```
+///
+/// Note: The `autoDispose` parameter has been removed as Joker now manages
+/// its own lifecycle based on listeners and the `keepAlive` flag.
 extension JokerTroupeExtension on List<Joker> {
   /// Creates a [JokerTroupe] widget from this list of Jokers.
   ///
   /// [converter]: Maps the dynamic list of Joker values into a Dart Record of type [T].
   /// [builder]: Receives the typed [T] and builds a widget based on combined state.
   /// [autoDispose]: Whether to automatically dispose Jokers on widget removal.
+  /// The Joker now manages its own lifecycle. This parameter is removed.
   ///
   /// Returns a [JokerTroupe] widget.
   JokerTroupe<T> assemble<T extends Record>({
     Key? key,
     required JokerTroupeConverter<T> converter,
     required JokerTroupeBuilder<T> builder,
-    bool autoDispose = true,
   }) {
     return JokerTroupe<T>(
       key: key,
       jokers: this,
       converter: converter,
       builder: builder,
-      autoDispose: autoDispose,
     );
   }
 }
@@ -152,13 +158,15 @@ extension JokerRingExtension on CircusRing {
   ///
   /// [initialValue]: Starting value for the Joker.
   /// [tag]: Globally unique tag used to identify this Joker.
+  /// [keepAlive]: If true, prevents automatic disposal when listeners drop to zero.
   ///
   /// Throws [CircusRingException] if the tag is empty.
   Joker<T> summon<T>(
     T initialValue, {
     required String tag,
+    bool keepAlive = false,
   }) {
-    final joker = Joker<T>(initialValue);
+    final joker = Joker<T>(initialValue, keepAlive: keepAlive, tag: tag);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
   }
@@ -166,13 +174,16 @@ extension JokerRingExtension on CircusRing {
   /// Registers a manual Joker (non-autoNotify) into the [CircusRing].
   ///
   /// Same as [summon] but requires manual [Joker.yell] to trigger listeners.
+  /// [keepAlive]: If true, prevents automatic disposal when listeners drop to zero.
   ///
   /// Throws [CircusRingException] if the tag is empty.
   Joker<T> recruit<T>(
     T initialValue, {
     required String tag,
+    bool keepAlive = false,
   }) {
-    final joker = Joker<T>(initialValue, autoNotify: false);
+    final joker = Joker<T>(initialValue,
+        autoNotify: false, keepAlive: keepAlive, tag: tag);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
   }
@@ -207,9 +218,14 @@ extension JokerRingExtension on CircusRing {
     return tryFind<Joker<T>>(tag);
   }
 
-  /// Removes and disposes the Joker tied to [tag].
+  /// Removes and potentially disposes the Joker tied to [tag].
   ///
-  /// Returns true if successful, false if tag not found.
+  /// This method removes the Joker instance from the CircusRing registry.
+  /// If the Joker has `keepAlive` set to false and no other listeners exist
+  /// (after being removed from the registry which might hold the last reference indirectly),
+  /// it might trigger its auto-dispose logic.
+  ///
+  /// Returns true if the Joker was found and removed from the registry, false otherwise.
   ///
   /// Throws [CircusRingException] if tag is empty.
   bool vanish<T>({required String tag}) {

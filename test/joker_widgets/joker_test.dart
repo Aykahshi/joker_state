@@ -3,6 +3,44 @@ import 'package:joker_state/joker_state.dart';
 
 void main() {
   group('Joker', () {
+    group('Initialization & Basic Properties', () {
+      test('Auto Joker should initialize with correct defaults', () {
+        // Arrange
+        final joker = Joker<int>(42, tag: 'test-tag');
+
+        // Assert
+        expect(joker.state, equals(42));
+        expect(joker.previousState, equals(42));
+        expect(joker.tag, equals('test-tag'));
+        expect(joker.autoNotify, isTrue);
+        expect(joker.keepAlive, isFalse); // Default keepAlive is false
+        expect(joker.isDisposed, isFalse);
+      });
+
+      test('Manual Joker should initialize with correct settings', () {
+        // Arrange
+        final joker = Joker<int>(42, autoNotify: false, tag: 'manual');
+
+        // Assert
+        expect(joker.state, equals(42));
+        expect(joker.previousState, equals(42));
+        expect(joker.tag, equals('manual'));
+        expect(joker.autoNotify, isFalse);
+        expect(joker.keepAlive, isFalse);
+        expect(joker.isDisposed, isFalse);
+      });
+
+      test('Joker with keepAlive should initialize correctly', () {
+        // Arrange
+        final joker = Joker<String>('persistent', keepAlive: true);
+
+        // Assert
+        expect(joker.keepAlive, isTrue);
+        expect(joker.autoNotify, isTrue);
+        expect(joker.isDisposed, isFalse);
+      });
+    });
+
     group('Auto Joker', () {
       test('should be initialized with correct values', () {
         // Arrange
@@ -267,6 +305,140 @@ void main() {
 
         // Assert
         expect(joker.state, equals(5)); // Original value preserved
+      });
+    });
+
+    group('Lifecycle Management (keepAlive & Auto-Dispose)', () {
+      test(
+          'Joker with keepAlive=false should dispose after listener removed (microtask)',
+          () async {
+        // Arrange
+        final joker = Joker<int>(10, keepAlive: false);
+        listener() {}
+        joker.addListener(listener);
+        expect(joker.isDisposed, isFalse);
+
+        // Act - remove listener, schedules microtask
+        joker.removeListener(listener);
+        // Need just one event loop turn for microtask to run
+        await Future.delayed(Duration.zero);
+
+        // Assert
+        expect(joker.isDisposed, isTrue);
+      });
+
+      test(
+          'Joker with keepAlive=true should NOT dispose after listener removed (microtask)',
+          () async {
+        // Arrange
+        final joker = Joker<int>(10, keepAlive: true);
+        listener() {}
+        joker.addListener(listener);
+        expect(joker.isDisposed, isFalse);
+
+        // Act - remove listener
+        joker.removeListener(listener);
+        await Future.delayed(Duration.zero); // Wait one event loop turn
+
+        // Assert
+        expect(joker.isDisposed, isFalse);
+      });
+
+      test('Adding listener should prevent microtask disposal', () async {
+        // Arrange
+        final joker = Joker<int>(10, keepAlive: false);
+        listener1() {}
+        listener2() {}
+        joker.addListener(listener1);
+
+        // Act - remove listener (schedules microtask), add listener back immediately
+        joker.removeListener(listener1);
+        joker.addListener(
+            listener2); // This should set _isDisposalScheduled = false
+
+        await Future.delayed(
+            Duration.zero); // Wait for microtask queue to process
+
+        // Assert - should not be disposed because flag was reset
+        expect(joker.isDisposed, isFalse);
+      });
+
+      test('Explicit dispose() should dispose Joker regardless of keepAlive',
+          () async {
+        // Arrange
+        final jokerKeepAlive = Joker<int>(10, keepAlive: true);
+        final jokerNoKeepAlive = Joker<int>(20, keepAlive: false);
+        listener() {}
+        jokerKeepAlive.addListener(listener);
+        jokerNoKeepAlive.addListener(listener);
+
+        // Act
+        jokerKeepAlive.dispose();
+        jokerNoKeepAlive.dispose();
+        // No need to wait for microtask here, explicit dispose is synchronous
+
+        // Assert
+        expect(jokerKeepAlive.isDisposed, isTrue);
+        expect(jokerNoKeepAlive.isDisposed, isTrue);
+      });
+
+      test('Calling methods on disposed Joker should throw JokerException',
+          () async {
+        // Arrange
+        final joker = Joker<int>(10);
+        listener() {}
+        joker.addListener(listener);
+        joker.removeListener(listener);
+        await Future.delayed(Duration.zero); // Wait for microtask disposal
+        expect(joker.isDisposed, isTrue);
+
+        // Assert
+        expect(() => joker.trick(20), throwsA(isA<JokerException>()));
+        expect(
+            () => joker.trickWith((_) => 30), throwsA(isA<JokerException>()));
+        expect(() => joker.trickAsync((_) async => 40),
+            throwsA(isA<JokerException>()));
+        expect(() => joker.whisper(50), throwsA(isA<JokerException>()));
+        expect(
+            () => joker.whisperWith((_) => 60), throwsA(isA<JokerException>()));
+        expect(() => joker.batch(), throwsA(isA<JokerException>()));
+        expect(() => joker.addListener(() {}), throwsA(isA<JokerException>()));
+        expect(() => joker.notifyListeners(), returnsNormally);
+        expect(() => joker.yell(), returnsNormally);
+        expect(() => joker.removeListener(() {}), returnsNormally);
+      });
+
+      test('Accessing state on disposed Joker should be allowed', () async {
+        // Arrange
+        final joker = Joker<int>(10);
+        listener() {}
+        joker.addListener(listener);
+        joker.removeListener(listener);
+        await Future.delayed(Duration.zero); // Wait for microtask disposal
+        expect(joker.isDisposed, isTrue);
+
+        // Assert
+        expect(joker.state, equals(10)); // State is still accessible
+        expect(joker.previousState, equals(10));
+        expect(joker.tag, isNull);
+        expect(joker.keepAlive, isFalse);
+      });
+
+      test('Batch operations should throw if Joker is disposed during apply',
+          () async {
+        // Arrange
+        final joker = Joker<int>(10);
+        final batch = joker.batch();
+
+        // Dispose the joker after creating the batch but before applying
+        joker.dispose();
+        // No need to wait for microtask
+        expect(joker.isDisposed, isTrue);
+
+        // Assert
+        expect(() => batch.apply((s) => s + 1), throwsA(isA<JokerException>()));
+        expect(() => batch.commit(), returnsNormally);
+        expect(() => batch.discard(), returnsNormally);
       });
     });
   });

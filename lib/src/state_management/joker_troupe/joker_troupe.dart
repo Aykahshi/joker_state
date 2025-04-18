@@ -62,12 +62,12 @@ class JokerTroupe<T extends Record> extends StatefulWidget {
   ///
   /// If [autoDispose] is true (default), all [Joker]s will be disposed or
   /// removed from [CircusRing] upon widget destruction.
+  /// The `autoDispose` parameter is removed, as Jokers now manage their own lifecycle.
   const JokerTroupe({
     super.key,
     required this.jokers,
     required this.converter,
     required this.builder,
-    this.autoDispose = true,
   });
 
   /// The list of [Joker]s to observe for changes.
@@ -86,12 +86,6 @@ class JokerTroupe<T extends Record> extends StatefulWidget {
   ///
   /// The converted record T is passed for safe access.
   final JokerTroupeBuilder<T> builder;
-
-  /// Automatically disposes all [Joker]s when the widget is removed.
-  ///
-  /// If a [Joker] was registered with a tag (via Circus), this will attempt
-  /// to "vanish" it by tag. If not registered or unmatched, it will be disposed manually.
-  final bool autoDispose;
 
   @override
   State<JokerTroupe<T>> createState() => _JokerTroupeState<T>();
@@ -173,19 +167,23 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
   void dispose() {
     _removeListeners();
 
+    /* // Removed autoDispose logic
     if (widget.autoDispose) {
       for (final joker in widget.jokers) {
         final tag = joker.tag;
         if (tag != null && tag.isNotEmpty) {
-          final removed = Circus.fireByTag(tag);
+          final removed = Circus.fireByTag(tag); // fireByTag also handles dispose
           if (!removed) {
-            joker.dispose();
+            // If not found by tag (maybe registered differently or not at all), dispose manually
+            if (!joker.isDisposed) joker.dispose();
           }
         } else {
-          joker.dispose();
+          // If no tag, dispose manually
+          if (!joker.isDisposed) joker.dispose();
         }
       }
     }
+    */
 
     super.dispose();
   }

@@ -1,10 +1,11 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
 
 void main() {
   group('JokerStage', () {
     setUp(() {
+      // Clean up CircusRing before each test
       Circus.fireAll();
     });
 
@@ -15,9 +16,8 @@ void main() {
 
       // Act
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerStage<String>(
+        MaterialApp(
+          home: JokerStage<String>(
             joker: joker,
             builder: (context, value) => Text(value),
           ),
@@ -35,9 +35,8 @@ void main() {
 
       // Act - build the widget
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerStage<int>(
+        MaterialApp(
+          home: JokerStage<int>(
             joker: joker,
             builder: (context, value) => Text('Count: $value'),
           ),
@@ -49,165 +48,180 @@ void main() {
 
       // Update joker
       joker.trick(20);
-      await tester.pump();
+      await tester.pump(); // Rebuild the widget
 
       // Assert
       expect(find.text('Count: 20'), findsOneWidget);
     });
 
-    testWidgets('should dispose joker when autoDispose is true',
+    testWidgets(
+        'Joker with keepAlive=false should dispose after stage is removed',
         (WidgetTester tester) async {
       // Arrange
-      final joker = Joker<int>(42);
+      final joker = Joker<int>(42, keepAlive: false);
+      expect(joker.isDisposed, isFalse);
+
+      // Act - build widget
+      await tester.pumpWidget(
+        MaterialApp(
+          home: JokerStage<int>(
+            joker: joker,
+            builder: (context, value) => Text('$value'),
+          ),
+        ),
+      );
+      expect(joker.isDisposed, isFalse);
+
+      // Remove widget - this schedules the dispose microtask
+      await tester.pumpWidget(Container());
+      // One pump should process the microtask
+      await tester.pump();
+
+      // Assert: Joker should now be disposed
+      expect(joker.isDisposed, isTrue);
+    });
+
+    testWidgets(
+        'Joker with keepAlive=true should NOT dispose after stage is removed',
+        (WidgetTester tester) async {
+      // Arrange
+      final joker = Joker<int>(42, keepAlive: true);
+      expect(joker.isDisposed, isFalse);
+
       // Act - build and then remove widget
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerStage<int>(
+        MaterialApp(
+          home: JokerStage<int>(
             joker: joker,
-            autoDispose: true,
             builder: (context, value) => Text('$value'),
           ),
         ),
       );
 
       await tester.pumpWidget(Container()); // Remove widget
+      await tester
+          .pump(); // Pump once to be safe, although it shouldn't dispose
 
       // Assert
-      expect(() => joker.trick(100), throwsA(isInstanceOf<FlutterError>()));
+      expect(joker.isDisposed, isFalse);
+      // Verify it still works
+      expect(() => joker.trick(100), returnsNormally);
+      expect(joker.state, 100);
     });
 
-    testWidgets('should not dispose joker when autoDispose is false',
+    testWidgets('should handle CircusRing integrated jokers correctly',
         (WidgetTester tester) async {
-      // Arrange
-      final joker = Joker<int>(42);
-      // Act - build and then remove widget
-      await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerStage<int>(
-            joker: joker,
-            autoDispose: false,
-            builder: (context, value) => Text('$value'),
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(Container()); // Remove widget
-
-      // Assert
-      expect(joker.state, 42);
-    });
-
-    testWidgets('should handle CircusRing integrated jokers',
-        (WidgetTester tester) async {
-      // Arrange - register joker in CircusRing
-      final joker = Joker<String>('Registered', tag: 'test-joker');
-      Circus.hire<Joker<String>>(joker, tag: 'test-joker');
-
-      // Verify joker is registered
+      // Arrange - register joker in CircusRing (keepAlive=false default)
+      final joker = Circus.summon<String>('Registered', tag: 'test-joker');
       expect(Circus.isHired<Joker<String>>('test-joker'), isTrue);
 
       // Act - build with registered joker
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerStage<String>(
+        MaterialApp(
+          home: JokerStage<String>(
             joker: joker,
             builder: (context, value) => Text(value),
           ),
         ),
       );
 
-      // Assert
+      // Assert initial display
       expect(find.text('Registered'), findsOneWidget);
 
-      // Update joker
+      // Update joker state
       joker.trick('Updated');
       await tester.pump();
-
       expect(find.text('Updated'), findsOneWidget);
 
-      // Remove widget
+      // Remove the widget - schedules dispose microtask
       await tester.pumpWidget(Container());
+      await tester.pump(); // Pump once for microtask
 
-      // Joker should still be registered (not auto-disposed)
-      expect(Circus.isHired<Joker<String>>('test-joker'), isFalse);
+      // Assert: Joker should still be in CircusRing
+      expect(Circus.isHired<Joker<String>>('test-joker'), isTrue);
+      // Assert: Now disposed
+      expect(joker.isDisposed, isTrue);
+      // Cleanup
+      Circus.vanish<String>(tag: 'test-joker');
     });
 
     testWidgets(
-        'should properly unregister CircusRing jokers when autoDispose=true',
+        'CircusRing joker with keepAlive=true should remain after stage removal',
         (WidgetTester tester) async {
-      // Arrange - register joker in CircusRing
-      final joker = Joker<int>(42, tag: 'auto-remove');
-      Circus.hire<Joker<int>>(joker, tag: 'auto-remove');
+      // Arrange - register joker with keepAlive=true
+      final joker = Circus.summon<String>('Persistent',
+          tag: 'keep-alive-joker', keepAlive: true);
+      expect(Circus.isHired<Joker<String>>('keep-alive-joker'), isTrue);
 
-      // Act - build with registered joker and autoDispose=true
+      // Act - build with registered joker
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerStage<int>(
+        MaterialApp(
+          home: JokerStage<String>(
             joker: joker,
-            autoDispose: true,
-            builder: (context, value) => Text('$value'),
-          ),
-        ),
-      );
-
-      // Initial check
-      expect(find.text('42'), findsOneWidget);
-      expect(Circus.isHired<Joker<int>>('auto-remove'), isTrue);
-
-      // Remove widget
-      await tester.pumpWidget(Container());
-      await tester.pump(); // Ensure dispose completes
-
-      // Joker should be unregistered
-      expect(Circus.isHired<Joker<int>>('auto-remove'), isFalse);
-    });
-
-    testWidgets('should handle joker without tag', (WidgetTester tester) async {
-      // Arrange - joker without tag
-      final joker = Joker<String>('No tag');
-
-      // Act - build and then remove
-      await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerStage<String>(
-            joker: joker,
-            autoDispose: true,
             builder: (context, value) => Text(value),
           ),
         ),
       );
+      expect(find.text('Persistent'), findsOneWidget);
 
+      // Remove the widget
+      await tester.pumpWidget(Container());
+      await tester.pump(); // Pump once
+
+      // Assert: Joker should still be in CircusRing AND not disposed
+      expect(Circus.isHired<Joker<String>>('keep-alive-joker'), isTrue);
+      expect(joker.isDisposed, isFalse);
+
+      // Verify it still works
+      expect(() => joker.trick('Still works'), returnsNormally);
+      expect(joker.state, 'Still works');
+
+      // Clean up manually
+      Circus.vanish<String>(tag: 'keep-alive-joker');
+    });
+
+    testWidgets('should handle joker without tag correctly',
+        (WidgetTester tester) async {
+      // Arrange - joker without tag, keepAlive=false (default)
+      final joker = Joker<String>('No tag');
+      expect(joker.isDisposed, isFalse);
+
+      // Act - build and then remove
+      await tester.pumpWidget(
+        MaterialApp(
+          home: JokerStage<String>(
+            joker: joker,
+            builder: (context, value) => Text(value),
+          ),
+        ),
+      );
       expect(find.text('No tag'), findsOneWidget);
 
-      // Should not crash when removed (even though joker has no tag)
+      // Remove widget - schedules dispose microtask
       await tester.pumpWidget(Container());
+      await tester.pump(); // Pump once for microtask
+
+      // Assert - Joker should be disposed automatically
+      expect(joker.isDisposed, isTrue);
     });
 
     testWidgets('should handle multiple stages with same joker',
         (WidgetTester tester) async {
       // Arrange - single joker used by multiple stages
-      final joker = Joker<int>(10);
+      final joker =
+          Joker<int>(10, keepAlive: true); // Use keepAlive for simplicity here
 
       // Act - build multiple stages
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: Column(
+        MaterialApp(
+          home: Column(
             children: [
               JokerStage<int>(
                 joker: joker,
-                autoDispose: false,
-                // Important: only one should auto-dispose
                 builder: (context, value) => Text('First: $value'),
               ),
               JokerStage<int>(
                 joker: joker,
-                autoDispose: true,
                 builder: (context, value) => Text('Second: $value'),
               ),
             ],
@@ -226,6 +240,31 @@ void main() {
       // Both should update
       expect(find.text('First: 20'), findsOneWidget);
       expect(find.text('Second: 20'), findsOneWidget);
+
+      // Remove one stage
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Column(
+            children: [
+              JokerStage<int>(
+                joker: joker,
+                builder: (context, value) => Text('First: $value'),
+              ),
+              // Second stage removed
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Joker should not be disposed as one listener remains and keepAlive=true
+      expect(joker.isDisposed, isFalse);
+      expect(find.text('First: 20'), findsOneWidget);
+
+      // Update again
+      joker.trick(30);
+      await tester.pump();
+      expect(find.text('First: 30'), findsOneWidget);
     });
 
     testWidgets('should work correctly with manual jokers',
@@ -235,9 +274,8 @@ void main() {
 
       // Act - build with manual joker
       await tester.pumpWidget(
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: JokerStage<int>(
+        MaterialApp(
+          home: JokerStage<int>(
             joker: joker,
             builder: (context, value) => Text('Value: $value'),
           ),

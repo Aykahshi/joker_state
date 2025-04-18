@@ -16,6 +16,7 @@ void main() {
     joker.trick(10); // This won't trigger
 
     expect(logs, ['0 → 1', '1 → 5']);
+    joker.dispose(); // Clean up
   });
 
   test('multiple listen() calls should work independently', () {
@@ -39,8 +40,11 @@ void main() {
 
     stop1();
     joker.trick('again');
-    expect(copy1, equals('move')); // didn’t update
+    expect(copy1, equals('move')); // didn't update
     expect(copy2, equals('Hello again'));
+
+    stop2(); // Stop the second listener too
+    joker.dispose(); // Clean up
   });
 
   test('listenWhen triggers only when condition met', () {
@@ -59,5 +63,6 @@ void main() {
 
     expect(logs, ['Grow: 0 → 1', 'Grow: 1 → 2', 'Grow: 1 → 3']);
     cancel();
+    joker.dispose(); // Clean up
   });
 }

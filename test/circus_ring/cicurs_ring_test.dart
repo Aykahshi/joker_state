@@ -1,10 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
 
+// Define a unique class for testing type-based lookup without tag
+class UniqueType {
+  final String value;
+  UniqueType(this.value);
+}
+
 void main() {
   setUp(() {
     // Reset CircusRing before each test
     Circus.fireAll();
+    // Removed Circus.config call, logging now tied to kDebugMode
+    // Circus.config(enableLogs: false);
   });
 
   group('CircusRing Basic Functionality', () {
@@ -19,14 +27,14 @@ void main() {
       expect(Circus, same(instance1));
     });
 
-    test('should enable and disable logs', () {
-      // Arrange & Act
-      Circus.config(enableLogs: true);
-
-      // We don't have direct access to _enableLogs, but we can test that
-      // the configuration doesn't throw an exception
-      expect(() => Circus.config(enableLogs: false), returnsNormally);
-    });
+    // Removed test for config method
+    // test('should enable and disable logs', () {
+    //   // Arrange & Act
+    //   Circus.config(enableLogs: true);
+    //   // We don't have direct access to _enableLogs, but we can test that
+    //   // the configuration doesn't throw an exception
+    //   expect(() => Circus.config(enableLogs: false), returnsNormally);
+    // });
   });
 
   group('CircusRing Hiring (Registration)', () {
@@ -66,17 +74,55 @@ void main() {
           throwsA(isA<CircusRingException>()));
     });
 
-    test('hire should replace existing instance', () {
+    test('hire should allow registering Joker with tag', () {
       // Arrange
-      final testInstance1 = _TestClass('test1');
-      final testInstance2 = _TestClass('test2');
+      final jokerInstance = Joker<String>('test');
+
+      // Act & Assert
+      expect(() => Circus.hire<Joker<String>>(jokerInstance, tag: 'myJoker'),
+          returnsNormally);
+      expect(Circus.isHired<Joker<String>>('myJoker'), isTrue);
+    });
+
+    test('hire should replace existing instance and dispose non-joker', () {
+      // Arrange
+      final testInstance1 = _DisposableObject();
+      final testInstance2 = _DisposableObject();
 
       // Act
-      Circus.hire<_TestClass>(testInstance1);
-      Circus.hire<_TestClass>(testInstance2);
+      Circus.hire<_DisposableObject>(testInstance1);
+      Circus.hire<_DisposableObject>(
+          testInstance2); // This replaces testInstance1
 
       // Assert
-      expect(Circus.find<_TestClass>(), equals(testInstance2));
+      expect(Circus.find<_DisposableObject>(), equals(testInstance2));
+      expect(
+          testInstance1.isDisposed, isTrue); // Old instance should be disposed
+      expect(testInstance2.isDisposed, isFalse); // New instance should not
+    });
+
+    test(
+        'hire should replace existing Joker instance WITHOUT disposing old one',
+        () {
+      // Arrange
+      final joker1 = Joker<int>(1, tag: 'joker');
+      final joker2 = Joker<int>(2, tag: 'joker');
+
+      Circus.hire<Joker<int>>(joker1, tag: 'joker');
+      expect(joker1.isDisposed, isFalse);
+
+      // Act
+      Circus.hire<Joker<int>>(joker2, tag: 'joker'); // Replace joker1
+
+      // Assert
+      expect(Circus.find<Joker<int>>('joker'), equals(joker2));
+      // CircusRing itself should NOT dispose the replaced Joker
+      expect(joker1.isDisposed, isFalse);
+      expect(joker2.isDisposed, isFalse);
+
+      // Clean up manually since it wasn't disposed by CircusRing
+      joker1.dispose();
+      expect(joker1.isDisposed, isTrue);
     });
 
     test('hireAsync should register an asynchronous singleton', () async {
@@ -279,7 +325,7 @@ void main() {
     });
   });
 
-  group('CircusRing Disposing', () {
+  group('CircusRing Firing (Deletion & Disposal)', () {
     test('fire should delete an instance', () {
       // Arrange
       final testInstance = _TestClass('test');
@@ -297,12 +343,35 @@ void main() {
       // Arrange
       final disposable = _DisposableObject();
       Circus.hire<_DisposableObject>(disposable);
+      expect(disposable.isDisposed, isFalse);
 
       // Act
-      Circus.fire<_DisposableObject>();
+      final result = Circus.fire<_DisposableObject>();
 
       // Assert
+      expect(result, isTrue);
       expect(disposable.isDisposed, isTrue);
+      expect(Circus.isHired<_DisposableObject>(), isFalse);
+    });
+
+    test('fire should NOT dispose Joker instance', () {
+      // Arrange
+      final joker = Joker<int>(10, tag: 'myJoker');
+      Circus.hire<Joker<int>>(joker, tag: 'myJoker');
+      expect(joker.isDisposed, isFalse);
+
+      // Act
+      final result = Circus.fire<Joker<int>>(tag: 'myJoker');
+
+      // Assert
+      expect(result, isTrue);
+      expect(
+          Circus.isHired<Joker<int>>('myJoker'), isFalse); // Removed from ring
+      expect(joker.isDisposed, isFalse); // BUT NOT disposed by CircusRing.fire
+
+      // Manually dispose for cleanup
+      joker.dispose();
+      expect(joker.isDisposed, isTrue);
     });
 
     test('fireAsync should delete an instance asynchronously', () async {
@@ -322,38 +391,114 @@ void main() {
       // Arrange
       final disposable = _AsyncDisposableObject();
       Circus.hire<_AsyncDisposableObject>(disposable);
+      expect(disposable.isDisposed, isFalse);
 
       // Act
-      await Circus.fireAsync<_AsyncDisposableObject>();
+      final result = await Circus.fireAsync<_AsyncDisposableObject>();
 
       // Assert
+      expect(result, isTrue);
       expect(disposable.isDisposed, isTrue);
+      expect(Circus.isHired<_AsyncDisposableObject>(), isFalse);
     });
 
-    test('fireAll should delete all instances', () {
+    test('fireAsync should dispose regular DisposableObject too', () async {
       // Arrange
-      Circus.hire<_TestClass>(_TestClass('test1'));
-      Circus.hire<String>('test2');
+      final disposable = _DisposableObject();
+      Circus.hire<_DisposableObject>(disposable);
+      expect(disposable.isDisposed, isFalse);
+
+      // Act
+      final result = await Circus.fireAsync<_DisposableObject>();
+
+      // Assert
+      expect(result, isTrue);
+      expect(disposable.isDisposed, isTrue);
+      expect(Circus.isHired<_DisposableObject>(), isFalse);
+    });
+
+    test('fireAsync should NOT dispose Joker instance', () async {
+      // Arrange
+      final joker = Joker<int>(10, tag: 'myJokerAsync');
+      Circus.hire<Joker<int>>(joker, tag: 'myJokerAsync');
+      expect(joker.isDisposed, isFalse);
+
+      // Act
+      final result = await Circus.fireAsync<Joker<int>>(tag: 'myJokerAsync');
+
+      // Assert
+      expect(result, isTrue);
+      expect(Circus.isHired<Joker<int>>('myJokerAsync'), isFalse);
+      expect(joker.isDisposed, isFalse); // Not disposed by fireAsync
+
+      // Manual cleanup
+      joker.dispose();
+      expect(joker.isDisposed, isTrue);
+    });
+
+    test('fireAll should delete all instances and dispose non-Jokers', () {
+      // Arrange
+      final disposable1 = _DisposableObject();
+      final joker = Joker<int>(1, tag: 'joker');
+      final normal = _TestClass('test');
+
+      Circus.hire<_DisposableObject>(disposable1);
+      Circus.hire<Joker<int>>(joker, tag: 'joker');
+      Circus.hire<_TestClass>(normal);
+
+      expect(disposable1.isDisposed, isFalse);
+      expect(joker.isDisposed, isFalse);
 
       // Act
       Circus.fireAll();
 
       // Assert
+      expect(Circus.isHired<_DisposableObject>(), isFalse);
+      expect(Circus.isHired<Joker<int>>('joker'), isFalse);
       expect(Circus.isHired<_TestClass>(), isFalse);
-      expect(Circus.isHired<String>(), isFalse);
+
+      expect(disposable1.isDisposed, isTrue); // Disposed
+      expect(joker.isDisposed, isFalse); // Joker NOT disposed by fireAll
+
+      // Manual cleanup
+      joker.dispose();
+      expect(joker.isDisposed, isTrue);
     });
 
-    test('fireAllAsync should delete all instances asynchronously', () async {
+    test(
+        'fireAllAsync should delete all instances and dispose non-Jokers (sync and async)',
+        () async {
       // Arrange
-      Circus.hire<_TestClass>(_TestClass('test1'));
-      Circus.hire<String>('test2');
+      final disposable = _DisposableObject();
+      final asyncDisposable = _AsyncDisposableObject();
+      final joker = Joker<int>(1, tag: 'jokerAsync');
+      final normal = _TestClass('test');
+
+      Circus.hire<_DisposableObject>(disposable);
+      Circus.hire<_AsyncDisposableObject>(asyncDisposable);
+      Circus.hire<Joker<int>>(joker, tag: 'jokerAsync');
+      Circus.hire<_TestClass>(normal);
+
+      expect(disposable.isDisposed, isFalse);
+      expect(asyncDisposable.isDisposed, isFalse);
+      expect(joker.isDisposed, isFalse);
 
       // Act
       await Circus.fireAllAsync();
 
       // Assert
+      expect(Circus.isHired<_DisposableObject>(), isFalse);
+      expect(Circus.isHired<_AsyncDisposableObject>(), isFalse);
+      expect(Circus.isHired<Joker<int>>('jokerAsync'), isFalse);
       expect(Circus.isHired<_TestClass>(), isFalse);
-      expect(Circus.isHired<String>(), isFalse);
+
+      expect(disposable.isDisposed, isTrue); // Disposed
+      expect(asyncDisposable.isDisposed, isTrue); // Disposed
+      expect(joker.isDisposed, isFalse); // Joker NOT disposed
+
+      // Manual cleanup
+      joker.dispose();
+      expect(joker.isDisposed, isTrue);
     });
   });
 
@@ -378,9 +523,11 @@ void main() {
       expect(result, isNull);
     });
 
-    test('fireByTag should delete instance by tag', () {
+    test('fireByTag should delete instance and dispose non-Joker', () {
       // Arrange
-      Circus.hire<_TestClass>(_TestClass('test'), tag: 'myTag');
+      final disposable = _DisposableObject();
+      Circus.hire<_DisposableObject>(disposable, tag: 'myTag');
+      expect(disposable.isDisposed, isFalse);
 
       // Act
       final result = Circus.fireByTag('myTag');
@@ -388,12 +535,39 @@ void main() {
       // Assert
       expect(result, isTrue);
       expect(Circus.tryFindByTag('myTag'), isNull);
+      expect(disposable.isDisposed, isTrue);
+    });
+
+    test('fireByTag should delete instance but NOT dispose Joker', () {
+      // Arrange
+      final joker = Joker<String>('hello', tag: 'jokerTag');
+      Circus.hire<Joker<String>>(joker, tag: 'jokerTag');
+      expect(joker.isDisposed, isFalse);
+
+      // Act
+      final result = Circus.fireByTag('jokerTag');
+
+      // Assert
+      expect(result, isTrue);
+      expect(Circus.tryFindByTag('jokerTag'), isNull);
+      expect(joker.isDisposed, isFalse); // NOT disposed by fireByTag
+
+      // Manual cleanup
+      joker.dispose();
+      expect(joker.isDisposed, isTrue);
+    });
+
+    test('fireByTag should return false if tag not found', () {
+      // Act
+      final result = Circus.fireByTag('nonExistentTag');
+      // Assert
+      expect(result, isFalse);
     });
   });
 
   group('CircusRing dependency binding', () {
     setUp(() {
-      Circus.fireAll(); // 清除所有註冊
+      Circus.fireAll(); // Clear all registrations
     });
 
     test('bindDependency prevents firing dependency being used', () {
@@ -414,6 +588,16 @@ void main() {
         () => Circus.fire<_ApiService>(tag: 'api'),
         throwsA(isA<CircusRingException>()),
       );
+      // Try removing ApiService by tag
+      expect(
+        () => Circus.fireByTag('api'),
+        throwsA(isA<CircusRingException>()),
+      );
+      // Try removing ApiService async
+      expect(
+        () => Circus.fireAsync<_ApiService>(tag: 'api'),
+        throwsA(isA<CircusRingException>()),
+      );
     });
 
     test('bindDependency is cleared when dependent is disposed', () {
@@ -428,7 +612,7 @@ void main() {
 
       // Remove Repo
       final removed = Circus.fire<_UserRepository>(tag: 'repo');
-      expect(removed, isTrue); // 可以移除
+      expect(removed, isTrue); // Can be removed
 
       // Now ApiService should be safe to remove
       final removedApi = Circus.fire<_ApiService>(tag: 'api');
@@ -477,8 +661,9 @@ void main() {
         tagD: 'api',
       );
 
-      expect(
-        () => Circus.fireAsync<_ApiService>(tag: 'api'),
+      // Use expectLater for async throws check
+      await expectLater(
+        Circus.fireAsync<_ApiService>(tag: 'api'),
         throwsA(isA<CircusRingException>()),
       );
     });
