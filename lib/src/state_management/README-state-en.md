@@ -3,16 +3,16 @@
 ### Creating a Joker
 
 ```dart
-// Simple counter state
+// The simplest counter state
 final counter = Joker<int>(0);
 
-// Auto-notify is enabled by default
+// Auto-notify is on by default
 counter.trick(1);  // Updates to 1 and notifies listeners
 
 // Manual mode
 final manualCounter = Joker<int>(0, autoNotify: false);
 manualCounter.whisper(42);  // Silent update
-manualCounter.yell();       // Manual notification
+manualCounter.yell();       // Notify when you want
 
 // Keep Joker alive even with no listeners
 final persistentJoker = Joker<String>("data", keepAlive: true);
@@ -21,12 +21,12 @@ final persistentJoker = Joker<String>("data", keepAlive: true);
 ### Using Joker with Flutter
 
 ```dart
-// Simple counter widget
+// The simplest counter widget
 counter.perform(
-  builder: (context, count) => Text('Count: $count'), 
+  builder: (context, count) => Text('Count: $count'),
 );
 
-// Select a specific slice of state
+// Select just a part of the state
 userJoker.observe<String>(
   selector: (user) => user.name,
   builder: (context, name) => Text('Name: $name'),
@@ -35,25 +35,25 @@ userJoker.observe<String>(
 
 ## 🎪 Core Concepts
 
-### State Modification
+### How to Update State
 
-Joker offers different methods for updating state:
+Joker gives you several ways to update state:
 
 ```dart
-// Auto-notify mode (default)
+// Auto-notify (default)
 counter.trick(42);                      // Direct value assignment
-counter.trickWith((state) => state + 1); // Transform with function
-await counter.trickAsync(fetchValue);    // Asynchronous update
+counter.trickWith((state) => state + 1); // Use a function to update
+await counter.trickAsync(fetchValue);    // Async update
 
 // Manual mode
 counter.whisper(42);                     // Silent update
 counter.whisperWith((s) => s + 1);       // Silent transform
-counter.yell();                          // Manual notification
+counter.yell();                          // Notify when you want
 ```
 
 ### Batch Updates
 
-Group multiple updates into a single notification:
+Group multiple changes into a single notification:
 
 ```dart
 user.batch()
@@ -66,7 +66,7 @@ user.batch()
 
 ### JokerStage
 
-Observe the entire state of a Joker:
+Watch the whole state of a Joker:
 
 ```dart
 JokerStage<User>(
@@ -77,7 +77,7 @@ JokerStage<User>(
 
 ### JokerFrame
 
-Observe a specific slice of state to avoid unnecessary rebuilds:
+Watch just a part of the state to avoid unnecessary rebuilds:
 
 ```dart
 JokerFrame<User, String>(
@@ -89,7 +89,7 @@ JokerFrame<User, String>(
 
 ### JokerTroupe
 
-Combine multiple Jokers into a single widget using Dart Records:
+Combine multiple Jokers into one widget using Dart Records:
 
 ```dart
 // Define your combined state type
@@ -115,23 +115,23 @@ JokerTroupe<UserProfile>(
 
 ### JokerPortal & JokerCast
 
-Make Jokers accessible throughout the widget tree:
+Make Jokers available throughout your widget tree:
 
 ```dart
-// At the top of your widget tree
+// Provide Joker at the top of your widget tree
 JokerPortal<int>(
   tag: 'counter',
   joker: counterJoker,
   child: MaterialApp(...),
 )
 
-// Anywhere in the widget tree
+// Access Joker anywhere in the tree
 JokerCast<int>(
   tag: 'counter',
   builder: (context, count) => Text('Count: $count'),
 )
 
-// Alternatively use the extension
+// Or use the extension
 Text('Count: ${context.joker<int>(tag: 'counter').state}')
 ```
 
@@ -151,23 +151,23 @@ final cancel = counterJoker.listenWhen(
   shouldListen: (prev, curr) => curr > (prev ?? 0),
 );
 
-// Later: stop listening
+// Stop listening when you want
 cancel();
 ```
 
 ## 🎪 Dependency Injection with CircusRing
 
-Joker integrates with CircusRing for global state management:
+Joker works seamlessly with CircusRing for global state management:
 
 ```dart
 // Register a Joker
 Circus.summon<int>(0, tag: 'counter');
 Circus.recruit<User>(User(), tag: 'user'); // Manual mode
 
-// Retrieve anywhere
+// Access anywhere
 final counterJoker = Circus.spotlight<int>(tag: 'counter');
 
-// Safe retrieval
+// Safe access
 final userJoker = Circus.trySpotlight<User>(tag: 'user');
 
 // Remove when done
@@ -176,7 +176,7 @@ Circus.vanish<int>(tag: 'counter');
 
 ## 📚 Extension Methods
 
-Fluent extensions for more readable code:
+These extensions make your code cleaner and easier to read:
 
 ```dart
 // Create widgets directly from Joker instances
@@ -189,32 +189,32 @@ userJoker.observe<String>(
   builder: (context, name) => Text('Name: $name'),
 );
 
-// Create a JokerTroupe
+// Combine multiple Jokers
 [nameJoker, ageJoker, activeJoker].assemble<UserProfile>(
   converter: (values) => (
-    values[0] as String, 
-    values[1] as int, 
-    values[2] as bool,
+    values[0] as String,
+    values[1] as int,
+    values[2] as bool
   ),
   builder: (context, profile) => ProfileCard(profile),
 );
 ```
 
-## 🧹 Lifecycle Management (New Section)
+## 🧹 Lifecycle Management
 
-- **Listener-Based Disposal**: By default (`keepAlive: false`), a Joker schedules itself for disposal via a microtask when its last listener is removed.
-- **Cancellation**: If a listener is added again before the microtask executes, the disposal is cancelled.
-- **keepAlive**: Setting `keepAlive: true` prevents this automatic disposal, keeping the Joker instance alive until manually disposed or removed via CircusRing (if registered).
-- **Manual Disposal**: You can always call `joker.dispose()` manually.
-- **Widget Integration**: Widgets like `JokerStage`, `JokerFrame`, etc., manage listeners internally. When the widget is removed from the tree, its listener is removed, potentially triggering the Joker's auto-disposal mechanism if `keepAlive` is false.
+- **Listener-based disposal**: By default (`keepAlive: false`), a Joker schedules itself for disposal with a microtask when its last listener is removed.
+- **Cancellation**: If you add a listener again before the microtask runs, disposal is canceled.
+- **keepAlive**: Set `keepAlive: true` to keep the Joker alive until you dispose it manually or remove it via CircusRing (if registered).
+- **Manual disposal**: You can always call `joker.dispose()` yourself.
+- **Widget integration**: Widgets like `JokerStage`, `JokerFrame`, etc. manage listeners for you. When the widget is removed, its listener is removed too, which may trigger auto-disposal if `keepAlive` is false.
 
 ## 🧪 Best Practices
 
-1. **Use Selectors**: Minimize rebuilds by selecting only needed state slices
-2. **Batch Updates**: Group related changes to avoid multiple rebuilds
-3. **Tagged Jokers**: Always use tags when working with CircusRing
-4. **`keepAlive`**: Use `keepAlive: true` for Jokers that need to persist independently of UI listeners (e.g., global application state).
-5. **Explicit Disposal**: Manually `dispose()` Jokers that are not managed by widgets or CircusRing, especially if `keepAlive` is true.
+1. **Use selectors**: Only select the state you need to minimize rebuilds
+2. **Batch updates**: Group related changes to avoid multiple rebuilds
+3. **Tag your Jokers**: Always use tags with CircusRing
+4. **`keepAlive`**: Use `keepAlive: true` for Jokers that need to stick around (like global app state)
+5. **Explicit disposal**: Manually `dispose()` Jokers not managed by widgets or CircusRing, especially if `keepAlive` is true
 
 ## 🏆 Comparison with Other Solutions
 

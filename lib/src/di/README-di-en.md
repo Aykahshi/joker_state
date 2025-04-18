@@ -1,57 +1,52 @@
 # 🎪 CircusRing
 
-A lightweight, flexible dependency injection container for Flutter applications.
+CircusRing is a lightweight and flexible dependency injection container for Flutter. It makes managing your app's objects, lifecycles, and dependencies straightforward and intuitive.
 
 ## 🌟 Overview
 
-CircusRing is a dependency management solution designed to simplify object creation, lifetime management, and component relations in Flutter applications. It provides an intuitive API for registering, finding, and managing dependencies with support for various instantiation strategies.
+This solution is all about making dependency registration, lookup, and management in your Flutter project as easy as possible. The API is designed to be clear and practical, and you can choose from several ways to create and manage your dependencies.
 
 ## ✨ Features
 
-- **🧩 Multiple Registration Types**:
-    - Singleton (eager and lazy)
-    - Asynchronous singletons
-    - Factories (new instance on each request)
-    - Auto-rebinding with "fenix" mode
-
-- **🔄 Dependency Management**:
+- **🧩 Multiple ways to register**:
+    - Singleton (eager or lazy)
+    - Async singletons
+    - Factories (get a new instance every time)
+    - "Fenix" mode for auto-rebinding
+- **🔄 Dependency management**:
     - Explicitly bind dependencies between components
-    - Prevent removal of components that other components depend on
-    - Clean disposal of resources when components are removed
-
-- **🔍 Flexible Retrieval**:
-    - Type-based lookup with optional tags
-    - Synchronous and asynchronous dependency resolution
-    - Tag-based lookup for finding components without knowing their type
-
-- **♻️ Resource Management**:
-    - Automatic disposal of resources implementing Disposable or ChangeNotifier
-    - Asynchronous disposal support through AsyncDisposable
-
-- **🧠 Integrated with State Management**:
-    - Seamless integration with the Joker state management system
+    - Prevent removal of components that are still needed
+    - Clean up resources automatically when components are removed
+- **🔍 Flexible lookup**:
+    - Find by type (optionally with a tag)
+    - Supports both sync and async resolution
+    - Lookup by tag if you don't know the type
+- **♻️ Resource management**:
+    - Automatically disposes resources that implement Disposable or ChangeNotifier
+    - Supports async disposal with AsyncDisposable
+- **🧠 State management integration**:
+    - Works seamlessly with the Joker state management system
     - Special extensions for working with Joker instances
 
-## 📝 Usage
+## 📝 How to Use
 
 ### 🌐 Global Access
 
-CircusRing follows the singleton pattern and can be accessed through the global `Circus` getter:
+CircusRing uses the singleton pattern, so you can always get the global instance with `Circus`:
 
 ```dart
 import 'package:your_package/circus_ring.dart';
 
-// Access the global instance
 final ring = Circus;
 ```
 
 ### 📥 Registering Dependencies
 
 ```dart
-// Register a singleton instance
+// Register a singleton
 Circus.hire<UserRepository>(UserRepositoryImpl());
 
-// Register with a tag for multiple instances of the same type
+// Register multiple instances of the same type with tags
 Circus.hire<ApiClient>(ProductionApiClient(), tag: 'prod');
 Circus.hire<ApiClient>(MockApiClient(), tag: 'test');
 
@@ -59,11 +54,9 @@ Circus.hire<ApiClient>(MockApiClient(), tag: 'test');
 Circus.hireLazily<Database>(() => Database.connect());
 
 // Register an async singleton
-Circus.hireLazilyAsync<NetworkService>(() async => 
-  await NetworkService.initialize()
-);
+Circus.hireLazilyAsync<NetworkService>(() async => await NetworkService.initialize());
 
-// Register a factory (new instance each time)
+// Register a factory (new instance every time)
 Circus.contract<UserModel>(() => UserModel());
 ```
 
@@ -76,23 +69,22 @@ final userRepo = Circus.find<UserRepository>();
 // Get a tagged singleton
 final apiClient = Circus.find<ApiClient>('prod');
 
-// Get or create a lazy singleton
+// Get a lazy singleton
 final db = Circus.find<Database>();
 
 // Get an async singleton
 final networkService = await Circus.findAsync<NetworkService>();
 
-// Safe retrieval (returns null if not found)
+// Safe lookup (returns null if not found)
 final maybeRepo = Circus.tryFind<UserRepository>();
 ```
 
-### 🔗 Dependency Binding
+### 🔗 Binding Dependencies
 
 ```dart
 // Make UserRepository depend on ApiClient
 Circus.bindDependency<UserRepository, ApiClient>();
-
-// Now ApiClient can't be removed while UserRepository exists
+// As long as UserRepository exists, ApiClient can't be removed
 ```
 
 ### 🧹 Cleaning Up
@@ -113,7 +105,7 @@ await Circus.fireAllAsync();
 
 ### 🃏 Joker Integration
 
-CircusRing integrates with the Joker state management system:
+CircusRing works hand-in-hand with the Joker state management system:
 
 ```dart
 // Register a Joker state
@@ -123,27 +115,22 @@ Circus.summon<int>(0, tag: 'counter');
 final counter = Circus.spotlight<int>(tag: 'counter');
 
 // Update state
-counter.trick(1); 
+counter.trick(1);
 
 // Remove Joker
 Circus.vanish<int>(tag: 'counter');
 ```
 
-## ⚙️ Logging (Previously Configuration)
+## ⚙️ Logging
 
-CircusRing includes internal logging for registration, retrieval, and disposal events.
-
-- **Automatic Logging**: Logging is automatically enabled when your application is run in debug mode (`kDebugMode` is true) and disabled in profile/release modes.
-- **No Configuration Needed**: There is no need to manually configure logging anymore.
+CircusRing automatically logs registration, lookup, and disposal events for you.
+- **Automatic logging**: Enabled in debug mode, disabled in release/profile.
+- **No setup needed**: You don't have to configure anything.
 
 ## 💡 Best Practices
 
-1. **🏷️ Use Tags Consistently**: When using tags to differentiate instances, maintain a consistent naming convention.
-
-2. **📊 Manage Dependencies Explicitly**: Use `bindDependency` to document and enforce dependencies between components.
-
-3. **🗑️ Dispose Resources Properly**: Implement `Disposable` or `AsyncDisposable` for classes that need cleanup.
-
-4. **🏭 Use Factories for Transient Objects**: For short-lived objects that shouldn't be shared, use `contract`.
-
-5. **⏳ Prefer Lazy Loading**: Use `hireLazily` for resources that are expensive to create but might not be used.
+1. **🏷️ Be consistent with tags**: If you use tags to differentiate instances, stick to a clear naming convention.
+2. **📊 Manage dependencies explicitly**: Use `bindDependency` to document and enforce relationships between components.
+3. **🗑️ Dispose resources properly**: Implement `Disposable` or `AsyncDisposable` for anything that needs cleanup.
+4. **🏭 Use factories for short-lived objects**: If you don't need to share an object, use `contract`.
+5. **⏳ Prefer lazy loading**: For expensive resources that might not always be used, go with `hireLazily`.

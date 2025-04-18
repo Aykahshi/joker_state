@@ -2,25 +2,25 @@
 
 # 🃏 JokerState
 
-**⚠️ Breaking Changes in v2.0.0:** Joker lifecycle and CircusRing disposal behavior have changed significantly. Please review the [Changelog](CHANGELOG.md) and updated documentation below before upgrading.
+**⚠️ Breaking Changes in v2.0.0:** Joker's lifecycle and CircusRing's disposal logic have changed a lot. Before upgrading, check out the [Changelog](CHANGELOG.md) and the updated docs below.
 
-A lightweight, reactive state management solution for Flutter that integrates dependency injection seamlessly. JokerState provides flexible state containers with minimal boilerplate through its `Joker` API and companion widgets.
+JokerState is a lightweight, reactive state management package for Flutter that makes dependency injection super easy. With its `Joker` API and handy widgets, you get flexible state containers and barely any boilerplate.
 
 [![pub package](https://img.shields.io/pub/v/joker_state.svg)](https://pub.dev/packages/joker_state)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- 🧠 **Reactive State Management** - Smart containers that notify listeners when state changes
-- 💉 **Dependency Injection** - Intuitive service locator with the CircusRing API
-- 🎭 **Flexible Widget Integration** - Multiple companion widgets for different UI patterns
-- 🪄 **Selective Rebuilds** - Fine-grained control over what updates rebuild your UI
-- 🔄 **Batch Updates** - Group multiple state changes into a single notification
-- 🏗️ **Record Support** - Combine multiple states using Dart Records
-- 🧩 **Modular Design** - Use just what you need or the entire ecosystem
-- 📢 **Event Bus System** - Type-safe events with RingCueMaster
-- 🎪 **Special Widgets** - Additional utility widgets like JokerReveal and JokerTrap
-- ⏱️ **Timing Controls** - Debounce and throttle mechanisms for controlling action execution
+- 🧠 **Reactive State Management** – Smart containers that notify listeners when your state changes
+- 💉 **Dependency Injection** – Intuitive service locator with the CircusRing API
+- 🎭 **Flexible Widget Integration** – Widgets for all kinds of UI patterns
+- 🪄 **Selective Rebuilds** – Fine control over what triggers a UI rebuild
+- 🔄 **Batch Updates** – Group multiple state changes into a single notification
+- 🏗️ **Record Support** – Combine multiple states using Dart Records
+- 🧩 **Modular Design** – Use just what you need, or the whole ecosystem
+- 📢 **Event Bus System** – Type-safe events with RingCueMaster
+- 🎪 **Special Widgets** – Extra utilities like JokerReveal and JokerTrap
+- ⏱️ **Timing Controls** – Debounce and throttle for smoother actions
 
 ## Getting Started
 
@@ -41,47 +41,47 @@ import 'package:joker_state/joker_state.dart';
 
 ### 🎭 Joker: The Reactive State Container
 
-`Joker<T>` is a reactive state container that extends `ChangeNotifier`. Its lifecycle is now primarily managed by its listeners and the `keepAlive` flag.
+`Joker<T>` is a reactive state container (extends `ChangeNotifier`). Its lifecycle is mostly managed by its listeners and the `keepAlive` flag.
 
 ```dart
-// Create a Joker with auto-notification (default)
+// Create a Joker (auto-notifies by default)
 final counter = Joker<int>(0);
 
-// Update state and notify all listeners
+// Update state and notify listeners
 counter.trick(1);
 
-// Update using a transform function
+// Update using a function
 counter.trickWith((current) => current + 1);
 
-// Batch multiple updates with a single notification
+// Batch multiple updates, notify once
 counter.batch()
   .apply((s) => s * 2)
   .apply((s) => s + 10)
   .commit();
 
-// Create a Joker that stays alive even without listeners
+// Keep alive even with no listeners
 final persistentState = Joker<String>("initial", keepAlive: true);
 ```
 
-For granular control, use manual notification mode:
+Want more control? Use manual notification mode:
 
 ```dart
-// Create with auto-notify disabled
+// Create with auto-notify off
 final manualCounter = Joker<int>(0, autoNotify: false);
 
 // Update silently
 manualCounter.whisper(5);
 manualCounter.whisperWith((s) => s + 1);
 
-// Trigger listeners manually when ready
+// Notify listeners when you're ready
 manualCounter.yell();
 ```
 
-**Lifecycle:** By default (`keepAlive: false`), a Joker automatically schedules itself for disposal via `Future.microtask` when its last listener is removed. Adding a listener again cancels this. Set `keepAlive: true` to disable this auto-disposal.
+**Lifecycle:** By default (`keepAlive: false`), a Joker schedules itself for disposal (via `Future.microtask`) when its last listener is removed. If you add a listener again, disposal is canceled. Set `keepAlive: true` to keep it alive until you dispose it manually.
 
 ### 🎪 CircusRing: Dependency Injection
 
-CircusRing is a lightweight dependency container. Its `fire*` methods now perform **conditional disposal**.
+CircusRing is a lightweight dependency container. Its `fire*` methods now do **conditional disposal**.
 
 ```dart
 // Global singleton accessor
@@ -90,40 +90,40 @@ final ring = Circus;
 // Register a singleton (Disposable example)
 ring.hire(MyDisposableService());
 
-// Register a lazy-loaded singleton
+// Register a lazy singleton
 ring.hireLazily(() => NetworkService());
 
-// Register a factory (new instance per request)
+// Register a factory (new instance each time)
 ring.contract(() => ApiClient());
 
-// Find instances later
+// Find your instance later
 final service = Circus.find<MyDisposableService>();
 ```
 
-For Joker integration with CircusRing:
+Joker and CircusRing work great together:
 
 ```dart
-// Register a Joker (requires a tag)
+// Register a Joker (needs a tag)
 Circus.summon<int>(0, tag: 'counter');
 
-// Find registered Joker
+// Find your Joker
 final counter = Circus.spotlight<int>(tag: 'counter');
 
-// Remove a Joker (ONLY removes from ring, does NOT dispose the Joker)
-Circus.vanish<int>(tag: 'counter'); 
+// Remove Joker (just from the registry, not disposed)
+Circus.vanish<int>(tag: 'counter');
 
-// Joker's own lifecycle (listeners/keepAlive) determines when it disposes.
+// Joker disposes itself based on listeners/keepAlive.
 ```
 
-**Disposal:** `Circus.fire*` methods will **only** dispose non-Joker instances that implement `Disposable`, `AsyncDisposable`, or `ChangeNotifier`. `Joker` instances are **never** disposed by CircusRing; they manage their own lifecycle.
+**Disposal:** `Circus.fire*` only disposes non-Joker instances that implement `Disposable`, `AsyncDisposable`, or `ChangeNotifier`. Jokers manage their own lifecycle.
 
 ### 🎭 UI Integration
 
-JokerState provides multiple widget types to integrate with your UI:
+JokerState gives you several widgets to connect state and UI:
 
 #### JokerStage
 
-Rebuilds when any part of the state changes:
+Rebuilds whenever any part of the state changes:
 
 ```dart
 final userJoker = Joker<User>(User(name: 'Alice', age: 30));
@@ -134,7 +134,7 @@ JokerStage<User>(
 )
 ```
 
-Or with a more fluent API:
+Or use the fluent API:
 
 ```dart
 userJoker.perform(
@@ -144,7 +144,7 @@ userJoker.perform(
 
 #### JokerFrame
 
-For selective rebuilds based on a specific part of your state:
+Rebuild only for a specific part of your state:
 
 ```dart
 userJoker.observe<String>(
@@ -155,7 +155,7 @@ userJoker.observe<String>(
 
 #### JokerTroupe
 
-Combine multiple Jokers with Dart Records:
+Combine multiple Jokers using Dart Records:
 
 ```dart
 final name = Joker<String>('Alice');
@@ -181,23 +181,23 @@ typedef UserRecord = (String name, int age, bool active);
 
 #### JokerPortal & JokerCast
 
-Provide and access Jokers through the widget tree. **Remember to use `tag` when providing/accessing common types like `int` or `String` to avoid ambiguity.**
+Provide and access Jokers through the widget tree. **If you're using common types like `int` or `String`, always use a `tag` to avoid confusion.**
 
 ```dart
-// Insert Joker into widget tree
+// Provide Joker in the widget tree
 JokerPortal<int>(
   joker: counterJoker,
-  tag: 'counter', // Tag is crucial here!
+  tag: 'counter', // Tag is important!
   child: MyApp(),
 )
 
-// Later, access it from any descendant
+// Access it from any descendant
 JokerCast<int>(
   tag: 'counter', // Use the same tag!
   builder: (context, count) => Text('Count: $count'),
 )
 
-// Or access directly with extension
+// Or use the extension
 Text('Count: ${context.joker<int>(tag: 'counter').state}')
 ```
 
@@ -205,7 +205,7 @@ Text('Count: ${context.joker<int>(tag: 'counter').state}')
 
 #### JokerReveal
 
-Conditionally display widgets based on a boolean expression:
+Show widgets conditionally based on a boolean:
 
 ```dart
 // Direct widgets
@@ -222,7 +222,7 @@ JokerReveal.lazy(
   whenFalseBuilder: (context) => ContentView(),
 )
 
-// Or use the extension method on boolean
+// Or use the extension on boolean
 isLoggedIn.reveal(
   whenTrue: ProfileScreen(),
   whenFalse: LoginScreen(),
@@ -231,7 +231,7 @@ isLoggedIn.reveal(
 
 #### JokerTrap
 
-Automatically dispose controllers when a widget is removed from the tree:
+Automatically dispose controllers when a widget is removed:
 
 ```dart
 // Single controller
@@ -247,7 +247,7 @@ textController.trapeze(
 
 ### 📢 RingCueMaster: Event Bus System
 
-A type-safe event bus for communication between components:
+A type-safe event bus for communication between parts of your app:
 
 ```dart
 // Define event types
@@ -273,7 +273,7 @@ subscription.cancel();
 
 ### ⏱️ CueGate: Timing Controls
 
-Manage the timing of actions with debounce and throttle mechanisms:
+Debounce and throttle actions easily:
 
 ```dart
 // Create a debounce gate
@@ -322,7 +322,7 @@ class _SearchViewState extends State<SearchView> with CueGateMixin {
 
 ### 🔄 Side-Effects
 
-Listen for state changes with side-effects:
+Listen for state changes and run side-effects:
 
 ```dart
 // Listen to all changes
@@ -342,10 +342,10 @@ cancel();
 
 ### 💉 CircusRing Dependencies
 
-Establish relationships between dependencies:
+Set up relationships between dependencies:
 
 ```dart
-// Record that UserRepository depends on ApiService
+// Make UserRepository depend on ApiService
 Circus.bindDependency<UserRepository, ApiService>();
 
 // Now ApiService can't be removed while UserRepository is registered
@@ -354,8 +354,8 @@ Circus.bindDependency<UserRepository, ApiService>();
 ### 🧹 Resource Management
 
 - **Joker**: Manages its own lifecycle based on listeners and `keepAlive`.
-- **CircusRing**: Conditionally disposes non-Joker resources upon removal.
-- **Manual Cleanup**: Always manually `dispose()` Jokers or other resources not managed elsewhere (especially `keepAlive: true` Jokers).
+- **CircusRing**: Disposes non-Joker resources when removed.
+- **Manual Cleanup**: Always call `dispose()` on Jokers or other resources not managed elsewhere (especially `keepAlive: true` Jokers).
 
 ```dart
 // Joker example
@@ -377,7 +377,7 @@ Circus.vanish<int>(tag: 'temp'); // Removes from ring ONLY
 
 ## Example
 
-Complete counter example:
+Here's a full counter example:
 
 ```dart
 import 'package:flutter/material.dart';
@@ -423,19 +423,19 @@ class MyApp extends StatelessWidget {
 }
 ```
 
-## Additional Information
+## Additional Info
 
-JokerState is designed to be lightweight, flexible, and powerful - providing reactive state management with dependency injection in one cohesive package.
+JokerState is designed to be lightweight, flexible, and powerful—giving you reactive state management and dependency injection in one package.
 
-### When to use JokerState
+### When should you use JokerState?
 
-- You want a simpler alternative to BLoC or other complex state solutions
+- You want something simpler than BLoC or other complex state solutions
 - You need reactive UI updates with minimal boilerplate
-- You want the flexibility of manual control when needed
-- You need integrated dependency management
-- You prefer clear, direct state manipulation without abstract concepts
+- You want the flexibility to control things manually when needed
+- You want built-in dependency management
+- You prefer clear, direct state operations (not abstract concepts)
 - You want a type-safe event bus for decoupled communication
-- You need utility widgets that work well with your state management
+- You want utility widgets that work well with your state management
 
 ## License
 

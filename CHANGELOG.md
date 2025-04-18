@@ -1,3 +1,8 @@
+### 2.0.3
+* Major update: All README files (Chinese and English) have been rewritten for a more conversational, developer-friendly tone.
+* Documentation is now easier to read, with clearer explanations and practical examples.
+* No breaking changes; all APIs and features remain the same.
+
 ### 2.0.2
 * Update example usage in README
 

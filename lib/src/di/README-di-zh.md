@@ -1,98 +1,90 @@
 # 🎪 CircusRing
 
-一個輕量級、靈活的 Flutter 應用依賴注入容器。
+CircusRing 是一個輕量、靈活的 Flutter 依賴注入容器，讓你管理物件、生命週期和元件關係都變得很直覺。
 
 ## 🌟 概述
 
-CircusRing 是一個依賴管理解決方案，旨在簡化 Flutter 應用中的物件創建、生命週期管理和元件關係。它提供了一套直觀的 API 用於註冊、查找和管理依賴，支援多種實例化策略。
+這套解決方案主要是幫你簡化 Flutter 專案裡的依賴註冊、查找和管理。API 設計得很直觀，支援多種實例化方式，讓你用起來更順手。
 
-## ✨ 特性
+## ✨ 特色
 
-- **🧩 多種註冊類型**:
-    - 單例（即時和延遲）
+- **🧩 多種註冊方式**：
+    - 單例（即時或延遲）
     - 非同步單例
-    - 工廠（每次請求新實例）
-    - 使用 "fenix" 模式自動重新綁定
+    - 工廠模式（每次都給新實例）
+    - "fenix" 模式自動重綁
+- **🔄 依賴關係管理**：
+    - 可以明確綁定元件間的依賴
+    - 防止還被依賴的元件被移除
+    - 元件移除時自動清理資源
+- **🔍 靈活查找**：
+    - 依型別查找（可加標籤）
+    - 同步、非同步都支援
+    - 也能只靠標籤查找
+- **♻️ 資源管理**：
+    - 自動處理 Disposable 或 ChangeNotifier
+    - 支援 AsyncDisposable 非同步釋放
+- **🧠 狀態管理整合**：
+    - 跟 Joker 狀態系統無縫整合
+    - 有專門處理 Joker 的 API
 
-- **🔄 依賴關係管理**:
-    - 明確綁定元件之間的依賴關係
-    - 防止移除仍被其他元件依賴的元件
-    - 元件移除時清理資源
+## 📝 怎麼用
 
-- **🔍 靈活檢索**:
-    - 基於類型的查找（可選標籤）
-    - 同步和非同步依賴解析
-    - 基於標籤的查找（無需知道元件類型）
+### 🌐 全域存取
 
-- **♻️ 資源管理**:
-    - 自動處理實現了 Disposable 或 ChangeNotifier 的資源
-    - 通過 AsyncDisposable 支援非同步資源釋放
-
-- **🧠 狀態管理整合**:
-    - 與 Joker 狀態管理系統無縫整合
-    - 提供專門用於處理 Joker 實例的擴展
-
-## 📝 使用方法
-
-### 🌐 全局訪問
-
-CircusRing 遵循單例模式，可以通過全局 `Circus` getter 訪問:
+CircusRing 採單例模式，直接用 `Circus` 這個 getter 就能拿到：
 
 ```dart
 import 'package:your_package/circus_ring.dart';
 
-// 訪問全局實例
 final ring = Circus;
 ```
 
 ### 📥 註冊依賴
 
 ```dart
-// 註冊單例實例
+// 註冊單例
 Circus.hire<UserRepository>(UserRepositoryImpl());
 
-// 使用標籤註冊同一類型的多個實例
+// 同型別多實例用標籤區分
 Circus.hire<ApiClient>(ProductionApiClient(), tag: 'prod');
 Circus.hire<ApiClient>(MockApiClient(), tag: 'test');
 
-// 註冊懶加載單例
+// 懶加載單例
 Circus.hireLazily<Database>(() => Database.connect());
 
-// 註冊非同步單例
-Circus.hireLazilyAsync<NetworkService>(() async => 
-  await NetworkService.initialize()
-);
+// 非同步單例
+Circus.hireLazilyAsync<NetworkService>(() async => await NetworkService.initialize());
 
-// 註冊工廠（每次新實例）
+// 工廠模式
 Circus.contract<UserModel>(() => UserModel());
 ```
 
 ### 🔎 查找依賴
 
 ```dart
-// 獲取單例
+// 直接拿單例
 final userRepo = Circus.find<UserRepository>();
 
-// 獲取帶標籤的單例
+// 拿有標籤的單例
 final apiClient = Circus.find<ApiClient>('prod');
 
-// 獲取或創建懶加載單例
+// 懶加載單例
 final db = Circus.find<Database>();
 
-// 獲取非同步單例
+// 非同步單例
 final networkService = await Circus.findAsync<NetworkService>();
 
-// 安全檢索（未找到時返回 null）
+// 安全查找（找不到就回傳 null）
 final maybeRepo = Circus.tryFind<UserRepository>();
 ```
 
-### 🔗 依賴綁定
+### 🔗 綁定依賴
 
 ```dart
-// 使 UserRepository 依賴於 ApiClient
+// 讓 UserRepository 依賴 ApiClient
 Circus.bindDependency<UserRepository, ApiClient>();
-
-// 現在，只要 UserRepository 存在，ApiClient 就不能被移除
+// 只要 UserRepository 還在，ApiClient 就不會被移除
 ```
 
 ### 🧹 清理資源
@@ -101,49 +93,44 @@ Circus.bindDependency<UserRepository, ApiClient>();
 // 移除特定依賴
 Circus.fire<UserRepository>();
 
-// 非同步移除（用於非同步可釋放資源）
+// 非同步移除
 await Circus.fireAsync<NetworkService>();
 
-// 移除所有依賴
+// 移除全部依賴
 Circus.fireAll();
 
-// 非同步清理所有依賴
+// 非同步清理全部
 await Circus.fireAllAsync();
 ```
 
 ### 🃏 Joker 整合
 
-CircusRing 與 Joker 狀態管理系統整合：
+CircusRing 跟 Joker 狀態系統可以直接搭配：
 
 ```dart
 // 註冊一個 Joker 狀態
 Circus.summon<int>(0, tag: 'counter');
 
-// 獲取已註冊的 Joker
+// 拿已註冊的 Joker
 final counter = Circus.spotlight<int>(tag: 'counter');
 
 // 更新狀態
-counter.trick(1); 
+counter.trick(1);
 
 // 移除 Joker
 Circus.vanish<int>(tag: 'counter');
 ```
 
-## ⚙️ 日誌記錄
+## ⚙️ 日誌
 
-CircusRing 包含用於註冊、檢索和釋放事件的內部日誌記錄。
-
-- **自動日誌**: 當您的應用程序在調試模式下運行時（`kDebugMode` 為 true），日誌記錄會自動啟用，在 profile/release 模式下則會禁用。
-- **無需配置**: 不再需要手動配置日誌記錄。
+CircusRing 會自動記錄註冊、查找、釋放等事件。
+- **自動日誌**：debug 模式下自動啟用，release/profile 模式會關掉。
+- **免設定**：不用自己設。
 
 ## 💡 最佳實踐
 
-1. **🏷️ 一致使用標籤**：使用標籤區分實例時，應保持一致的命名規範。
-
-2. **📊 明確管理依賴關係**：使用 `bindDependency` 記錄並強制實施元件之間的依賴關係。
-
-3. **🗑️ 正確釋放資源**：為需要清理的類實現 `Disposable` 或 `AsyncDisposable`。
-
-4. **🏭 為短暫物件使用工廠**：對於不需要共享的短暫物件，使用 `contract`。
-
-5. **⏳ 優先使用懶加載**：對於創建代價高但可能不會使用的資源，使用 `hireLazily`。
+1. **🏷️ 標籤要一致**：用標籤區分時，命名要有規律。
+2. **📊 依賴關係要明確**：用 `bindDependency` 綁定元件依賴。
+3. **🗑️ 資源要正確釋放**：需要清理的類建議實作 `Disposable` 或 `AsyncDisposable`。
+4. **🏭 短暫物件用工廠**：不需共用的物件用 `contract`。
+5. **⏳ 優先用懶加載**：高成本但不一定會用到的資源建議用 `hireLazily`。

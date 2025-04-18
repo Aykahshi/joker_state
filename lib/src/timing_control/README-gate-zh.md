@@ -1,37 +1,37 @@
 # ⏱️ 計時控制
 
-提供管理 Flutter 應用程式中與時間相關行為的實用工具集合。
+這裡提供一些管理 Flutter 應用裡「跟時間有關」行為的實用工具。
 
 ## 🚦 CueGate
 
-### 這是什麼？ 🤔
-`CueGate` 是一個計時控制器，協助管理頻繁事件，如用戶交互、API 呼叫或動畫。它提供兩種主要模式：
+### 這是什麼？
+`CueGate` 是一個計時控制器，幫你管理像是用戶連續操作、API 呼叫、動畫等頻繁事件。它有兩種主要模式：
 
-- **去抖動 (Debounce)**：延遲執行動作，直到輸入停止指定時間
+- **去抖動 (Debounce)**：等輸入停下來一段時間才執行動作
 - **節流 (Throttle)**：限制動作執行的頻率
 
-### 特色功能 ✨
-- **簡潔的 API**：易於創建和使用
-- **兩種操作模式**：針對不同場景的去抖動和節流
-- **狀態追蹤**：檢查動作是否已排程
-- **資源管理**：輕鬆釋放和清理狀態
+### 特色
+- **API 很簡單**：建立、用法都很直覺
+- **兩種模式**：針對不同場景選 debounce 或 throttle
+- **狀態追蹤**：可以查動作有沒有排程中
+- **資源管理方便**：釋放、清理都很簡單
 
-### 何時使用各模式？ 🎯
+### 什麼時候該用哪種？
 
 #### 去抖動 (Debounce)
-- **邊打字邊搜尋**：等待用戶停止輸入
-- **調整大小處理器**：等待調整大小完成
-- **表單驗證**：用戶完成輸入後再驗證
+- 邊打字邊搜尋：等用戶停下來再查
+- 視窗調整大小：等調整完再處理
+- 表單驗證：用戶輸入完再驗證
 
 #### 節流 (Throttle)
-- **捲動事件處理**：限制處理頻率
-- **點擊處理**：防止意外雙擊
-- **即時數據更新**：控制更新頻率
+- 捲動事件：限制處理頻率
+- 點擊防連點：避免重複觸發
+- 即時數據更新：控制更新頻率
 
-### 使用範例 📝
+### 用法範例
 
 #### 基本去抖動
-等待用戶停止輸入後再搜尋：
+等用戶停下來再搜尋：
 
 ```dart
 final searchGate = CueGate.debounce(delay: Duration(milliseconds: 300));
@@ -39,7 +39,7 @@ final searchGate = CueGate.debounce(delay: Duration(milliseconds: 300));
 TextField(
   onChanged: (text) {
     searchGate.trigger(() {
-      // 執行搜尋操作
+      // 執行搜尋
       searchService.search(text);
     });
   },
@@ -47,7 +47,7 @@ TextField(
 ```
 
 #### 基本節流
-限制「讚」按鈕可被按下的頻率：
+限制按鈕點擊頻率：
 
 ```dart
 final likeGate = CueGate.throttle(interval: Duration(milliseconds: 500));
@@ -55,7 +55,7 @@ final likeGate = CueGate.throttle(interval: Duration(milliseconds: 500));
 ElevatedButton(
   onPressed: () {
     likeGate.trigger(() {
-      // 註冊讚操作
+      // 執行按讚
       postService.like(postId);
     });
   },
@@ -65,12 +65,12 @@ ElevatedButton(
 
 #### 取消已排程動作
 ```dart
-// 取消待處理的去抖動動作
+// 取消還沒執行的 debounce 動作
 searchGate.cancel();
 
-// 檢查是否有待處理的去抖動動作
+// 檢查有沒有排程中的 debounce 動作
 if (searchGate.isScheduled) {
-  // 顯示「搜尋中...」指示器
+  // 顯示「搜尋中...」
 }
 ```
 
@@ -85,15 +85,15 @@ void dispose() {
 
 ## 🎭 CueGateMixin
 
-### 這是什麼？ 🤔
-`CueGateMixin` 是一種便捷方式，可以直接將去抖動和節流功能添加到 `StatefulWidget` 中，無需手動管理資源。
+### 這是什麼？
+`CueGateMixin` 讓你在 StatefulWidget 裡直接用 debounce/throttle，不用自己管理資源。
 
-### 特色功能 ✨
-- **無需手動創建/釋放**：處理 CueGate 生命週期
-- **簡化 API**：僅在需要時呼叫方法
-- **動態調整時間**：可隨時更改延遲/間隔
+### 特色
+- **不用手動建立/釋放**：生命週期自動處理
+- **API 更簡單**：要用時直接呼叫
+- **時間可隨時調整**：延遲/間隔都能改
 
-### 使用範例 📝
+### 用法範例
 
 ```dart
 class SearchScreen extends StatefulWidget {
@@ -112,7 +112,7 @@ class _SearchScreenState extends State<SearchScreen> with CueGateMixin {
         TextField(
           controller: controller,
           onChanged: (text) {
-            // 在 300ms 無活動後去抖動搜尋
+            // 300ms 內沒動作才搜尋
             debounceTrigger(() {
               setState(() {
                 results = searchService.search(text);
@@ -120,12 +120,10 @@ class _SearchScreenState extends State<SearchScreen> with CueGateMixin {
             }, Duration(milliseconds: 300));
           },
         ),
-        
-        // 結果列表...
-        
+        // ...結果列表...
         ElevatedButton(
           onPressed: () {
-            // 節流刷新，最多每秒一次
+            // 最多每秒刷新一次
             throttleTrigger(() {
               setState(() {
                 results = searchService.refresh();
@@ -140,10 +138,10 @@ class _SearchScreenState extends State<SearchScreen> with CueGateMixin {
 }
 ```
 
-## 為什麼使用計時控制？ 🎯
+## 為什麼要用計時控制？
 
-- **更好的用戶體驗**：防止界面卡頓和過度操作
-- **資源效率**：減少不必要的 API 呼叫和計算
-- **節省電池**：最小化行動裝置上的工作量
-- **網絡優化**：批處理請求以獲得更好的性能
-- **乾淨的程式碼**：使用聲明式方法簡化計時邏輯
+- **用戶體驗更好**：避免卡頓、過度觸發
+- **省資源**：減少不必要的 API 呼叫和計算
+- **省電**：減少裝置負擔
+- **網路更有效率**：請求能批次處理
+- **程式碼更乾淨**：計時邏輯更直覺
