@@ -125,11 +125,13 @@ class JokerPortal<T> extends InheritedNotifier<Joker<T>> {
   }
 
   /// Helper method to find a portal by tag by walking up the element tree.
+  /// Establishes a dependency on the found element.
   static JokerPortal<T>? _findPortalByTag<T>(BuildContext context, String tag) {
-    // Use getElementForInheritedWidgetOfExactType for potential optimization if needed,
-    // but visitAncestorElements is generally robust.
     JokerPortal<T>? result;
-    final found = context.visitAncestorElements((element) {
+    // visitAncestorElements is the standard way to walk up the tree.
+    // The return value ('found') is not needed here.
+    context.visitAncestorElements((element) {
+      // Check if the current element's widget is the type we're looking for.
       if (element.widget is JokerPortal<T>) {
         final portal = element.widget as JokerPortal<T>;
         if (portal.tag == tag) {

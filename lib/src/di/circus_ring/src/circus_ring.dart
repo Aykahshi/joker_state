@@ -249,14 +249,6 @@ class CircusRing {
     return true;
   }
 
-  void _removeReverseDependencies(String removedKey) {
-    _dependencies.removeWhere((dependentKey, dependencySet) {
-      dependencySet.remove(removedKey);
-      // Remove the entry entirely if the set becomes empty
-      return dependencySet.isEmpty;
-    });
-  }
-
   void _checkDisposed() {
     if (_isDisposed) {
       throw StateError(
