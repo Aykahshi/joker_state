@@ -1,3 +1,7 @@
+## [2.1.1]
+
+* fix CHANGELOG.md typo
+
 ## [2.1.0]
 
 **BREAKING CHANGES**
@@ -10,17 +14,17 @@
 *   **Tests Updated**: Tests related to CircusRing disposal (`circus_ring_test.dart`, `circus_ring_reactive_test.dart`, examples) have been updated to reflect the new asynchronous `fireAll` and removal of `fireAllAsync`.
 *   **Documentation Updated**: README files (`README-di-*.md`) and documentation comments updated for `fireAll`, `fireAllAsync`, `fire`, `fireByTag`, and `dispose` methods.
 
-### [2.0.3]
+## [2.0.3]
 
 * Major update: All README files (Chinese and English) have been rewritten for a more conversational, developer-friendly tone.
 * Documentation is now easier to read, with clearer explanations and practical examples.
 * No breaking changes; all APIs and features remain the same.
 
-### [2.0.2]
+## [2.0.2]
 
 * Update example usage in README
 
-### [2.0.1]
+## [2.0.1]
 
 * Update README
 
