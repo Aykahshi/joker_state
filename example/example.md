@@ -9,8 +9,8 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // You can get a Joker and register it in CircusRing by just call Circus.spotlight()
-    final counter = Circus.spotlight<int>(tag: 'counter');
+    // You can get a Joker and register it in CircusRing by just call Circus.summon()
+    final counter = Circus.summon<int>(tag: 'counter');
     
     return MaterialApp(
       home: Scaffold(

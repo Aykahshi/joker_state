@@ -383,16 +383,14 @@ import 'package:flutter/material.dart';
 import 'package:joker_state/joker_state.dart';
 
 void main() {
-  // 全局註冊 Joker
-  Circus.summon<int>(0, tag: 'counter');
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // 尋找已註冊的 Joker
-    final counter = Circus.spotlight<int>(tag: 'counter');
+    // 直接註冊 Joker 並獲取實例
+    final counter = Circus.summon<int>(tag: 'counter');
     
     return MaterialApp(
       home: Scaffold(

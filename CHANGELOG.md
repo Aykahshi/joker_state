@@ -1,3 +1,6 @@
+### 2.0.2
+* Update example usage in README
+
 ### 2.0.1
 * Update README
 
