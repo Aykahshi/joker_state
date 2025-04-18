@@ -3,15 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:joker_state/joker_state.dart';
 
 void main() {
-  // Register Joker globally
-  Circus.summon<int>(0, tag: 'counter');
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // Find the registered Joker
+    // You can get a Joker and register it in CircusRing by just call Circus.spotlight()
     final counter = Circus.spotlight<int>(tag: 'counter');
     
     return MaterialApp(

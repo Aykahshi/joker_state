@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'package:joker_state/joker_state.dart';
 
 import '../../domain/entity/counter.dart';

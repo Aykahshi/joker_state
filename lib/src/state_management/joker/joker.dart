@@ -157,9 +157,10 @@ class Joker<T> extends ChangeNotifier {
   /// Only usable in autoNotify mode.
   /// Throws [JokerException] if called on a disposed Joker.
   void trick(T newState) {
-    if (_isDisposed)
+    if (_isDisposed) {
       throw JokerException(
           'Cannot call trick() on a disposed Joker (tag: $tag)');
+    }
     if (!autoNotify) {
       throw JokerException(
         'trick() called on manual Joker. Use whisper() and yell() instead.',
@@ -173,9 +174,10 @@ class Joker<T> extends ChangeNotifier {
   /// Updates state using a transform function and notifies.
   /// Throws [JokerException] if called on a disposed Joker.
   void trickWith(T Function(T currentState) performer) {
-    if (_isDisposed)
+    if (_isDisposed) {
       throw JokerException(
           'Cannot call trickWith() on a disposed Joker (tag: $tag)');
+    }
     if (!autoNotify) {
       throw JokerException(
         'trickWith(): Use whisperWith() in manual mode.',
@@ -191,9 +193,10 @@ class Joker<T> extends ChangeNotifier {
   /// Waits for value transformation then notifies listeners.
   /// Throws [JokerException] if called on a disposed Joker.
   Future<void> trickAsync(Future<T> Function(T current) performer) async {
-    if (_isDisposed)
+    if (_isDisposed) {
       throw JokerException(
           'Cannot call trickAsync() on a disposed Joker (tag: $tag)');
+    }
     if (!autoNotify) {
       throw JokerException(
         'trickAsync(): Use whisperWith() and yell() in manual mode.',
@@ -211,9 +214,10 @@ class Joker<T> extends ChangeNotifier {
   /// Only usable when [autoNotify] is false.
   /// Throws [JokerException] if called on a disposed Joker.
   T whisper(T newState) {
-    if (_isDisposed)
+    if (_isDisposed) {
       throw JokerException(
           'Cannot call whisper() on a disposed Joker (tag: $tag)');
+    }
     if (autoNotify) {
       throw JokerException('whisper() is not allowed in autoNotify mode.');
     }
@@ -225,9 +229,10 @@ class Joker<T> extends ChangeNotifier {
   /// Functor version of [whisper].
   /// Throws [JokerException] if called on a disposed Joker.
   T whisperWith(T Function(T currentState) updater) {
-    if (_isDisposed)
+    if (_isDisposed) {
       throw JokerException(
           'Cannot call whisperWith() on a disposed Joker (tag: $tag)');
+    }
     if (autoNotify) {
       throw JokerException('whisperWith() is not allowed in autoNotify mode.');
     }
@@ -261,9 +266,10 @@ class Joker<T> extends ChangeNotifier {
   /// Use [JokerBatch.commit] to notify once after multiple updates.
   /// Throws [JokerException] if called on a disposed Joker.
   JokerBatch<T> batch() {
-    if (_isDisposed)
+    if (_isDisposed) {
       throw JokerException(
           'Cannot start batch on a disposed Joker (tag: $tag)');
+    }
     return JokerBatch<T>(this);
   }
 }
@@ -283,9 +289,10 @@ class JokerBatch<T> {
 
   /// Applies a field-level change to the Joker state.
   JokerBatch<T> apply(T Function(T state) updater) {
-    if (_joker.isDisposed)
+    if (_joker.isDisposed) {
       throw JokerException(
           'Cannot apply batch update to a disposed Joker (tag: ${_joker.tag})');
+    }
     if (_isAutoNotify) {
       final newState = updater(_joker.state);
       (_joker as dynamic)._state = newState;
