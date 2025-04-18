@@ -1,3 +1,6 @@
+### 2.0.1
+* Update README
+
 ## 2.0.0
 
 **BREAKING CHANGES**
