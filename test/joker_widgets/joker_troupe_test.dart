@@ -1,6 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
+import 'package:joker_state/src/state_management/presenter/presenter.dart';
+
+// Helper class for testing Presenter lifecycle and usage
+class TestPresenter<T> extends Presenter<T> {
+  bool initCalled = false;
+  bool readyCalled = false;
+  bool doneCalled = false;
+
+  TestPresenter(T initial, {String? tag, bool keepAlive = false})
+      : super(initial, tag: tag, keepAlive: keepAlive);
+
+  @override
+  void onInit() {
+    super.onInit();
+    initCalled = true;
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    readyCalled = true;
+  }
+
+  @override
+  void onDone() {
+    doneCalled = true;
+    super.onDone();
+  }
+
+  // Helper to modify state for testing
+  void updateState(T newState) {
+    trick(newState);
+  }
+}
 
 void main() {
   group('JokerTroupe', () {
@@ -321,6 +355,60 @@ void main() {
       expect(find.text('Message: hello'), findsOneWidget);
       expect(find.text('Active: true'), findsOneWidget);
       expect(find.text('Rating: 3.14'), findsOneWidget);
+    });
+
+    testWidgets('should work with mixed Joker and Presenter types',
+        (WidgetTester tester) async {
+      // Arrange
+      final normalJoker = Joker<String>('Joker String');
+      final testPresenter = TestPresenter<int>(99);
+
+      // Act
+      await tester.pumpWidget(
+        MaterialApp(
+          home: JokerTroupe<(String, int)>(
+            jokers: [normalJoker, testPresenter], // Mix of types
+            converter: (values) => (values[0] as String, values[1] as int),
+            builder: (context, values) {
+              final (text, count) = values;
+              return Column(
+                children: [
+                  Text('From Joker: $text'),
+                  Text('From Presenter: $count'),
+                ],
+              );
+            },
+          ),
+        ),
+      );
+
+      // Assert initial state & presenter lifecycle
+      expect(find.text('From Joker: Joker String'), findsOneWidget);
+      expect(find.text('From Presenter: 99'), findsOneWidget);
+      expect(testPresenter.initCalled, isTrue);
+      await tester.pump(); // for onReady
+      expect(testPresenter.readyCalled, isTrue);
+
+      // Act: Update normal Joker
+      normalJoker.trick('Updated Joker');
+      await tester.pump();
+      expect(find.text('From Joker: Updated Joker'), findsOneWidget);
+      expect(find.text('From Presenter: 99'), findsOneWidget);
+
+      // Act: Update Presenter
+      testPresenter.updateState(100);
+      await tester.pump();
+      expect(find.text('From Joker: Updated Joker'), findsOneWidget);
+      expect(find.text('From Presenter: 100'), findsOneWidget);
+
+      // Remove widget
+      await tester.pumpWidget(Container());
+      await tester.pump();
+
+      // Assert disposal
+      expect(normalJoker.isDisposed, isTrue); // Normal joker should dispose
+      expect(testPresenter.doneCalled, isTrue);
+      expect(testPresenter.isDisposed, isTrue); // Presenter should dispose
     });
   });
 }

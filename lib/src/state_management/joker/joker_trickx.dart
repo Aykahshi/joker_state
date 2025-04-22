@@ -68,7 +68,7 @@ extension JokerStageExtension<T> on Joker<T> {
 /// Note: The `autoDispose` parameter has been removed as Joker now manages
 /// its own lifecycle based on listeners and the `keepAlive` flag.
 extension JokerFrameExtension<T> on Joker<T> {
-  /// Creates a [JokerFrame] that observes a selected portion of the Joker state.
+  /// Creates a [JokerFrame] that focuses on a selected portion of the Joker state.
   ///
   /// [selector]: Function to extract the slice of state to observe.
   /// [builder]: Function called when the selected value changes.
@@ -76,7 +76,7 @@ extension JokerFrameExtension<T> on Joker<T> {
   /// The Joker now manages its own lifecycle. This parameter is removed.
   ///
   /// Returns a [JokerFrame] widget that only rebuilds when selector result changes.
-  JokerFrame<T, S> observe<S>({
+  JokerFrame<T, S> focusOn<S>({
     Key? key,
     required JokerFrameSelector<T, S> selector,
     required JokerFrameBuilder<S> builder,
@@ -166,6 +166,11 @@ extension JokerRingExtension on CircusRing {
     required String tag,
     bool keepAlive = false,
   }) {
+    final existingJoker = trySpotlight<T>(tag: tag);
+    if (existingJoker != null) {
+      return existingJoker;
+    }
+
     final joker = Joker<T>(initialValue, keepAlive: keepAlive, tag: tag);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
@@ -182,6 +187,11 @@ extension JokerRingExtension on CircusRing {
     required String tag,
     bool keepAlive = false,
   }) {
+    final existingJoker = trySpotlight<T>(tag: tag);
+    if (existingJoker != null) {
+      return existingJoker;
+    }
+
     final joker = Joker<T>(initialValue,
         autoNotify: false, keepAlive: keepAlive, tag: tag);
     hire<Joker<T>>(joker, tag: tag);

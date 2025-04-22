@@ -1,10 +1,42 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
+import 'package:joker_state/src/state_management/presenter/presenter.dart'; // Import Presenter
 
 // Define a unique class for testing type-based lookup without tag
 class UniqueType {
   final String value;
   UniqueType(this.value);
+}
+
+// Helper class for testing Presenter lifecycle and usage
+class TestPresenter<T> extends Presenter<T> {
+  bool initCalled = false;
+  bool readyCalled = false;
+  bool doneCalled = false;
+
+  TestPresenter(T initial, {String? tag, bool keepAlive = false})
+      : super(initial, tag: tag, keepAlive: keepAlive);
+
+  @override
+  void onInit() {
+    super.onInit();
+    initCalled = true;
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    readyCalled = true;
+  }
+
+  @override
+  void onDone() {
+    debugPrint(
+        ">>> [TestPresenter] onDone CALLED, setting doneCalled = true for ${tag ?? runtimeType}");
+    doneCalled = true;
+    super.onDone();
+  }
 }
 
 void main() {
@@ -26,15 +58,6 @@ void main() {
       expect(CircusRing.instance, same(instance1));
       expect(Circus, same(instance1));
     });
-
-    // Removed test for config method
-    // test('should enable and disable logs', () {
-    //   // Arrange & Act
-    //   Circus.config(enableLogs: true);
-    //   // We don't have direct access to _enableLogs, but we can test that
-    //   // the configuration doesn't throw an exception
-    //   expect(() => Circus.config(enableLogs: false), returnsNormally);
-    // });
   });
 
   group('CircusRing Hiring (Registration)', () {
@@ -91,8 +114,8 @@ void main() {
 
       // Act
       Circus.hire<_DisposableObject>(testInstance1);
-      Circus.hire<_DisposableObject>(
-          testInstance2); // This replaces testInstance1
+      Circus.hire<_DisposableObject>(testInstance2,
+          allowReplace: true); // Add allowReplace
 
       // Assert
       expect(Circus.find<_DisposableObject>(), equals(testInstance2));
@@ -101,9 +124,7 @@ void main() {
       expect(testInstance2.isDisposed, isFalse); // New instance should not
     });
 
-    test(
-        'hire should replace existing Joker instance WITHOUT disposing old one',
-        () {
+    test('hire should replace existing Joker instance AND dispose old one', () {
       // Arrange
       final joker1 = Joker<int>(1, tag: 'joker');
       final joker2 = Joker<int>(2, tag: 'joker');
@@ -112,17 +133,47 @@ void main() {
       expect(joker1.isDisposed, isFalse);
 
       // Act
-      Circus.hire<Joker<int>>(joker2, tag: 'joker'); // Replace joker1
+      Circus.hire<Joker<int>>(joker2,
+          tag: 'joker', allowReplace: true); // Add allowReplace
 
       // Assert
       expect(Circus.find<Joker<int>>('joker'), equals(joker2));
-      // CircusRing itself should NOT dispose the replaced Joker
-      expect(joker1.isDisposed, isFalse);
+      // CircusRing replacement logic SHOULD NOW dispose the replaced Joker
+      expect(joker1.isDisposed, isTrue);
       expect(joker2.isDisposed, isFalse);
 
-      // Clean up manually since it wasn't disposed by CircusRing
-      joker1.dispose();
-      expect(joker1.isDisposed, isTrue);
+      // No manual cleanup needed for joker1
+    });
+
+    testWidgets(
+        'hire should replace existing Presenter instance AND dispose old one (direct check)',
+        (WidgetTester tester) async {
+      // Arrange
+      final presenter1 = TestPresenter<int>(1, tag: 'presenter');
+      final presenter2 = TestPresenter<int>(2, tag: 'presenter');
+
+      Circus.hire<TestPresenter<int>>(presenter1, tag: 'presenter');
+      expect(presenter1.isDisposed, isFalse,
+          reason: "Presenter1 should not be disposed initially");
+      expect(presenter1.doneCalled, isFalse,
+          reason: "Presenter1 onDone should not be called initially");
+
+      // Act
+      Circus.hire<TestPresenter<int>>(presenter2,
+          tag: 'presenter', allowReplace: true); // Add allowReplace
+
+      // Assert IMMEDIATELY after replacement
+      // Check isDisposed first, as it's set after onDone is called.
+      expect(presenter1.isDisposed, isTrue,
+          reason: "Presenter1 should be disposed after replacement");
+      expect(presenter1.doneCalled, isTrue,
+          reason: "Presenter1 onDone should be called during replacement");
+
+      // Also check Circus state and presenter2 state
+      expect(Circus.find<TestPresenter<int>>('presenter'), equals(presenter2),
+          reason: "Circus should now hold presenter2");
+      expect(presenter2.isDisposed, isFalse,
+          reason: "Presenter2 should not be disposed");
     });
 
     test('hireAsync should register an asynchronous singleton', () async {
@@ -354,7 +405,7 @@ void main() {
       expect(Circus.isHired<_DisposableObject>(), isFalse);
     });
 
-    test('fire should NOT dispose Joker instance', () {
+    test('fire should dispose Joker instance', () {
       // Arrange
       final joker = Joker<int>(10, tag: 'myJoker');
       Circus.hire<Joker<int>>(joker, tag: 'myJoker');
@@ -365,13 +416,38 @@ void main() {
 
       // Assert
       expect(result, isTrue);
-      expect(
-          Circus.isHired<Joker<int>>('myJoker'), isFalse); // Removed from ring
-      expect(joker.isDisposed, isFalse); // BUT NOT disposed by CircusRing.fire
-
-      // Manually dispose for cleanup
-      joker.dispose();
+      expect(Circus.isHired<Joker<int>>('myJoker'), isFalse);
+      // Joker SHOULD NOW BE disposed by CircusRing.fire
       expect(joker.isDisposed, isTrue);
+      // No manual cleanup needed
+    });
+
+    testWidgets(
+        'fire should dispose Presenter instance and call onDone (widget test)',
+        (WidgetTester tester) async {
+      // Arrange
+      final presenter = TestPresenter<int>(10, tag: 'myPresenter');
+      Circus.hire<TestPresenter<int>>(presenter, tag: 'myPresenter');
+      expect(presenter.isDisposed, isFalse);
+      expect(presenter.doneCalled, isFalse);
+
+      // Act
+      final result = Circus.fire<TestPresenter<int>>(tag: 'myPresenter');
+      expect(result, isTrue);
+
+      // Use tester.pumpAndSettle() to ensure all work is done
+      await tester.pumpAndSettle();
+
+      // Diagnostic log right before expect
+      final isDisposedAfterSettle = presenter.isDisposed;
+      final doneCalledAfterSettle = presenter.doneCalled;
+      debugPrint(
+          ">>> [Test Check] After pumpAndSettle: isDisposed=$isDisposedAfterSettle, doneCalled=$doneCalledAfterSettle for ${presenter.tag ?? presenter.runtimeType}");
+
+      // Assert
+      expect(Circus.isHired<TestPresenter<int>>('myPresenter'), isFalse);
+      expect(isDisposedAfterSettle, isTrue); // Check the captured value
+      expect(doneCalledAfterSettle, isTrue); // Check the captured value
     });
 
     test('fireAsync should delete an instance asynchronously', () async {
@@ -417,7 +493,7 @@ void main() {
       expect(Circus.isHired<_DisposableObject>(), isFalse);
     });
 
-    test('fireAsync should NOT dispose Joker instance', () async {
+    test('fireAsync should dispose Joker instance', () async {
       // Arrange
       final joker = Joker<int>(10, tag: 'myJokerAsync');
       Circus.hire<Joker<int>>(joker, tag: 'myJokerAsync');
@@ -429,77 +505,83 @@ void main() {
       // Assert
       expect(result, isTrue);
       expect(Circus.isHired<Joker<int>>('myJokerAsync'), isFalse);
-      expect(joker.isDisposed, isFalse); // Not disposed by fireAsync
-
-      // Manual cleanup
-      joker.dispose();
+      // Joker SHOULD NOW BE disposed by fireAsync
       expect(joker.isDisposed, isTrue);
+      // No manual cleanup needed
     });
 
-    test('fireAll should delete all instances and dispose non-Jokers', () {
+    testWidgets(
+        'fireAsync should dispose Presenter instance and call onDone (widget test)',
+        (WidgetTester tester) async {
       // Arrange
-      final disposable1 = _DisposableObject();
-      final joker = Joker<int>(1, tag: 'joker');
-      final normal = _TestClass('test');
-
-      Circus.hire<_DisposableObject>(disposable1);
-      Circus.hire<Joker<int>>(joker, tag: 'joker');
-      Circus.hire<_TestClass>(normal);
-
-      expect(disposable1.isDisposed, isFalse);
-      expect(joker.isDisposed, isFalse);
+      final presenter = TestPresenter<int>(10, tag: 'myPresenterAsync');
+      Circus.hire<TestPresenter<int>>(presenter, tag: 'myPresenterAsync');
+      expect(presenter.isDisposed, isFalse);
+      expect(presenter.doneCalled, isFalse);
 
       // Act
-      Circus.fireAll();
+      final result =
+          await Circus.fireAsync<TestPresenter<int>>(tag: 'myPresenterAsync');
+      expect(result, isTrue);
+
+      // Use pumpAndSettle AND an extra pump
+      await tester.pumpAndSettle();
+      await tester.pump(); // Extra pump
 
       // Assert
-      expect(Circus.isHired<_DisposableObject>(), isFalse);
-      expect(Circus.isHired<Joker<int>>('joker'), isFalse);
-      expect(Circus.isHired<_TestClass>(), isFalse);
-
-      expect(disposable1.isDisposed, isTrue); // Disposed
-      expect(joker.isDisposed, isFalse); // Joker NOT disposed by fireAll
-
-      // Manual cleanup
-      joker.dispose();
-      expect(joker.isDisposed, isTrue);
+      expect(Circus.isHired<TestPresenter<int>>('myPresenterAsync'), isFalse);
+      expect(presenter.isDisposed, isTrue); // Should be disposed
+      expect(presenter.doneCalled, isTrue); // onDone should be called
     });
 
-    test(
-        'fireAll should delete all instances and dispose non-Jokers (sync and async)',
-        () async {
+    testWidgets(
+        'fireAll should delete all instances and dispose Jokers/Presenters too (widget test)',
+        (WidgetTester tester) async {
       // Arrange
       final disposable = _DisposableObject();
       final asyncDisposable = _AsyncDisposableObject();
       final joker = Joker<int>(1, tag: 'joker');
+      final presenter = TestPresenter<String>('hello', tag: 'presenter');
       final normal = _TestClass('test');
 
       Circus.hire<_DisposableObject>(disposable);
       Circus.hire<_AsyncDisposableObject>(asyncDisposable);
       Circus.hire<Joker<int>>(joker, tag: 'joker');
+      Circus.hire<TestPresenter<String>>(presenter, tag: 'presenter');
       Circus.hire<_TestClass>(normal);
 
       expect(disposable.isDisposed, isFalse);
       expect(asyncDisposable.isDisposed, isFalse);
       expect(joker.isDisposed, isFalse);
+      expect(presenter.isDisposed, isFalse);
+      expect(presenter.doneCalled, isFalse);
 
-      // Act
-      await Circus.fireAll();
+      // Act and Assert within runAsync
+      await tester.runAsync(() async {
+        await Circus.fireAll(); // Perform the async action
 
-      // Assert
-      expect(Circus.isHired<_DisposableObject>(), isFalse);
-      expect(Circus.isHired<_AsyncDisposableObject>(), isFalse);
-      expect(Circus.isHired<Joker<int>>('joker'), isFalse);
-      expect(Circus.isHired<_TestClass>(), isFalse);
+        // Add delay *inside* runAsync before pumping
+        await Future.delayed(
+            const Duration(milliseconds: 10)); // Try a slightly longer delay
 
-      expect(disposable.isDisposed, isTrue); // Disposed
-      expect(
-          asyncDisposable.isDisposed, isTrue); // Async Disposable also disposed
-      expect(joker.isDisposed, isFalse); // Joker NOT disposed by fireAll
+        // Pump after the action within runAsync
+        await tester.pumpAndSettle();
+        await tester.pump(); // Extra pump
 
-      // Manual cleanup
-      joker.dispose();
-      expect(joker.isDisposed, isTrue);
+        // Assertions
+        expect(Circus.isHired<_DisposableObject>(), isFalse);
+        expect(Circus.isHired<_AsyncDisposableObject>(), isFalse);
+        expect(Circus.isHired<Joker<int>>('joker'), isFalse);
+        expect(Circus.isHired<TestPresenter<String>>('presenter'), isFalse);
+        expect(Circus.isHired<_TestClass>(), isFalse);
+
+        expect(disposable.isDisposed, isTrue);
+        expect(asyncDisposable.isDisposed, isTrue);
+        // Joker and Presenter SHOULD NOW BE disposed by fireAll
+        expect(joker.isDisposed, isTrue);
+        expect(presenter.isDisposed, isTrue);
+        expect(presenter.doneCalled, isTrue); // Check assertion here
+      });
     });
   });
 
@@ -539,7 +621,7 @@ void main() {
       expect(disposable.isDisposed, isTrue);
     });
 
-    test('fireByTag should delete instance but NOT dispose Joker', () {
+    test('fireByTag should delete instance AND dispose Joker', () {
       // Arrange
       final joker = Joker<String>('hello', tag: 'jokerTag');
       Circus.hire<Joker<String>>(joker, tag: 'jokerTag');
@@ -551,11 +633,37 @@ void main() {
       // Assert
       expect(result, isTrue);
       expect(Circus.tryFindByTag('jokerTag'), isNull);
-      expect(joker.isDisposed, isFalse); // NOT disposed by fireByTag
-
-      // Manual cleanup
-      joker.dispose();
+      // Joker SHOULD NOW BE disposed by fireByTag
       expect(joker.isDisposed, isTrue);
+      // No manual cleanup needed
+    });
+
+    testWidgets(
+        'fireByTag should delete instance AND dispose Presenter, calling onDone (widget test)',
+        (WidgetTester tester) async {
+      // Arrange
+      final presenter = TestPresenter<String>('hello', tag: 'presenterTag');
+      Circus.hire<TestPresenter<String>>(presenter, tag: 'presenterTag');
+      expect(presenter.isDisposed, isFalse);
+      expect(presenter.doneCalled, isFalse);
+
+      // Act and Assert within runAsync
+      await tester.runAsync(() async {
+        final result = Circus.fireByTag('presenterTag'); // fireByTag is sync
+        expect(result, isTrue);
+
+        // Add delay *inside* runAsync before pumping
+        await Future.delayed(const Duration(milliseconds: 10));
+
+        // Use pumpAndSettle AND an extra pump
+        await tester.pumpAndSettle();
+        await tester.pump(); // Extra pump
+
+        // Assert
+        expect(Circus.tryFindByTag('presenterTag'), isNull);
+        expect(presenter.isDisposed, isTrue); // Should be disposed
+        expect(presenter.doneCalled, isTrue); // Check assertion here
+      });
     });
 
     test('fireByTag should return false if tag not found', () {

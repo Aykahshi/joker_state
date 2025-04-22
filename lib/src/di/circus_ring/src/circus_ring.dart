@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'package:flutter/foundation.dart';
 
 import '../../../state_management/joker/joker.dart';
+import '../../../state_management/presenter/presenter.dart';
 import 'circus_ring_exception.dart';
 import 'disposable.dart';
 
@@ -93,14 +94,6 @@ class CircusRing {
   /// Creates a unique identifier for each registered dependency
   /// based on its type and optional tag
   String _getKey(Type type, [String? tag]) {
-    /// If CueMaster, just use CueMaster_$tag
-    /// because there might be some class like CustomCueMaster
-    /// and if we use CustomCueMaster_$tag, it will be conflict
-    /// Circus.ringMaster() can not find the CustomCueMaster
-    if (type.toString().contains('CueMaster')) {
-      return 'CueMaster_$tag';
-    }
-
     return tag != null ? '${type.toString()}_$tag' : type.toString();
   }
 
@@ -169,28 +162,30 @@ class CircusRing {
         'It implements AsyncDisposable. Use fireAsync<$T>(tag: "$tag") instead.',
       );
     }
-    // Only dispose if it's NOT a Joker and implements Disposable or ChangeNotifier
-    if (instance is! Joker) {
+
+    bool shouldDispose = true;
+    if (instance is Joker) {
+      if (instance.keepAlive) {
+        shouldDispose = false;
+      }
+    }
+
+    if (shouldDispose) {
       if (instance is Disposable) {
         try {
-          _log('Disposing Disposable: $key');
           instance.dispose();
         } catch (e, s) {
-          _log('Error disposing Disposable instance $key: $e\n$s');
+          _log('Error disposing Disposable instance $key: $e\\n$s');
         }
       } else if (instance is ChangeNotifier) {
         // Dispose ChangeNotifier as a fallback if not Disposable
         try {
-          _log('Disposing ChangeNotifier: $key');
           instance.dispose();
         } catch (e, s) {
-          _log('Error disposing ChangeNotifier instance $key: $e\n$s');
+          _log('Error disposing ChangeNotifier instance $key: $e\\n$s');
         }
       }
-    } else {
-      _log('Skipping dispose for Joker instance: $key (manages own lifecycle)');
     }
-    // --- End Conditionally dispose ---
 
     return true;
   }
@@ -251,7 +246,6 @@ class CircusRing {
     _instances.remove(keyToRemove);
     _log('Instance removed by tag: $tag (key: $keyToRemove)');
 
-    // --- Conditionally dispose ---
     // Check for AsyncDisposable FIRST and throw
     if (instanceToRemove is AsyncDisposable) {
       throw CircusRingException(
@@ -259,28 +253,31 @@ class CircusRing {
         'It implements AsyncDisposable. Use fireAsyncByTag(tag: "$tag") or fireAsync<Type>(tag: "$tag") instead.',
       );
     }
-    if (instanceToRemove is! Joker) {
+
+    bool shouldDispose = true;
+    if (instanceToRemove is Joker) {
+      if (instanceToRemove.keepAlive) {
+        shouldDispose = false;
+      }
+    }
+
+    if (shouldDispose) {
       if (instanceToRemove is Disposable) {
         try {
-          _log('Disposing Disposable by tag: $tag');
           instanceToRemove.dispose();
         } catch (e, s) {
           _log(
-              'Error disposing Disposable instance (tag: $tag) $keyToRemove: $e\n$s');
+              'Error disposing Disposable instance (tag: $tag) $keyToRemove: $e\\n$s');
         }
       } else if (instanceToRemove is ChangeNotifier) {
         try {
-          _log('Disposing ChangeNotifier by tag: $tag');
           instanceToRemove.dispose();
         } catch (e, s) {
           _log(
-              'Error disposing ChangeNotifier instance (tag: $tag) $keyToRemove: $e\n$s');
+              'Error disposing ChangeNotifier instance (tag: $tag) $keyToRemove: $e\\n$s');
         }
       }
-    } else {
-      _log('Skipping dispose for Joker instance by tag: $tag');
     }
-    // --- End Conditionally dispose ---
 
     return true;
   }
@@ -302,34 +299,36 @@ class CircusRing {
     for (final key in keys) {
       final instance = _instances.remove(key);
       if (instance != null) {
-        // --- Conditionally dispose (Async first) ---
-        if (instance is! Joker) {
+        bool shouldDispose = true;
+        if (instance is Joker) {
+          if (instance.keepAlive) {
+            shouldDispose = false;
+          }
+        } else {
+          shouldDispose = true;
+        }
+
+        if (shouldDispose) {
           if (instance is AsyncDisposable) {
             try {
-              _log('fireAll: Disposing AsyncDisposable: $key');
               await instance.dispose();
             } catch (e, s) {
-              _log('fireAll: Error disposing AsyncDisposable $key: $e\n$s');
+              _log('fireAll: Error disposing AsyncDisposable $key: $e\\n$s');
             }
           } else if (instance is Disposable) {
             try {
-              _log('fireAll: Disposing Disposable: $key');
               instance.dispose();
             } catch (e, s) {
-              _log('fireAll: Error disposing Disposable $key: $e\n$s');
+              _log('fireAll: Error disposing Disposable $key: $e\\n$s');
             }
           } else if (instance is ChangeNotifier) {
             try {
-              _log('fireAll: Disposing ChangeNotifier: $key');
               instance.dispose();
             } catch (e, s) {
-              _log('fireAll: Error disposing ChangeNotifier $key: $e\n$s');
+              _log('fireAll: Error disposing ChangeNotifier $key: $e\\n$s');
             }
           }
-        } else {
-          _log('fireAll: Skipping dispose for Joker: $key');
         }
-        // --- End Conditionally dispose ---
       }
     }
     // Clear remaining containers
@@ -366,30 +365,39 @@ class CircusRing {
     final fenixRemoved = _fenixBuilders.remove(key) != null;
 
     bool instanceRemoved = instance != null;
+    bool didDispose = false; // Track if dispose was called
 
     if (instanceRemoved) {
       _log('${isReplacing ? "Replacing" : "Deleting"} instance: $key');
-      // --- Conditionally dispose removed instance ---
-      if (instance is! Joker) {
+
+      bool shouldDispose = true;
+      if (instance is Joker && instance.keepAlive) {
+        shouldDispose = false;
+        _log(
+            'Skipping dispose during delete/replace for Joker(keepAlive=true): $key');
+      }
+
+      if (shouldDispose) {
         if (instance is Disposable) {
           try {
+            _log('Disposing Disposable during delete/replace: $key');
             instance.dispose();
+            didDispose = true;
           } catch (e, s) {
             _log(
-                'Error disposing Disposable during delete/replace $key: $e\n$s');
+                'Error disposing Disposable during delete/replace $key: $e\\n$s');
           }
         } else if (instance is ChangeNotifier) {
           try {
+            _log('Disposing ChangeNotifier during delete/replace: $key');
             instance.dispose();
+            didDispose = true;
           } catch (e, s) {
             _log(
-                'Error disposing ChangeNotifier during delete/replace $key: $e\n$s');
+                'Error disposing ChangeNotifier during delete/replace $key: $e\\n$s');
           }
         }
-      } else {
-        _log('Skipping dispose for Joker during delete/replace: $key');
       }
-      // --- End Conditionally dispose ---
     } else if (factoryRemoved) {
       _log('${isReplacing ? "Replacing" : "Deleting"} factory: $key');
     } else if (lazyFactoryRemoved) {
@@ -398,22 +406,18 @@ class CircusRing {
       _log('${isReplacing ? "Replacing" : "Deleting"} fenix builder: $key');
     }
 
-    // Clear dependencies only if actually deleting, not just replacing
-    // if (!isReplacing && (instanceRemoved || factoryRemoved || lazyFactoryRemoved || fenixRemoved)) {
-    //   _clearDependenciesFor(key);
-    // }
-    // Correction: Dependencies should be cleared regardless, as the old binding is gone.
-    if (instanceRemoved ||
-        factoryRemoved ||
-        lazyFactoryRemoved ||
-        fenixRemoved) {
+    // An instance or factory was removed
+    bool bindingRemoved =
+        instanceRemoved || factoryRemoved || lazyFactoryRemoved || fenixRemoved;
+
+    // Clear dependencies if a binding was actually removed
+    if (bindingRemoved) {
       _clearDependenciesFor(key);
     }
 
-    return instanceRemoved ||
-        factoryRemoved ||
-        lazyFactoryRemoved ||
-        fenixRemoved;
+    // Return true if a binding was removed OR if dispose was successfully called
+    // (Consider removal successful even if only dispose happened, though usually implies instance removal)
+    return bindingRemoved || didDispose;
   }
 
   // Async version of _deleteSingle
@@ -424,37 +428,48 @@ class CircusRing {
     final fenixAsyncRemoved = _fenixAsyncBuilders.remove(key) != null;
 
     bool instanceRemoved = instance != null;
+    bool didDispose = false; // Track if dispose was called
 
     if (instanceRemoved) {
       _log('${isReplacing ? "Replacing" : "Deleting"} async instance: $key');
-      // --- Conditionally dispose removed instance (Async first) ---
-      if (instance is! Joker) {
+
+      bool shouldDispose = true;
+      if (instance is Joker && instance.keepAlive) {
+        shouldDispose = false;
+        _log(
+            'Skipping dispose during async delete/replace for Joker(keepAlive=true): $key');
+      }
+
+      if (shouldDispose) {
         if (instance is AsyncDisposable) {
           try {
+            _log('Disposing AsyncDisposable during async delete/replace: $key');
             await instance.dispose();
+            didDispose = true;
           } catch (e, s) {
             _log(
-                'Error disposing AsyncDisposable during async delete/replace $key: $e\n$s');
+                'Error disposing AsyncDisposable during async delete/replace $key: $e\\n$s');
           }
         } else if (instance is Disposable) {
           try {
+            _log('Disposing Disposable during async delete/replace: $key');
             instance.dispose();
+            didDispose = true;
           } catch (e, s) {
             _log(
-                'Error disposing Disposable during async delete/replace $key: $e\n$s');
+                'Error disposing Disposable during async delete/replace $key: $e\\n$s');
           }
         } else if (instance is ChangeNotifier) {
           try {
+            _log('Disposing ChangeNotifier during async delete/replace: $key');
             instance.dispose();
+            didDispose = true;
           } catch (e, s) {
             _log(
-                'Error disposing ChangeNotifier during async delete/replace $key: $e\n$s');
+                'Error disposing ChangeNotifier during async delete/replace $key: $e\\n$s');
           }
         }
-      } else {
-        _log('Skipping dispose for Joker during async delete/replace: $key');
       }
-      // --- End Conditionally dispose ---
     } else if (lazyAsyncRemoved) {
       _log(
           '${isReplacing ? "Replacing" : "Deleting"} async lazy factory: $key');
@@ -463,16 +478,17 @@ class CircusRing {
           '${isReplacing ? "Replacing" : "Deleting"} async fenix builder: $key');
     }
 
-    // Clear dependencies only if actually deleting, not just replacing
-    // if (!isReplacing && (instanceRemoved || lazyAsyncRemoved || fenixAsyncRemoved)) {
-    //   _clearDependenciesFor(key);
-    // }
-    // Correction: Dependencies should be cleared regardless
-    if (instanceRemoved || lazyAsyncRemoved || fenixAsyncRemoved) {
+    // An async instance or factory was removed
+    bool bindingRemoved =
+        instanceRemoved || lazyAsyncRemoved || fenixAsyncRemoved;
+
+    // Clear dependencies if a binding was actually removed
+    if (bindingRemoved) {
       _clearDependenciesFor(key);
     }
 
-    return instanceRemoved || lazyAsyncRemoved || fenixAsyncRemoved;
+    // Return true if a binding was removed OR if dispose was successfully called
+    return bindingRemoved || didDispose;
   }
 
   // Helper to clear dependencies AND dependents for a removed key
@@ -500,116 +516,244 @@ class CircusRing {
 
 /// Extension for registering dependencies in the CircusRing
 extension CircusRingHiring on CircusRing {
-  /// Register a synchronous singleton
+  /// Register a synchronous singleton, optionally allowing replacement.
   ///
   /// Registers an instance that will be shared throughout the app.
-  /// [instance]: The object to register
-  /// [tag]: Optional name to distinguish between instances of the same type
-  T hire<T extends Object>(T instance, {String? tag}) {
+  /// By default, if an instance/factory with the same key already exists,
+  /// it returns the existing instance. Set [allowReplace] to true to
+  /// delete the old registration and register the new instance.
+  ///
+  /// [instance]: The object to register.
+  /// [tag]: Optional name to distinguish between instances of the same type.
+  /// [allowReplace]: If true, replaces any existing registration with the same key.
+  ///
+  /// Returns the registered or existing instance.
+  /// Throws [CircusRingException] if trying to register a Joker directly without a tag.
+  T hire<T extends Object>(
+    T instance, {
+    String? tag,
+    bool allowReplace = false,
+  }) {
     _checkDisposed();
-    // Verify that Joker instances must use summon or provide a tag
-    if (instance is Joker && (tag == null || tag.isEmpty)) {
+    // 1. Verify Joker tag requirement, except for Presenter.
+    if (instance is Joker &&
+        instance is! Presenter &&
+        (tag == null || tag.isEmpty)) {
+      // We don't need a specific check for Presenter here anymore
+      // because the hire call for Presenter will either have a tag (handled by _getKey)
+      // or no tag (also handled by _getKey, using the specific Presenter subclass name).
+      // This check catches only general Jokers without tags being passed to hire directly.
       throw CircusRingException(
-        'Joker instances must be registered using summon() or provide a non-empty tag. '
-        'Use: Circus.summon<T>(tag: "unique_tag") or Circus.hire<Joker<T>>(joker, tag: "unique_tag")',
+        'Joker instances must be registered using summon()/recruit() or provide a non-empty tag when using hire(). '
+        'Use: Circus.summon<T>(initialValue, [tag: "..."]) or Circus.hire<Joker<T>>(joker, tag: "unique_tag")',
       );
     }
+
+    // 2. Determine the key.
     final key = _getKey(T, tag);
-    if (_instances.containsKey(key) ||
+
+    // 3. Check if registration exists.
+    final bool keyExists = _instances.containsKey(key) ||
         _lazyFactories.containsKey(key) ||
-        _factories.containsKey(key)) {
-      _log('Instance/Factory $key already exists, will be replaced');
-      _deleteSingle<T>(key: key, isReplacing: true);
+        _factories.containsKey(key);
+
+    // 4. Handle existing registration based on allowReplace.
+    if (keyExists) {
+      if (allowReplace) {
+        _log(
+            'Instance/Factory $key already exists. Replacing due to allowReplace=true.');
+        _deleteSingle<T>(key: key, isReplacing: true); // Remove old one
+      } else {
+        _log(
+            'Instance/Factory $key already exists. Returning existing instance (allowReplace=false).');
+        // If instance exists, return it directly. Otherwise, use find<T> to handle lazy/factory instantiation.
+        if (_instances.containsKey(key)) {
+          return _instances[key] as T;
+        }
+        return find<T>(tag);
+      }
     }
+
+    // 5. No existing registration or replaced, proceed to register the new instance.
     _instances[key] = instance;
-    _log('Instance $key registered');
+    _log('Instance $key registered (allowReplace: $allowReplace)');
     return instance;
   }
 
-  /// Register an asynchronous singleton
+  /// Register an asynchronous singleton, optionally allowing replacement.
   ///
-  /// Registers a dependency that will be created asynchronously
-  /// [asyncBuilder]: Function that returns a Future of the instance
-  /// [tag]: Optional name to distinguish between instances of the same type
+  /// Registers a dependency that will be created asynchronously.
+  /// By default, if an instance/factory with the same key already exists,
+  /// it returns the existing instance asynchronously. Set [allowReplace] to true to
+  /// delete the old registration and register the new instance.
+  ///
+  /// [asyncBuilder]: Function that returns a Future of the instance to register.
+  /// [tag]: Optional name to distinguish between instances of the same type.
+  /// [allowReplace]: If true, replaces any existing registration with the same key.
+  ///
+  /// Returns a Future of the registered or existing instance.
   Future<T> hireAsync<T extends Object>(
     AsyncFactoryFunc<T> asyncBuilder, {
     String? tag,
+    bool allowReplace = false,
   }) async {
     _checkDisposed();
     final key = _getKey(T, tag);
-    if (_instances.containsKey(key) || _lazyAsyncSingleton.containsKey(key)) {
-      _log('Replacing existing async instance/factory: $key');
-      await _deleteSingleAsync<T>(key: key, isReplacing: true);
+
+    // 1. Check if registration exists.
+    final bool keyExists =
+        _instances.containsKey(key) || _lazyAsyncSingleton.containsKey(key);
+
+    // 2. Handle existing registration based on allowReplace.
+    if (keyExists) {
+      if (allowReplace) {
+        _log(
+            'Async instance/factory $key already exists. Replacing due to allowReplace=true.');
+        await _deleteSingleAsync<T>(
+            key: key, isReplacing: true); // Remove old one
+        // Continue to registration below after deletion
+      } else {
+        _log(
+            'Async instance/factory $key already exists. Returning existing instance (allowReplace=false).');
+        return findAsync<T>(
+            tag); // Use findAsync to handle potential async lazy instantiation
+      }
     }
-    _log('Creating async instance: $key');
+
+    // 3. No existing registration or replaced, proceed to register the new instance asynchronously.
+    _log('Creating async instance: $key (allowReplace: $allowReplace)');
     final instance = await asyncBuilder();
+
+    // 4. Check again after await, in case it was registered concurrently *while we were building*.
+    //    Only replace if allowReplace is true AND the key still points to something else (or a factory).
+    final bool keyExistsAfterBuild =
+        _instances.containsKey(key) || _lazyAsyncSingleton.containsKey(key);
+    if (keyExistsAfterBuild) {
+      if (allowReplace) {
+        // If replacement is allowed, AND the key still exists (meaning someone else registered *while we built*),
+        // we need to delete that one before adding ours.
+        _log(
+            'Async instance/factory $key was registered concurrently. Replacing again due to allowReplace=true.');
+        await _deleteSingleAsync<T>(key: key, isReplacing: true);
+      } else {
+        // If replacement is not allowed, and it got registered concurrently, return the concurrently registered one.
+        _log(
+            'Async instance/factory $key was registered concurrently. Returning existing instance (allowReplace=false).');
+        return findAsync<T>(tag);
+      }
+    }
+
+    // 5. Register the newly built instance.
     _instances[key] = instance;
-    _log('Async instance registered: $key');
+    _log('Async instance $key registered (allowReplace: $allowReplace)');
     return instance;
   }
 
-  /// Register a lazy-loaded singleton
+  /// Register a lazy-loaded singleton, optionally allowing replacement.
   ///
-  /// Registers a dependency that will be created only when first requested
-  /// [builder]: Function that creates the instance
-  /// [tag]: Optional name to distinguish between instances of the same type
-  /// [fenix]: Whether to fenix the instance if it was removed
+  /// Registers a dependency that will be created only when first requested.
+  /// By default, if any registration with the same key already exists, this method does nothing.
+  /// Set [allowReplace] to true to delete the old registration before registering the new lazy factory.
+  ///
+  /// [builder]: Function that creates the instance.
+  /// [tag]: Optional name to distinguish between instances of the same type.
+  /// [fenix]: Whether to auto-rebind the instance if it was removed using `fire()`.
+  /// [allowReplace]: If true, replaces any existing registration with the same key.
   void hireLazily<T extends Object>(
     FactoryFunc<T> builder, {
     String? tag,
     bool fenix = false,
+    bool allowReplace = false,
   }) {
     _checkDisposed();
     final key = _getKey(T, tag);
 
-    if (_lazyFactories.containsKey(key) ||
-        _instances.containsKey(key) ||
+    // 1. Check if registration exists.
+    final bool keyExists = _instances.containsKey(key) ||
+        _lazyFactories.containsKey(key) ||
         _factories.containsKey(key) ||
-        _fenixBuilders.containsKey(key)) {
-      _log('Instance/Factory/Fenix $key already exists, will be replaced');
-      _deleteSingle<T>(key: key, isReplacing: true);
+        _fenixBuilders.containsKey(key);
+
+    // 2. Handle existing registration based on allowReplace.
+    if (keyExists) {
+      if (allowReplace) {
+        _log(
+            'Instance/Factory/Lazy/Fenix $key already exists. Replacing due to allowReplace=true.');
+        _deleteSingle<T>(key: key, isReplacing: true); // Remove old one
+        // Continue to registration below
+      } else {
+        _log(
+            'Instance/Factory/Lazy/Fenix $key already exists. Skipping registration (allowReplace=false).');
+        return; // Do nothing if already registered and not replacing
+      }
     }
 
+    // 3. No existing registration or replaced, proceed to register the lazy factory.
     _lazyFactories[key] = builder;
+    _log('Lazy instance $key registered (allowReplace: $allowReplace)');
 
     if (fenix) {
+      // Also register fenix builder, potentially replacing an old one if allowReplace was true.
+      // If allowReplace was false and a fenix builder already existed, we would have returned above.
       _fenixBuilders[key] = builder;
-      _log('Fenix (auto-rebind) registered for: $key');
+      _log(
+          'Fenix (auto-rebind) registered for: $key (allowReplace: $allowReplace)');
     }
-
-    _log('Lazy instance $key registered');
   }
 
-  /// Register an async lazy-loaded singleton
+  /// Register an async lazy-loaded singleton, optionally allowing replacement.
   ///
-  /// Registers a dependency that will be created asynchronously when first requested
-  /// [asyncBuilder]: Function that returns a Future of the instance
-  /// [tag]: Optional name to distinguish between instances of the same type
-  /// [fenix]: Whether to fenix the instance if it was removed
+  /// Registers a dependency that will be created asynchronously when first requested.
+  /// By default, if any async registration with the same key already exists, this method does nothing.
+  /// Set [allowReplace] to true to delete the old registration before registering the new async lazy factory.
+  ///
+  /// [asyncBuilder]: Function that returns a Future of the instance.
+  /// [tag]: Optional name to distinguish between instances of the same type.
+  /// [fenix]: Whether to auto-rebind the instance if it was removed.
+  /// [allowReplace]: If true, replaces any existing registration with the same key.
   void hireLazilyAsync<T extends Object>(
     AsyncFactoryFunc<T> builder, {
     String? tag,
     bool fenix = false,
+    bool allowReplace = false,
   }) {
     _checkDisposed();
     final key = _getKey(T, tag);
 
-    if (_lazyAsyncSingleton.containsKey(key) ||
-        _instances.containsKey(key) ||
-        _fenixAsyncBuilders.containsKey(key)) {
-      _log(
-          'Async Instance/Factory/Fenix $key already registered, will be replaced');
-      _deleteSingleAsync<T>(key: key, isReplacing: true);
+    // 1. Check if registration exists.
+    final bool keyExists = _instances.containsKey(key) ||
+        _lazyAsyncSingleton.containsKey(key) ||
+        _fenixAsyncBuilders.containsKey(key);
+
+    // 2. Handle existing registration based on allowReplace.
+    if (keyExists) {
+      if (allowReplace) {
+        _log(
+            'Async Instance/Lazy/Fenix $key already registered. Replacing due to allowReplace=true.');
+        // Use a fire-and-forget pattern for the async deletion, as this method is sync.
+        // Or should this method be async? Let's make it sync for now.
+        // We cannot await _deleteSingleAsync here. The deletion will happen later.
+        // This means a subsequent *synchronous* find might still get the old instance briefly
+        // before the async deletion completes. This is a trade-off.
+        // Consider making this method async if guaranteed replacement before proceeding is needed.
+        _deleteSingleAsync<T>(key: key, isReplacing: true);
+        // Continue to registration below
+      } else {
+        _log(
+            'Async Instance/Lazy/Fenix $key already registered. Skipping registration (allowReplace=false).');
+        return; // Do nothing if already registered and not replacing
+      }
     }
 
+    // 3. No existing registration or replaced, proceed to register the async lazy factory.
     _lazyAsyncSingleton[key] = builder;
+    _log('Async lazy instance registered: $key (allowReplace: $allowReplace)');
 
     if (fenix) {
       _fenixAsyncBuilders[key] = builder;
-      _log('Fenix (auto-rebind async) registered for: $key');
+      _log(
+          'Fenix (auto-rebind async) registered for: $key (allowReplace: $allowReplace)');
     }
-
-    _log('Async lazy instance registered: $key');
   }
 
   /// Register a factory that creates a new instance on each call

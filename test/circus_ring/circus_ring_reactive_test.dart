@@ -193,7 +193,7 @@ void main() {
       joker.dispose();
     });
 
-    test('vanish should remove Joker from ring but NOT dispose it', () {
+    test('vanish should remove Joker from ring AND dispose it', () {
       // Arrange - summon a joker
       final joker = circus.summon<int>(42, tag: 'answer');
       expect(circus.isHired<Joker<int>>('answer'), isTrue);
@@ -206,12 +206,12 @@ void main() {
       expect(result, isTrue);
       expect(circus.isHired<Joker<int>>('answer'), isFalse);
 
-      // Assert - Joker itself should NOT be disposed by vanish
-      expect(joker.isDisposed, isFalse);
-
-      // Manually dispose for cleanup
-      joker.dispose();
+      // Assert - Joker itself SHOULD NOW BE disposed by vanish (which calls fire)
       expect(joker.isDisposed, isTrue);
+
+      // No need for manual dispose anymore
+      // joker.dispose();
+      // expect(joker.isDisposed, isTrue);
     });
 
     test('should recruit manual jokers through CircusRing extension', () {

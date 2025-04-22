@@ -11,7 +11,7 @@ class CounterDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Observe the Joker<Counter> state directly using the tag.
-    return Circus.spotlight<Counter>(tag: COUNTER_JOKER_TAG).observe<int>(
+    return Circus.spotlight<Counter>(tag: COUNTER_JOKER_TAG).focusOn<int>(
       // Select the integer value from the Counter state.
       selector: (counter) => counter.value,
       builder: (context, count) {

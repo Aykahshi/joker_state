@@ -84,7 +84,7 @@ void main() {
       int? observedValue;
 
       // Act: Use the observe extension
-      final frame = joker.observe<int>(
+      final frame = joker.focusOn<int>(
         selector: (state) => state['count'] as int,
         builder: (context, count) {
           builderCalled = true;
@@ -114,7 +114,7 @@ void main() {
       int buildCount = 0;
 
       // Act: Observe only the name
-      final frame = joker.observe<String>(
+      final frame = joker.focusOn<String>(
         selector: (state) => state['name'] as String,
         builder: (context, name) {
           buildCount++;
@@ -150,7 +150,7 @@ void main() {
       // Arrange: Joker will auto-dispose
       final joker =
           Joker<Map<String, dynamic>>({'key': 'value'}, keepAlive: false);
-      final frame = joker.observe<String>(
+      final frame = joker.focusOn<String>(
         selector: (state) => state['key'] as String,
         builder: (context, value) => Text(value),
       );
@@ -172,7 +172,7 @@ void main() {
       // Arrange: Joker will NOT auto-dispose
       final joker =
           Joker<Map<String, dynamic>>({'key': 'value'}, keepAlive: true);
-      final frame = joker.observe<String>(
+      final frame = joker.focusOn<String>(
         selector: (state) => state['key'] as String,
         builder: (context, value) => Text(value),
       );
@@ -537,7 +537,7 @@ void main() {
 
     test(
         // Test name updated to reflect actual behavior
-        'vanish() should remove from ring but NOT auto-dispose if no listeners were active',
+        'vanish() should remove from ring AND dispose the Joker (keepAlive=false)',
         () async {
       // Arrange: Joker with no external listeners, keepAlive=false
       final joker =
@@ -552,12 +552,13 @@ void main() {
       expect(result, isTrue);
       expect(Circus.isHired<Joker<int>>('dispose-on-vanish'), isFalse);
 
-      // Assert: Should NOT be disposed because vanish doesn't call removeListener
+      // Assert: Should NOW be disposed because vanish calls dispose directly
       await Future.delayed(Duration.zero); // Wait for microtask just in case
-      expect(joker.isDisposed, isFalse); // Corrected assertion
+      expect(joker.isDisposed, isTrue); // Corrected assertion
     });
 
-    test('vanish() should NOT trigger auto-dispose if keepAlive=true',
+    test(
+        'vanish() should remove from ring but NOT dispose the Joker if keepAlive=true',
         () async {
       // Arrange: Joker with keepAlive=true
       final joker =
@@ -572,7 +573,7 @@ void main() {
       expect(result, isTrue);
       expect(Circus.isHired<Joker<int>>('keep-on-vanish'), isFalse);
 
-      // Assert: Should NOT be disposed
+      // Assert: Should NOT be disposed because keepAlive is true
       await Future.delayed(Duration.zero); // Wait just in case
       expect(joker.isDisposed, isFalse); // This should now pass
     });

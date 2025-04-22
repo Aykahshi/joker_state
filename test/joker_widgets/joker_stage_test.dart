@@ -1,6 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
+import 'package:joker_state/src/state_management/presenter/presenter.dart';
+import 'package:joker_state/src/state_management/presenter/presenterx.dart';
+
+// Helper class for testing Presenter lifecycle and usage (copied here for self-containment)
+class TestPresenter<T> extends Presenter<T> {
+  bool initCalled = false;
+  bool readyCalled = false;
+  bool doneCalled = false;
+  int stateUpdateCount = 0; // Optional: count state updates
+
+  TestPresenter(T initial, {String? tag, bool keepAlive = false})
+      : super(initial, tag: tag, keepAlive: keepAlive);
+
+  @override
+  void onInit() {
+    super.onInit();
+    initCalled = true;
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    readyCalled = true;
+  }
+
+  @override
+  void onDone() {
+    doneCalled = true;
+    super.onDone(); // Call super at the end for logging consistency
+  }
+
+  // Override state update methods to track calls if needed
+  @override
+  void trick(T newState) {
+    stateUpdateCount++;
+    super.trick(newState);
+  }
+
+  @override
+  void trickWith(T Function(T currentState) performer) {
+    stateUpdateCount++;
+    super.trickWith(performer);
+  }
+
+  // Add a simple method for testing interactions
+  void incrementIfInt() {
+    if (state is int) {
+      final current = state as int;
+      trick(current + 1 as T); // Basic increment assuming T is int
+    }
+  }
+}
 
 void main() {
   group('JokerStage', () {
@@ -298,6 +350,172 @@ void main() {
 
       // Should update now
       expect(find.text('Value: 10'), findsOneWidget);
+    });
+
+    testWidgets('should work with Presenter as joker provider',
+        (WidgetTester tester) async {
+      // Arrange
+      final presenter = TestPresenter<String>('Initial Presenter State');
+
+      // Act
+      await tester.pumpWidget(
+        MaterialApp(
+          home: JokerStage<String>(
+            // Still need type T for JokerStage
+            joker: presenter, // Pass the presenter instance
+            builder: (context, value) => Text(value),
+          ),
+        ),
+      );
+
+      // Assert initial state
+      expect(find.text('Initial Presenter State'), findsOneWidget);
+
+      // Act: update presenter state
+      presenter.trick('Updated Presenter State');
+      await tester.pump();
+
+      // Assert updated state
+      expect(find.text('Updated Presenter State'), findsOneWidget);
+
+      // Check lifecycle (onInit and onReady should be called)
+      expect(presenter.initCalled, isTrue);
+      // Need to pump a frame for onReady scheduled by addPostFrameCallback
+      await tester.pump();
+      expect(presenter.readyCalled, isTrue);
+
+      // Remove widget to check onDone
+      await tester.pumpWidget(Container());
+      await tester.pump(); // Allow microtask for potential Joker disposal
+      expect(presenter.doneCalled, isTrue); // Should be called via dispose
+      expect(presenter.isDisposed, isTrue);
+    });
+
+    testWidgets('presenter.show() extension should create JokerStage',
+        (WidgetTester tester) async {
+      // Arrange
+      final presenter = TestPresenter<int>(100);
+
+      // Act: Use the .show() extension
+      await tester.pumpWidget(
+        MaterialApp(
+          home: presenter.perform(
+            builder: (context, value) => Text('Value: $value'),
+          ),
+        ),
+      );
+
+      // Assert initial state
+      expect(find.text('Value: 100'), findsOneWidget);
+
+      // Act: update presenter state
+      presenter.incrementIfInt(); // State becomes 101
+      await tester.pump();
+
+      // Assert updated state
+      expect(find.text('Value: 101'), findsOneWidget);
+
+      // Check lifecycle (onInit and onReady)
+      expect(presenter.initCalled, isTrue);
+      await tester.pump(); // For onReady
+      expect(presenter.readyCalled, isTrue);
+
+      // Remove widget to check onDone
+      await tester.pumpWidget(Container());
+      await tester.pump();
+      expect(presenter.doneCalled, isTrue);
+      expect(presenter.isDisposed, isTrue);
+    });
+
+    testWidgets(
+        'JokerStage with Presenter (keepAlive=true) should not dispose presenter',
+        (WidgetTester tester) async {
+      // Arrange
+      final presenter =
+          TestPresenter<int>(55, keepAlive: true); // KeepAlive = true
+
+      // Act: Use the .show() extension
+      await tester.pumpWidget(
+        MaterialApp(
+          home: presenter.perform(
+            builder: (context, value) => Text('Value: $value'),
+          ),
+        ),
+      );
+      expect(find.text('Value: 55'), findsOneWidget);
+      expect(presenter.isDisposed, isFalse);
+
+      // Remove widget
+      await tester.pumpWidget(Container());
+      await tester.pump(); // Pump for potential microtask
+
+      // Assert: Presenter should NOT be disposed due to keepAlive=true
+      expect(presenter.doneCalled, isFalse);
+      expect(presenter.isDisposed, isFalse);
+
+      // Verify it still works
+      expect(() => presenter.incrementIfInt(), returnsNormally);
+      expect(presenter.state, 56);
+
+      // Manually dispose
+      presenter.dispose();
+      expect(presenter.doneCalled, isTrue);
+      expect(presenter.isDisposed, isTrue);
+    });
+
+    testWidgets('JokerStage with Presenter registered in CircusRing',
+        (WidgetTester tester) async {
+      // Arrange - Register presenter in CircusRing
+      final presenter = Circus.hire<TestPresenter<String>>(
+          TestPresenter<String>('Circus Presenter',
+              tag: 'presenter-test', keepAlive: true),
+          tag: 'presenter-test');
+      expect(Circus.isHired<TestPresenter<String>>('presenter-test'), isTrue);
+      expect(presenter.initCalled,
+          isTrue); // onInit called during construction/hire
+
+      // Act: Use the registered presenter with .show()
+      await tester.pumpWidget(
+        MaterialApp(
+          home: presenter.perform(
+            builder: (context, value) => Text(value),
+          ),
+        ),
+      );
+
+      // Assert initial state & onReady
+      expect(find.text('Circus Presenter'), findsOneWidget);
+      await tester.pump(); // for onReady
+      expect(presenter.readyCalled, isTrue);
+
+      // Update state
+      presenter.trick('Circus Updated');
+      await tester.pump();
+      expect(find.text('Circus Updated'), findsOneWidget);
+
+      // Remove the widget
+      await tester.pumpWidget(Container());
+      await tester.pump();
+
+      // Assert: Presenter should still be in CircusRing (managed by it)
+      expect(Circus.isHired<TestPresenter<String>>('presenter-test'), isTrue);
+      // Assert: Presenter should NOT be disposed automatically because keepAlive is true
+      expect(presenter.doneCalled, isFalse);
+      expect(presenter.isDisposed, isFalse);
+
+      // Clean up via CircusRing. Since keepAlive is true, fire should NOT dispose it.
+      final removed = Circus.fire<TestPresenter<String>>(tag: 'presenter-test');
+      expect(removed, isTrue); // Should still be removed from registry
+      expect(presenter.doneCalled,
+          isFalse); // <<<< CHANGED: Should NOT be called by fire
+      expect(presenter.isDisposed,
+          isFalse); // <<<< CHANGED: Should NOT be disposed by fire
+      expect(Circus.isHired<TestPresenter<String>>('presenter-test'), isFalse);
+
+      // Manual disposal is now needed for keepAlive presenters after firing
+      presenter.dispose();
+      expect(presenter.doneCalled, isTrue); // Now it should be called
+      expect(presenter.isDisposed, isTrue);
     });
   });
 }
