@@ -1,3 +1,18 @@
+## [3.0.0]
+
+**BREAKING CHANGES**
+
+*   **`CircusRing` Disposal Logic for `Joker`/`Presenter`**: 
+    *   `CircusRing` methods (`fire`, `fireByTag`, `fireAll`, `fireAsync`) now **actively manage the disposal** of removed `Joker` and `Presenter` instances.
+    *   When a `Joker` or `Presenter` is removed via these methods, `CircusRing` will now call its `dispose()` method **UNLESS** the instance's `keepAlive` property is set to `true`.
+    *   This is a significant change from v2.x where `CircusRing` *never* initiated the disposal of `Joker` instances (lifecycle was purely self-managed by Joker based on listeners).
+    *   Ensure your application logic correctly handles this new disposal behavior, especially for instances previously expected to persist after being removed from `CircusRing` without `keepAlive: true`.
+
+**New Features**
+
+*   **Added `Presenter<T>` Class**: Introduced an abstract class `Presenter<T>` extending `Joker<T>`. It provides a standard lifecycle (`onInit`, `onReady`, `onDone`) suitable for controllers or presenters in Flutter applications, integrating state management with lifecycle events.
+*   **Added `Presenter` Extensions**: Added extension methods `.perform()` and `.focusOn()` to simplify using `Presenter` instances with `JokerStage` and `JokerFrame` widgets respectively.
+
 ## [2.1.1]
 
 * fix CHANGELOG.md typo
