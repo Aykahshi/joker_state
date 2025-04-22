@@ -1,3 +1,6 @@
+## [3.1.0]
+* Missing export for new Presenter features.
+
 ## [3.0.0]
 
 **BREAKING CHANGES**
