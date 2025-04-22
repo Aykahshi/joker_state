@@ -1,33 +1,53 @@
 ## 🚀 Basic Usage
 
-### Creating a Joker
+### Creating a Joker or Presenter
+
+- JokerState gives you a simple reactive container via `Joker`. When you want to implement BLoC, MVC, or MVVM patterns with clear separation of concerns, switch to `Presenter`. It extends `Joker` and adds handy lifecycle hooks—`onInit`, `onReady`, and `onDone`—so you can neatly organize setup, UI-ready logic, and cleanup without drowning in boilerplate.
 
 ```dart
-// The simplest counter state
-final counter = Joker<int>(0);
+// Simple reactive state (Joker)
+final counterJoker = Joker<int>(0);
 
-// Auto-notify is on by default
-counter.trick(1);  // Updates to 1 and notifies listeners
+// Structured controller for BLoC/MVC/MVVM (Presenter)
+class CounterPresenter extends Presenter<int> {
+  CounterPresenter() : super(0);
 
-// Manual mode
-final manualCounter = Joker<int>(0, autoNotify: false);
-manualCounter.whisper(42);  // Silent update
-manualCounter.yell();       // Notify when you want
+  @override
+  void onInit() { /* setup data or listeners */ }
 
-// Keep Joker alive even with no listeners
+  @override
+  void onReady() { /* safe to use BuildContext or WidgetsBinding */ }
+
+  @override
+  void onDone() { /* clean up any resources */ }
+
+  void increment() => trickWith((s) => s + 1);
+}
+final counterPresenter = CounterPresenter();
+
+// Common usage:
+counterJoker.trick(1);
+counterPresenter.increment();
+
+// Keep alive examples
 final persistentJoker = Joker<String>("data", keepAlive: true);
+final persistentPresenter = CounterPresenter(keepAlive: true);
 ```
 
-### Using Joker with Flutter
+### Using Joker/Presenter with Flutter
 
 ```dart
-// The simplest counter widget
-counter.perform(
+// Simplest way using perform()
+counterJoker.perform(
   builder: (context, count) => Text('Count: $count'),
 );
 
-// Select just a part of the state
-userJoker.observe<String>(
+counterPresenter.perform(
+  builder: (context, count) => Text('Presenter Count: $count'),
+);
+
+// Select just a part of the state using focusOn()
+userPresenter.focusOn<String>(
   selector: (user) => user.name,
   builder: (context, name) => Text('Name: $name'),
 );
@@ -41,14 +61,14 @@ Joker gives you several ways to update state:
 
 ```dart
 // Auto-notify (default)
-counter.trick(42);                      // Direct value assignment
-counter.trickWith((state) => state + 1); // Use a function to update
-await counter.trickAsync(fetchValue);    // Async update
+counterJoker.trick(42);                      // Direct value assignment
+counterJoker.trickWith((state) => state + 1); // Use a function to update
+await counterJoker.trickAsync(fetchValue);    // Async update
 
 // Manual mode
-counter.whisper(42);                     // Silent update
-counter.whisperWith((s) => s + 1);       // Silent transform
-counter.yell();                          // Notify when you want
+counterJoker.whisper(42);                     // Silent update
+counterJoker.whisperWith((s) => s + 1);       // Silent transform
+counterJoker.yell();                          // Notify when you want
 ```
 
 ### Batch Updates
@@ -56,7 +76,7 @@ counter.yell();                          // Notify when you want
 Group multiple changes into a single notification:
 
 ```dart
-user.batch()
+userJoker.batch()
   .apply((u) => u.copyWith(name: 'Bob'))
   .apply((u) => u.copyWith(age: 30))
   .commit();  // Notifies listeners once
@@ -64,25 +84,36 @@ user.batch()
 
 ## 🌉 Widget Ecosystem
 
-### JokerStage
+### JokerStage / Presenter.perform
 
-Watch the whole state of a Joker:
+Watch the whole state of a Joker or Presenter:
 
 ```dart
+// With Joker
 JokerStage<User>(
   joker: userJoker,
   builder: (context, user) => Text('${user.name}: ${user.age}'),
 )
+// With Presenter (using extension)
+myPresenter.perform(
+   builder: (context, state) => Text('State: $state'),
+)
 ```
 
-### JokerFrame
+### JokerFrame / Presenter.focusOn
 
 Watch just a part of the state to avoid unnecessary rebuilds:
 
 ```dart
+// With Joker
 JokerFrame<User, String>(
   joker: userJoker,
   selector: (user) => user.name,
+  builder: (context, name) => Text('Name: $name'),
+)
+// With Presenter (using extension)
+userPresenter.focusOn<String>(
+  selector: (userProfile) => userProfile.name,
   builder: (context, name) => Text('Name: $name'),
 )
 ```
@@ -157,21 +188,23 @@ cancel();
 
 ## 🎪 Dependency Injection with CircusRing
 
-Joker works seamlessly with CircusRing for global state management:
+Joker and Presenter work seamlessly with CircusRing:
 
 ```dart
-// Register a Joker
+// Register a Joker (use summon)
 Circus.summon<int>(0, tag: 'counter');
-Circus.recruit<User>(User(), tag: 'user'); // Manual mode
+
+// Register a Presenter (use hire)
+final presenter = MyPresenter(initialState, tag: 'myPresenter');
+Circus.hire<MyPresenter>(presenter, tag: 'myPresenter');
 
 // Access anywhere
 final counterJoker = Circus.spotlight<int>(tag: 'counter');
+final myPresenter = Circus.find<MyPresenter>(tag: 'myPresenter');
 
-// Safe access
-final userJoker = Circus.trySpotlight<User>(tag: 'user');
-
-// Remove when done
-Circus.vanish<int>(tag: 'counter');
+// Remove when done (CircusRing handles disposal based on keepAlive)
+Circus.vanish<int>(tag: 'counter'); // Will dispose if keepAlive is false
+Circus.fire<MyPresenter>(tag: 'myPresenter'); // Will dispose if keepAlive is false
 ```
 
 ## 📚 Extension Methods
@@ -179,49 +212,29 @@ Circus.vanish<int>(tag: 'counter');
 These extensions make your code cleaner and easier to read:
 
 ```dart
-// Create widgets directly from Joker instances
-counterJoker.perform(
-  builder: (context, count) => Text('Count: $count'),
-);
+// Create widgets directly from Joker/Presenter instances
+counterJoker.perform(...);
+counterPresenter.perform(...);
 
-userJoker.observe<String>(
-  selector: (user) => user.name,
-  builder: (context, name) => Text('Name: $name'),
-);
+userPresenter.focusOn<String>(...);
 
 // Combine multiple Jokers
-[nameJoker, ageJoker, activeJoker].assemble<UserProfile>(
-  converter: (values) => (
-    values[0] as String,
-    values[1] as int,
-    values[2] as bool
-  ),
-  builder: (context, profile) => ProfileCard(profile),
-);
+[nameJoker, ageJoker, activeJoker].assemble<UserProfile>(...);
 ```
 
 ## 🧹 Lifecycle Management
 
-- **Listener-based disposal**: By default (`keepAlive: false`), a Joker schedules itself for disposal with a microtask when its last listener is removed.
-- **Cancellation**: If you add a listener again before the microtask runs, disposal is canceled.
-- **keepAlive**: Set `keepAlive: true` to keep the Joker alive until you dispose it manually or remove it via CircusRing (if registered).
-- **Manual disposal**: You can always call `joker.dispose()` yourself.
-- **Widget integration**: Widgets like `JokerStage`, `JokerFrame`, etc. manage listeners for you. When the widget is removed, its listener is removed too, which may trigger auto-disposal if `keepAlive` is false.
+- **Listener-based disposal**: By default (`keepAlive: false`), `Joker` and `Presenter` schedule disposal with a microtask when their last listener is removed.
+- **Cancellation**: Adding a listener again cancels the scheduled disposal.
+- **`keepAlive`**: Set `keepAlive: true` to prevent listener-based disposal. The instance remains until explicitly disposed or removed by CircusRing (see below).
+- **Manual disposal**: You can always call `joker.dispose()` or `presenter.dispose()` yourself.
+- **Widget integration**: Widgets like `JokerStage`, `JokerFrame` manage listeners. Removing the widget may trigger auto-disposal if `keepAlive` is false.
+- **CircusRing Interaction (v3.0.0+)**: When removing a `Joker` or `Presenter` via `Circus.fire*` or `Circus.vanish`, CircusRing **WILL** call `dispose()` on the instance **IF `keepAlive` is `false`**. If `keepAlive` is `true`, CircusRing only removes it from the registry, and you need to manage disposal manually.
 
 ## 🧪 Best Practices
 
-1. **Use selectors**: Only select the state you need to minimize rebuilds
-2. **Batch updates**: Group related changes to avoid multiple rebuilds
-3. **Tag your Jokers**: Always use tags with CircusRing
-4. **`keepAlive`**: Use `keepAlive: true` for Jokers that need to stick around (like global app state)
-5. **Explicit disposal**: Manually `dispose()` Jokers not managed by widgets or CircusRing, especially if `keepAlive` is true
-
-## 🏆 Comparison with Other Solutions
-
-| Feature | Joker | Provider | BLoC | GetX |
-|---------|-------|----------|------|------|
-| Learning Curve | Low | Medium | High | Low |
-| Boilerplate | Minimal | Low | High | Low |
-| Testability | High | High | High | Medium |
-| Performance | Good | Good | Great | Good |
-| Complexity | Simple | Medium | Complex | Simple |
+1. **Use selectors (`focusOn`)**: Minimize rebuilds by selecting only needed state parts.
+2. **Batch updates**: Group related changes.
+3. **Tag your instances**: Always use tags with CircusRing, especially for common types.
+4. **`keepAlive`**: Use `keepAlive: true` for global/persistent state (Joker or Presenter). Remember manual disposal might be needed if CircusRing removes it.
+5. **Explicit disposal**: Manually `dispose()` instances not managed by widgets or CircusRing (especially if `keepAlive` is true).

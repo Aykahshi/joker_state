@@ -2,7 +2,7 @@
 
 # 🃏 JokerState
 
-**⚠️ v2.0.0 重大變更提醒：** Joker 的生命週期和 CircusRing 的釋放行為有了重要調整。升級前，建議先看看[變更日誌](CHANGELOG.md)和下方更新說明。
+**⚠️ v3.0.0 重大變更提醒：** `CircusRing` 對 `Joker`/`Presenter` 實例的銷毀邏輯已顯著改變。`keepAlive: false` 的實例現在會在被 `CircusRing` 移除時被銷毀。升級前請務必詳閱[變更日誌](CHANGELOG.md)和下方說明。
 
 JokerState 是一套輕量級的 Flutter 響應式狀態管理工具，還直接整合了依賴注入。你只要用 `Joker` API 和幾個配套小部件，就能靈活管理狀態，樣板程式碼也很少。
 
@@ -77,78 +77,108 @@ manualCounter.whisperWith((s) => s + 1);
 manualCounter.yell();
 ```
 
-**生命週期說明：** 預設 (`keepAlive: false`) 下，當最後一個監聽器被移除時，Joker 會用 microtask 自動安排釋放。如果你又加回監聽器，釋放會自動取消。若希望 Joker 一直存在，請設 `keepAlive: true`。
+**生命週期說明：** 預設 (`keepAlive: false`) 下，當最後一個監聽器被移除時，Joker 會用 microtask 自動安排銷毀。如果你又加回監聽器，銷毀會自動取消。若希望 Joker 一直存在，請設 `keepAlive: true`。CircusRing 的 `fire*` 方法現在也可能觸發銷毀（如果 `keepAlive` 為 false，見下文）。
+
+### ✨ Presenter：輕鬆打造 BLoC、MVC 或 MVVM 架構
+
+想用更簡潔的方式搭建 BLoC、MVC 或 MVVM 架構嗎？`Presenter<T>` 繼承自 `Joker<T>`，並額外提供 `onInit`、`onReady`、`onDone` 三大生命週期掛勾，助你分層管理初始化、就緒與清理邏輯，專注核心功能，減少樣板程式碼。
+
+```dart
+class MyCounterPresenter extends Presenter<int> {
+  MyCounterPresenter() : super(0);
+
+  @override
+  void onInit() { /* 初始化操作 */ }
+
+  @override
+  void onReady() { /* 可以安全地與 WidgetsBinding 互動 */ }
+
+  @override
+  void onDone() { /* 清理資源 */ }
+
+  void increment() => trickWith((s) => s + 1);
+}
+
+// 使用:
+final myPresenter = MyCounterPresenter();
+myPresenter.increment();
+// dispose() 會自動呼叫 onDone()
+myPresenter.dispose(); 
+```
 
 ### 🎪 CircusRing：依賴注入
 
-CircusRing 是一個輕量級的依賴容器。它的 `fire*` 方法現在會根據情況自動釋放資源。
+CircusRing 是一個輕量級的依賴容器。
+
+**🚨 重要銷毀邏輯變更 (v3.0.0):**
+`CircusRing` 的 `fire*` 方法 (`fire`, `fireByTag`, `fireAll` 等) 現在會**主動銷毀**被移除的 `Joker` 和 `Presenter` 實例，**除非**它們的 `keepAlive` 屬性為 `true`。
 
 ```dart
 // 全域單例存取器
 final ring = Circus;
 
-// 註冊單例（Disposable 範例）
+// 註冊標準 Disposable
 ring.hire(MyDisposableService());
 
-// 註冊延遲加載的單例
-ring.hireLazily(() => NetworkService());
+// 註冊 Presenter (使用 hire)
+final presenter = MyPresenter(initialState, tag: 'myTag');
+ring.hire<MyPresenter>(presenter, tag: 'myTag');
 
-// 註冊工廠，每次請求都給新實例
-ring.contract(() => ApiClient());
-
-// 之後取得實例
-final service = Circus.find<MyDisposableService>();
-```
-
-CircusRing 跟 Joker 的整合：
-
-```dart
-// 註冊一個 Joker（要加 tag）
+// 註冊 Joker (使用 summon, 需要 tag)
 Circus.summon<int>(0, tag: 'counter');
 
-// 取得已註冊的 Joker
+// 取得實例
+final service = Circus.find<MyDisposableService>();
+final myPresenter = Circus.find<MyPresenter>(tag: 'myTag');
 final counter = Circus.spotlight<int>(tag: 'counter');
 
-// 移除 Joker（只從註冊表移除，不會釋放 Joker）
-Circus.vanish<int>(tag: 'counter');
+// 移除實例:
+Circus.fire<MyDisposableService>(); // 會銷毀 service
 
-// Joker 什麼時候釋放，由監聽器/keepAlive 決定。
+// 移除 Joker, 如果 keepAlive 為 false, 則觸發 dispose()
+Circus.vanish<int>(tag: 'counter'); 
+
+// 移除 Presenter, 如果 keepAlive 為 false, 則觸發 dispose() (及 onDone())
+Circus.fire<MyPresenter>(tag: 'myTag'); 
 ```
-
-**釋放說明：** `Circus.fire*` 只會釋放非 Joker，且有實作 `Disposable`、`AsyncDisposable` 或 `ChangeNotifier` 的實例。Joker 實例永遠不會被 CircusRing 釋放，它們自己管理生命週期。
 
 ### 🎭 UI 整合
 
 JokerState 提供多種小部件，方便你把狀態和 UI 結合：
 
-#### JokerStage
+#### JokerStage & Presenter.perform
 
-只要狀態有變，這個小部件就會重建：
-
-```dart
-final userJoker = Joker<User>(User(name: 'Alice', age: 30));
-
-JokerStage<User>(
-  joker: userJoker,
-  builder: (context, user) => Text('Name: ${user.name}, Age: ${user.age}'),
-)
-```
-
-你也可以用更流暢的 API：
+只要狀態有變，這個小部件就會重建。同時適用於 `Joker` 和 `Presenter`。
 
 ```dart
+// 使用 Joker
+final userJoker = Joker<User>(...);
 userJoker.perform(
-  builder: (context, user) => Text('Name: ${user.name}, Age: ${user.age}'),
+  builder: (context, user) => Text('Name: ${user.name}'),
+)
+
+// 使用 Presenter
+final myPresenter = MyPresenter(...);
+myPresenter.perform(
+  builder: (context, state) => Text('State: $state'),
 )
 ```
 
-#### JokerFrame
+#### JokerFrame & Presenter.focusOn
 
-只針對狀態的某一部分重建：
+只針對狀態的某一部分重建。同時適用於 `Joker` 和 `Presenter`。
 
 ```dart
-userJoker.observe<String>(
+// 使用 Joker
+userJoker.focusOn<String>(
   selector: (user) => user.name,
+  builder: (context, name) => Text('Name: $name'),
+)
+
+// 使用 Presenter
+final userPresenter = UserPresenter(...);
+userPresenter.focusOn<String>(
+  selector: (userProfile) => userProfile.name, 
   builder: (context, name) => Text('Name: $name'),
 )
 ```
@@ -352,26 +382,26 @@ Circus.bindDependency<UserRepository, ApiService>();
 
 ### 🧹 資源管理
 
-- **Joker**：基於監聽器和 `keepAlive` 管理自己的生命週期。
-- **CircusRing**：在移除時有條件地釋放非 Joker 資源。
-- **手動清理**：務必手動 `dispose()` 未由其他地方管理的 Jokers 或其他資源（尤其是 `keepAlive: true` 的 Jokers）。
+- **Joker/Presenter 生命周期**: 主要由監聽器和 `keepAlive` 標誌管理。
+- **CircusRing 銷毀**: `CircusRing` 的 `fire*` 方法現在會**觸發**被移除的 `Joker`/`Presenter` 實例的 `dispose()` 方法，*前提是* `keepAlive` 為 `false`。
+- **手動清理**: 對於 `keepAlive: true` 的 Jokers/Presenters，或者不由 CircusRing 或 JokerTrap 管理的其他資源，**始終需要手動呼叫 `dispose()`**。
 
 ```dart
-// Joker 範例
-final persistentJoker = Joker<int>(0, keepAlive: true);
-// ... 使用 joker ...
-persistentJoker.dispose(); // 需要手動釋放
+// KeepAlive 範例
+final persistentPresenter = MyPresenter(..., keepAlive: true);
+// ... 使用 presenter ...
+Circus.fire<MyPresenter>(tag: 'myTag'); // 從 CircusRing 移除, 不會觸發銷毀
+persistentPresenter.dispose(); // 需要手動銷毀!
 
-// CircusRing 範例 (Disposable)
+// 普通 Disposable 範例
 Circus.hire(MyDisposableService());
 // ... 使用 service ...
-Circus.fire<MyDisposableService>(); // Service 會被 fire() 釋放
+Circus.fire<MyDisposableService>(); // Service 會被 fire() 銷毀
 
-// CircusRing 範例 (Joker)
-final managedJoker = Circus.summon<int>(0, tag: 'temp');
+// 預設 Joker 範例 (keepAlive: false)
+final tempJoker = Circus.summon<int>(0, tag: 'temp');
 // ... 使用 joker ...
-Circus.vanish<int>(tag: 'temp'); // 僅從 ring 中移除
-// 如果沒有剩餘的監聽器，managedJoker 會自行釋放 (預設 keepAlive: false)
+Circus.vanish<int>(tag: 'temp'); // 從 Ring 移除並觸發銷毀()
 ```
 
 ## 範例

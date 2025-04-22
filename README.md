@@ -2,7 +2,7 @@
 
 # 🃏 JokerState
 
-**⚠️ Breaking Changes in v2.0.0:** Joker's lifecycle and CircusRing's disposal logic have changed a lot. Before upgrading, check out the [Changelog](CHANGELOG.md) and the updated docs below.
+**⚠️ Breaking Changes in v3.0.0:** `CircusRing`'s disposal logic for `Joker`/`Presenter` instances has changed significantly. Instances with `keepAlive: false` are now disposed by `CircusRing` upon removal. See the [Changelog](CHANGELOG.md) and docs below before upgrading.
 
 JokerState is a lightweight, reactive state management package for Flutter that makes dependency injection super easy. With its `Joker` API and handy widgets, you get flexible state containers and barely any boilerplate.
 
@@ -77,78 +77,108 @@ manualCounter.whisperWith((s) => s + 1);
 manualCounter.yell();
 ```
 
-**Lifecycle:** By default (`keepAlive: false`), a Joker schedules itself for disposal (via `Future.microtask`) when its last listener is removed. If you add a listener again, disposal is canceled. Set `keepAlive: true` to keep it alive until you dispose it manually.
+**Lifecycle:** By default (`keepAlive: false`), a Joker schedules itself for disposal (via `Future.microtask`) when its last listener is removed. If you add a listener again, disposal is canceled. Set `keepAlive: true` to keep it alive until you dispose it manually. CircusRing's `fire*` methods might also trigger disposal if `keepAlive` is false (see below).
+
+### ✨ Presenter: Build BLoC, MVC or MVVM with Ease
+
+Need a lightweight way to implement BLoC, MVC, or MVVM patterns? `Presenter<T>` extends `Joker<T>` and adds handy lifecycle hooks (`onInit`, `onReady`, `onDone`) so you can keep your controller logic organized and focus on building features.
+
+```dart
+class MyCounterPresenter extends Presenter<int> {
+  MyCounterPresenter() : super(0);
+
+  @override
+  void onInit() { /* Initialize things */ }
+
+  @override
+  void onReady() { /* Safe to interact with WidgetsBinding */ }
+
+  @override
+  void onDone() { /* Clean up resources */ }
+
+  void increment() => trickWith((s) => s + 1);
+}
+
+// Use it:
+final myPresenter = MyCounterPresenter();
+myPresenter.increment();
+// dispose() will automatically call onDone()
+myPresenter.dispose(); 
+```
 
 ### 🎪 CircusRing: Dependency Injection
 
-CircusRing is a lightweight dependency container. Its `fire*` methods now do **conditional disposal**.
+CircusRing is a lightweight dependency container. 
+
+**🚨 Important Disposal Change (v3.0.0):**
+`CircusRing`'s `fire*` methods (`fire`, `fireByTag`, `fireAll`, etc.) now **actively dispose** removed `Joker` and `Presenter` instances, **UNLESS** their `keepAlive` property is `true`. This differs from v2.x where Jokers were never disposed by CircusRing.
 
 ```dart
 // Global singleton accessor
 final ring = Circus;
 
-// Register a singleton (Disposable example)
+// Register a standard Disposable
 ring.hire(MyDisposableService());
 
-// Register a lazy singleton
-ring.hireLazily(() => NetworkService());
+// Register a Presenter (using hire)
+final presenter = MyPresenter(initialState, tag: 'myTag');
+ring.hire<MyPresenter>(presenter, tag: 'myTag');
 
-// Register a factory (new instance each time)
-ring.contract(() => ApiClient());
-
-// Find your instance later
-final service = Circus.find<MyDisposableService>();
-```
-
-Joker and CircusRing work great together:
-
-```dart
-// Register a Joker (needs a tag)
+// Register a Joker (using summon, needs a tag)
 Circus.summon<int>(0, tag: 'counter');
 
-// Find your Joker
+// Find instances
+final service = Circus.find<MyDisposableService>();
+final myPresenter = Circus.find<MyPresenter>(tag: 'myTag');
 final counter = Circus.spotlight<int>(tag: 'counter');
 
-// Remove Joker (just from the registry, not disposed)
-Circus.vanish<int>(tag: 'counter');
+// Removing instances:
+Circus.fire<MyDisposableService>(); // Disposes the service
 
-// Joker disposes itself based on listeners/keepAlive.
+// Removes Joker, triggers dispose() if keepAlive is false
+Circus.vanish<int>(tag: 'counter'); 
+
+// Removes Presenter, triggers dispose() (and onDone()) if keepAlive is false
+Circus.fire<MyPresenter>(tag: 'myTag'); 
 ```
-
-**Disposal:** `Circus.fire*` only disposes non-Joker instances that implement `Disposable`, `AsyncDisposable`, or `ChangeNotifier`. Jokers manage their own lifecycle.
 
 ### 🎭 UI Integration
 
 JokerState gives you several widgets to connect state and UI:
 
-#### JokerStage
+#### JokerStage & Presenter.perform
 
-Rebuilds whenever any part of the state changes:
-
-```dart
-final userJoker = Joker<User>(User(name: 'Alice', age: 30));
-
-JokerStage<User>(
-  joker: userJoker,
-  builder: (context, user) => Text('Name: ${user.name}, Age: ${user.age}'),
-)
-```
-
-Or use the fluent API:
+Rebuilds whenever any part of the state changes. Works with both `Joker` and `Presenter`.
 
 ```dart
+// Using a Joker
+final userJoker = Joker<User>(...);
 userJoker.perform(
-  builder: (context, user) => Text('Name: ${user.name}, Age: ${user.age}'),
+  builder: (context, user) => Text('Name: ${user.name}'),
+)
+
+// Using a Presenter
+final myPresenter = MyPresenter(...);
+myPresenter.perform(
+  builder: (context, state) => Text('State: $state'),
 )
 ```
 
-#### JokerFrame
+#### JokerFrame & Presenter.focusOn
 
-Rebuild only for a specific part of your state:
+Rebuild only for a specific part of your state. Works with both `Joker` and `Presenter`.
 
 ```dart
-userJoker.observe<String>(
+// Using a Joker
+userJoker.focusOn<String>(
   selector: (user) => user.name,
+  builder: (context, name) => Text('Name: $name'),
+)
+
+// Using a Presenter
+final userPresenter = UserPresenter(...);
+userPresenter.focusOn<String>(
+  selector: (userProfile) => userProfile.name, 
   builder: (context, name) => Text('Name: $name'),
 )
 ```
@@ -353,26 +383,26 @@ Circus.bindDependency<UserRepository, ApiService>();
 
 ### 🧹 Resource Management
 
-- **Joker**: Manages its own lifecycle based on listeners and `keepAlive`.
-- **CircusRing**: Disposes non-Joker resources when removed.
-- **Manual Cleanup**: Always call `dispose()` on Jokers or other resources not managed elsewhere (especially `keepAlive: true` Jokers).
+- **Joker/Presenter Lifecycle**: Primarily managed by listeners and the `keepAlive` flag. 
+- **CircusRing Disposal**: `CircusRing`'s `fire*` methods now trigger `dispose()` on removed `Joker`/`Presenter` instances *if* `keepAlive` is `false`.
+- **Manual Cleanup**: Always call `dispose()` manually on `keepAlive: true` Jokers/Presenters, or any other resource not managed by CircusRing or JokerTrap.
 
 ```dart
-// Joker example
-final persistentJoker = Joker<int>(0, keepAlive: true);
-// ... use joker ...
-persistentJoker.dispose(); // Manual disposal needed
+// KeepAlive Example
+final persistentPresenter = MyPresenter(..., keepAlive: true);
+// ... use presenter ...
+Circus.fire<MyPresenter>(tag: 'myTag'); // Removes from CircusRing, DOES NOT dispose
+persistentPresenter.dispose(); // Manual disposal needed!
 
-// CircusRing example (Disposable)
+// Normal Disposable Example
 Circus.hire(MyDisposableService());
 // ... use service ...
-Circus.fire<MyDisposableService>(); // Service will be disposed by fire()
+Circus.fire<MyDisposableService>(); // Service IS disposed by fire()
 
-// CircusRing example (Joker)
-final managedJoker = Circus.summon<int>(0, tag: 'temp');
+// Default Joker Example (keepAlive: false)
+final tempJoker = Circus.summon<int>(0, tag: 'temp');
 // ... use joker ...
-Circus.vanish<int>(tag: 'temp'); // Removes from ring ONLY
-// managedJoker will dispose itself if no listeners remain (default keepAlive: false)
+Circus.vanish<int>(tag: 'temp'); // Removes from ring AND triggers dispose()
 ```
 
 ## Example

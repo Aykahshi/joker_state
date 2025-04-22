@@ -62,6 +62,8 @@ Circus.contract<UserModel>(() => UserModel());
 
 ### 🔎 Finding Dependencies
 
+Once you've registered your services or controllers, grabbing them is just as easy:
+
 ```dart
 // Get a singleton
 final userRepo = Circus.find<UserRepository>();
@@ -84,38 +86,58 @@ final maybeRepo = Circus.tryFind<UserRepository>();
 ```dart
 // Make UserRepository depend on ApiClient
 Circus.bindDependency<UserRepository, ApiClient>();
-// As long as UserRepository exists, ApiClient can't be removed
+// ApiClient cannot be removed while UserRepository exists.
 ```
 
 ### 🧹 Cleaning Up
 
+When you're done with a service, Presenter, or Joker, clean up in one line. CircusRing will handle disposal based on your `keepAlive` setting.
+
+**🚨 Important Disposal Change (v3.0.0):**
+`fire*` methods now **actively dispose** removed Jokers and Presenters (unless `keepAlive: true`).
+
 ```dart
-// Remove a specific dependency
+// Remove a standard Disposable (triggers dispose)
 Circus.fire<UserRepository>();
 
-// Remove asynchronously (for async disposables)
+// Remove an AsyncDisposable asynchronously (triggers async dispose)
 await Circus.fireAsync<NetworkService>();
 
-// Remove all dependencies (handles async cleanup)
+// Remove a Joker or Presenter (keepAlive: false): dispose() is called
+Circus.fire<MyPresenter>(tag: 'myTag');
+Circus.vanish<int>(tag: 'counter');
+
+// Remove a Joker or Presenter (keepAlive: true): only unregisters
+Circus.fire<MyPresenter>(tag: 'myTagKeepAlive');
+
+// Remove all (respects keepAlive, handles async cleanup)
 await Circus.fireAll();
 ```
 
 ### 🃏 Joker Integration
 
-CircusRing works hand-in-hand with the Joker state management system:
+CircusRing plays nicely with Joker for state management—register and retrieve seamlessly:
 
 ```dart
-// Register a Joker state
+// Register a Joker state (keepAlive: false)
 Circus.summon<int>(0, tag: 'counter');
 
-// Get a registered Joker
+// Keep a Joker state alive
+Circus.summon<String>('sessionData', tag: 'session', keepAlive: true);
+
+// Retrieve
 final counter = Circus.spotlight<int>(tag: 'counter');
+final session = Circus.spotlight<String>(tag: 'session');
 
 // Update state
 counter.trick(1);
 
-// Remove Joker
+// Clean up Jokers (dispose() if keepAlive is false)
 Circus.vanish<int>(tag: 'counter');
+Circus.vanish<String>(tag: 'session');
+
+// Manual disposal for keepAlive Jokers
+session.dispose();
 ```
 
 ## ⚙️ Logging
