@@ -10,9 +10,8 @@ class CounterPresenter extends Presenter<int> {
   bool readyCalled = false;
   bool doneCalled = false;
 
-  CounterPresenter(int initial,
-      {bool autoNotify = true, bool keepAlive = false, String? tag})
-      : super(initial, autoNotify: autoNotify, keepAlive: keepAlive, tag: tag);
+  CounterPresenter(super.initial,
+      {super.autoNotify, super.keepAlive, super.tag});
 
   @override
   void onInit() {
@@ -64,8 +63,7 @@ class UserPresenter extends Presenter<UserProfile> {
   bool readyCalled = false;
   bool doneCalled = false;
 
-  UserPresenter(UserProfile initial, {bool keepAlive = false, String? tag})
-      : super(initial, keepAlive: keepAlive, tag: tag);
+  UserPresenter(super.initial, {super.keepAlive, super.tag});
 
   @override
   void onInit() {
@@ -345,5 +343,4 @@ void main() {
           isFalse); // fire should NOT trigger dispose, because keepAlive=true
     });
   });
-  ;
 }

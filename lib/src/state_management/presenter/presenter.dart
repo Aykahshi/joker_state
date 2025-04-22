@@ -8,16 +8,11 @@ import '../joker/joker.dart';
 /// Commonly used as a Controller or Presenter in UI patterns.
 abstract class Presenter<T> extends Joker<T> {
   Presenter(
-    T initialState, {
-    bool autoNotify = true,
-    bool keepAlive = false,
-    String? tag,
-  }) : super(
-          initialState,
-          autoNotify: autoNotify,
-          keepAlive: keepAlive,
-          tag: tag,
-        ) {
+    super.initialState, {
+    super.autoNotify,
+    super.keepAlive,
+    super.tag,
+  }) {
     try {
       onInit(); // Call initialization logic immediately.
     } catch (e, s) {

@@ -9,8 +9,7 @@ class TestPresenter<T> extends Presenter<T> {
   bool readyCalled = false;
   bool doneCalled = false;
 
-  TestPresenter(T initial, {String? tag, bool keepAlive = false})
-      : super(initial, tag: tag, keepAlive: keepAlive);
+  TestPresenter(super.initial, {super.tag, super.keepAlive});
 
   @override
   void onInit() {

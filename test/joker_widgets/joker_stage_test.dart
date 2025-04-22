@@ -11,8 +11,7 @@ class TestPresenter<T> extends Presenter<T> {
   bool doneCalled = false;
   int stateUpdateCount = 0; // Optional: count state updates
 
-  TestPresenter(T initial, {String? tag, bool keepAlive = false})
-      : super(initial, tag: tag, keepAlive: keepAlive);
+  TestPresenter(super.initial, {super.tag, super.keepAlive});
 
   @override
   void onInit() {

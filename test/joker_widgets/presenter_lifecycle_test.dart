@@ -7,8 +7,7 @@ import 'package:joker_state/src/state_management/presenter/presenter.dart';
 class LifecyclePresenter extends Presenter<int> {
   List<String> lifecycleEvents = [];
 
-  LifecyclePresenter(int initial, {String? tag, bool keepAlive = false})
-      : super(initial, tag: tag, keepAlive: keepAlive);
+  LifecyclePresenter(super.initial, {super.tag, super.keepAlive});
 
   @override
   void onInit() {
