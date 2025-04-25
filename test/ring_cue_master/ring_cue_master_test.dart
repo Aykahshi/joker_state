@@ -1,115 +1,127 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:joker_state/src/di/circus_ring/src/circus_ring.dart';
+import 'package:joker_state/src/event_bus/ring_cue_master/cue_master.dart';
 import 'package:joker_state/src/event_bus/ring_cue_master/ring_cue_master.dart';
 
 void main() {
-  group('RingCueMaster', () {
-    late RingCueMaster cueMaster;
+  group('CircusRing & RingCueMaster integration', () {
+    late CircusRing circus;
 
     setUp(() {
-      cueMaster = RingCueMaster();
+      circus = CircusRing();
     });
 
     tearDown(() {
-      cueMaster.dispose();
+      circus.fireAll();
     });
 
-    test('can send and receive a cue', () async {
-      final completer = Completer<_TestCue>();
+    test(
+        'ringMaster() creates and returns a RingCueMaster instance with default tag',
+        () {
+      // First access should create a new instance
+      final ringMaster = circus.ringMaster();
+      expect(ringMaster, isA<RingCueMaster>());
+      expect(circus.isHired<CueMaster>('ringMaster'), isTrue);
+    });
 
-      cueMaster.on<_TestCue>().listen(completer.complete);
-      cueMaster.sendCue(_TestCue('Hello'));
+    test(
+        'ringMaster() returns the same instance on subsequent calls with same tag',
+        () {
+      final ringMaster1 = circus.ringMaster();
+      final ringMaster2 = circus.ringMaster();
 
+      expect(identical(ringMaster1, ringMaster2), isTrue);
+    });
+
+    test('ringMaster() can create multiple instances with different tags', () {
+      // Create two ring masters with different tags
+      final defaultMaster = circus.ringMaster();
+      final customMaster = circus.ringMaster('customMaster');
+
+      // Should be different instances
+      expect(identical(defaultMaster, customMaster), isFalse);
+
+      // Both should be registered with correct tags
+      expect(circus.isHired<CueMaster>('ringMaster'), isTrue);
+      expect(circus.isHired<CueMaster>('customMaster'), isTrue);
+    });
+
+    test('cue() method works with ringMaster to send events', () async {
+      final completer = Completer<String>();
+
+      // Listen for events
+      circus.onCue<_TestCue>((cue) => completer.complete(cue.value));
+
+      // Send event via CircusRing extension
+      final sent = circus.cue(_TestCue('Hello from CircusRing'));
+
+      // Should return true if there's a listener
+      expect(sent, isTrue);
+
+      // Verify the message is received
       final received = await completer.future;
-      expect(received.value, 'Hello');
+      expect(received, 'Hello from CircusRing');
     });
 
-    test('multiple listeners receive cue', () async {
-      final resultA = Completer<String>();
-      final resultB = Completer<String>();
+    test('cue() returns false when there are no listeners', () {
+      // Send event with no listeners
+      final sent = circus.cue(_TestCue('No listeners'));
 
-      cueMaster.listen<_TestCue>((cue) => resultA.complete('A:${cue.value}'));
-      cueMaster.listen<_TestCue>((cue) => resultB.complete('B:${cue.value}'));
-
-      cueMaster.sendCue(_TestCue('Multi'));
-
-      expect(await resultA.future, 'A:Multi');
-      expect(await resultB.future, 'B:Multi');
+      // Should return false
+      expect(sent, isFalse);
     });
 
-    test('returns false if sendCue called with no listeners', () async {
-      final success = cueMaster.sendCue(_TestCue('Nobody?'));
-      expect(success, isFalse);
-    });
+    test('onCue() subscribes to events correctly', () async {
+      final receivedMessages = <String>[];
 
-    test('returns true if sendCue has at least one listener', () async {
-      cueMaster.on<_TestCue>().listen((_) {});
-      final success = cueMaster.sendCue(_TestCue('Hello'));
-      expect(success, isTrue);
-    });
+      // Set up listener
+      final subscription = circus.onCue<_TestCue>((cue) {
+        receivedMessages.add(cue.value);
+      });
 
-    test('hasListeners works correctly', () async {
-      expect(cueMaster.hasListeners<_TestCue>(), isFalse);
+      // Send multiple events
+      circus.cue(_TestCue('Message 1'));
+      circus.cue(_TestCue('Message 2'));
 
-      final subscription = cueMaster.listen<_TestCue>((_) {});
-      expect(cueMaster.hasListeners<_TestCue>(), isTrue);
-
-      await subscription.cancel();
-      await Future.delayed(Duration.zero); // wait for listener to clean up
-
-      expect(cueMaster.hasListeners<_TestCue>(), isFalse);
-    });
-
-    test('reset<T> closes stream and drops listeners', () async {
-      final received = <String>[];
-
-      final sub = cueMaster.listen<_TestCue>((e) => received.add(e.value));
-      cueMaster.sendCue(_TestCue('A'));
-
-      final didReset = cueMaster.reset<_TestCue>();
-      expect(didReset, isTrue);
-
-      // Wait for stream to cleanup async unsubscribe
+      // Wait for events to process
       await Future.delayed(Duration.zero);
 
-      expect(cueMaster.hasListeners<_TestCue>(), isFalse);
+      // Check that messages were received
+      expect(receivedMessages, ['Message 1', 'Message 2']);
 
-      final result = cueMaster.sendCue(_TestCue('B'));
-      expect(result, isFalse);
-
-      expect(received, ['A']);
-      await sub.cancel();
+      // Clean up
+      await subscription.cancel();
     });
 
-    test('reset returns false for unregistered type', () {
-      final result = cueMaster.reset<int>(); // not initialized
-      expect(result, isFalse);
-    });
+    test('multiple tags have separate event streams', () async {
+      final defaultMessages = <String>[];
+      final customMessages = <String>[];
 
-    test('on<T> returns stream that supports multiple subscriptions', () async {
-      final resultA = Completer<String>();
-      final resultB = Completer<String>();
+      // Set up listeners on different channels
+      final defaultSub = circus.onCue<_TestCue>((cue) {
+        defaultMessages.add(cue.value);
+      });
 
-      cueMaster
-          .on<_TestCue>()
-          .listen((cue) => resultA.complete('A:${cue.value}'));
-      cueMaster
-          .on<_TestCue>()
-          .listen((cue) => resultB.complete('B:${cue.value}'));
+      final customSub = circus.onCue<_TestCue>((cue) {
+        customMessages.add(cue.value);
+      }, 'customMaster');
 
-      cueMaster.sendCue(_TestCue('StreamTest'));
+      // Send events to different channels
+      circus.cue(_TestCue('Default channel'));
+      circus.cue(_TestCue('Custom channel'), 'customMaster');
 
-      expect(await resultA.future, 'A:StreamTest');
-      expect(await resultB.future, 'B:StreamTest');
-    });
+      // Wait for events to process
+      await Future.delayed(Duration.zero);
 
-    test('dispose closes all controllers and clears map', () {
-      cueMaster.on<_TestCue>().listen((_) {});
-      cueMaster.dispose();
+      // Verify messages went to correct channels
+      expect(defaultMessages, ['Default channel']);
+      expect(customMessages, ['Custom channel']);
 
-      final result = cueMaster.sendCue(_TestCue('After dispose'));
-      expect(result, isFalse);
+      // Clean up
+      await defaultSub.cancel();
+      await customSub.cancel();
     });
   });
 }

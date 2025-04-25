@@ -68,10 +68,11 @@ extension RingMasterExtension on CircusRing {
   /// e.g. Circus.hire(CustomCueMaster(), tag: 'customMaster') or
   /// Circus.ringMaster(tag: 'customMaster')
   CueMaster ringMaster([String tag = 'ringMaster']) {
-    if (!isHired<CueMaster>(tag)) {
-      hire(RingCueMaster(), tag: tag);
+    final master = tryFind<CueMaster>(tag);
+    if (master == null) {
+      return hire<CueMaster>(RingCueMaster(), tag: tag);
     }
-    return find<CueMaster>(tag);
+    return master;
   }
 
   /// Triggers a cue (typed signal) through the master.

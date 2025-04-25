@@ -1,3 +1,6 @@
+## [3.1.1]
+* Fix RingCueMaster regirestration issue
+
 ## [3.1.0]
 * Missing export for new Presenter features.
 
