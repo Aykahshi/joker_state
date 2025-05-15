@@ -1,4 +1,4 @@
-[![Chinese](https://img.shields.io/badge/Language-Chinese-blueviolet?style=for-the-badge)](README-zh.md)
+[![Chinese](https://img.shields.io/badge/Language-Chinese-blueviolet?style=for-the-badge)](https://github.com/Aykahshi/joker_state/blob/master/packages/circus_ring/README-zh.md)
 
 # 🎪 CircusRing
 
