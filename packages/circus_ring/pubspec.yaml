@@ -1,0 +1,17 @@
+name: circus_ring
+description: "CircusRing is a lightweight, dependency injection container for Flutter that brings the fun of the circus to your codebase with simple, flexible, and type-safe dependency management."
+version: 1.0.0
+homepage: https://github.com/Aykahshi/joker_state
+repository: https://github.com/Aykahshi/joker_state
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
