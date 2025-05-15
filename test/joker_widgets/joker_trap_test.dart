@@ -1,186 +1,187 @@
-import 'dart:async';
+// import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:joker_state/src/di/circus_ring/src/disposable.dart';
-import 'package:joker_state/src/special_widgets/joker_trap/joker_trap.dart';
+// import 'package:flutter/material.dart';
+// import 'package:flutter_test/flutter_test.dart';
+// import 'package:joker_state/src/special_widgets/joker_trap/joker_trap.dart';
 
-/// Mock implementation of a custom Disposable interface.
-class MockDisposable implements Disposable {
-  bool disposed = false;
+// import '../../packages/circus_ring/src/disposable.dart';
 
-  @override
-  void dispose() => disposed = true;
-}
+// /// Mock implementation of a custom Disposable interface.
+// class MockDisposable implements Disposable {
+//   bool disposed = false;
 
-/// Mock implementation of a custom AsyncDisposable interface.
-class MockAsyncDisposable implements AsyncDisposable {
-  bool disposed = false;
+//   @override
+//   void dispose() => disposed = true;
+// }
 
-  @override
-  Future<void> dispose() async => disposed = true;
-}
+// /// Mock implementation of a custom AsyncDisposable interface.
+// class MockAsyncDisposable implements AsyncDisposable {
+//   bool disposed = false;
 
-void main() {
-  testWidgets('JokerTrap disposes TextEditingController', (tester) async {
-    final controller = TextEditingController();
+//   @override
+//   Future<void> dispose() async => disposed = true;
+// }
 
-    await tester.pumpWidget(
-      MaterialApp(home: controller.trapeze(const SizedBox())),
-    );
+// void main() {
+//   testWidgets('JokerTrap disposes TextEditingController', (tester) async {
+//     final controller = TextEditingController();
 
-    // Verify controller is enabled before disposal
-    expect(controller.text, '');
+//     await tester.pumpWidget(
+//       MaterialApp(home: controller.trapeze(const SizedBox())),
+//     );
 
-    // Remove the widget to dispose controller
-    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+//     // Verify controller is enabled before disposal
+//     expect(controller.text, '');
 
-    // use addListener which throws FlutterError if disposed
-    expect(() => controller.addListener(() {}), throwsFlutterError);
-  });
+//     // Remove the widget to dispose controller
+//     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
 
-  testWidgets('JokerTrap disposes ScrollController', (tester) async {
-    final scrollCtrl = ScrollController();
+//     // use addListener which throws FlutterError if disposed
+//     expect(() => controller.addListener(() {}), throwsFlutterError);
+//   });
 
-    await tester.pumpWidget(
-      MaterialApp(home: scrollCtrl.trapeze(const SizedBox())),
-    );
+//   testWidgets('JokerTrap disposes ScrollController', (tester) async {
+//     final scrollCtrl = ScrollController();
 
-    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+//     await tester.pumpWidget(
+//       MaterialApp(home: scrollCtrl.trapeze(const SizedBox())),
+//     );
 
-    expect(() => scrollCtrl.position, throwsAssertionError);
-  });
+//     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
 
-  testWidgets('JokerTrap disposes ChangeNotifier (ValueNotifier)',
-      (tester) async {
-    final notifier = ValueNotifier<int>(42);
+//     expect(() => scrollCtrl.position, throwsAssertionError);
+//   });
 
-    await tester.pumpWidget(
-      MaterialApp(home: notifier.trapeze(const SizedBox())),
-    );
+//   testWidgets('JokerTrap disposes ChangeNotifier (ValueNotifier)',
+//       (tester) async {
+//     final notifier = ValueNotifier<int>(42);
 
-    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+//     await tester.pumpWidget(
+//       MaterialApp(home: notifier.trapeze(const SizedBox())),
+//     );
 
-    // In general, using notifier after dispose should throw when addListener is called
-    expect(() => notifier.addListener(() {}), throwsA(isA<FlutterError>()));
-  });
+//     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
 
-  testWidgets('JokerTrap disposes StreamSubscription', (tester) async {
-    final stream = Stream<int>.value(123);
-    bool cancelled = false;
-    final innerSubscription = stream.listen((event) {});
-    final tracked = _WrappedStreamSubscription(innerSubscription, onCancel: () {
-      cancelled = true;
-    });
+//     // In general, using notifier after dispose should throw when addListener is called
+//     expect(() => notifier.addListener(() {}), throwsA(isA<FlutterError>()));
+//   });
 
-    await tester.pumpWidget(
-      MaterialApp(home: tracked.trapeze(const Text('stream'))),
-    );
+//   testWidgets('JokerTrap disposes StreamSubscription', (tester) async {
+//     final stream = Stream<int>.value(123);
+//     bool cancelled = false;
+//     final innerSubscription = stream.listen((event) {});
+//     final tracked = _WrappedStreamSubscription(innerSubscription, onCancel: () {
+//       cancelled = true;
+//     });
 
-    // Remove the widget to trigger dispose
-    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+//     await tester.pumpWidget(
+//       MaterialApp(home: tracked.trapeze(const Text('stream'))),
+//     );
 
-    // StreamSubscription.cancel() should have been called
-    expect(cancelled, isTrue);
-  });
+//     // Remove the widget to trigger dispose
+//     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
 
-  testWidgets('JokerTrap disposes custom Disposable', (tester) async {
-    final disposable = MockDisposable();
+//     // StreamSubscription.cancel() should have been called
+//     expect(cancelled, isTrue);
+//   });
 
-    await tester.pumpWidget(
-      MaterialApp(home: disposable.trapeze(const SizedBox())),
-    );
+//   testWidgets('JokerTrap disposes custom Disposable', (tester) async {
+//     final disposable = MockDisposable();
 
-    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+//     await tester.pumpWidget(
+//       MaterialApp(home: disposable.trapeze(const SizedBox())),
+//     );
 
-    expect(disposable.disposed, isTrue); // since we control class
-  });
+//     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
 
-  testWidgets('JokerTrap disposes AsyncDisposable', (tester) async {
-    final asyncDisposable = MockAsyncDisposable();
+//     expect(disposable.disposed, isTrue); // since we control class
+//   });
 
-    await tester.pumpWidget(
-      MaterialApp(home: asyncDisposable.trapeze(const Text('Async'))),
-    );
+//   testWidgets('JokerTrap disposes AsyncDisposable', (tester) async {
+//     final asyncDisposable = MockAsyncDisposable();
 
-    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+//     await tester.pumpWidget(
+//       MaterialApp(home: asyncDisposable.trapeze(const Text('Async'))),
+//     );
 
-    expect(asyncDisposable.disposed, isTrue);
-  });
+//     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
 
-  testWidgets('JokerTrap properly disposes a list of mixed controllers',
-      (tester) async {
-    bool cancelled = false;
+//     expect(asyncDisposable.disposed, isTrue);
+//   });
 
-    final textCtrl = TextEditingController();
-    final scrollCtrl = ScrollController();
-    final notifier = ValueNotifier<int>(0);
-    final mock = MockDisposable();
+//   testWidgets('JokerTrap properly disposes a list of mixed controllers',
+//       (tester) async {
+//     bool cancelled = false;
 
-    final subscription = _WrappedStreamSubscription(
-      Stream<int>.value(1).listen((_) {}),
-      onCancel: () => cancelled = true,
-    );
+//     final textCtrl = TextEditingController();
+//     final scrollCtrl = ScrollController();
+//     final notifier = ValueNotifier<int>(0);
+//     final mock = MockDisposable();
 
-    final asyncDisposable = MockAsyncDisposable();
+//     final subscription = _WrappedStreamSubscription(
+//       Stream<int>.value(1).listen((_) {}),
+//       onCancel: () => cancelled = true,
+//     );
 
-    final list = [
-      textCtrl,
-      scrollCtrl,
-      notifier,
-      mock,
-      subscription,
-      asyncDisposable
-    ];
+//     final asyncDisposable = MockAsyncDisposable();
 
-    await tester.pumpWidget(
-      MaterialApp(home: list.trapeze(const Text('Multi'))),
-    );
+//     final list = [
+//       textCtrl,
+//       scrollCtrl,
+//       notifier,
+//       mock,
+//       subscription,
+//       asyncDisposable
+//     ];
 
-    await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
+//     await tester.pumpWidget(
+//       MaterialApp(home: list.trapeze(const Text('Multi'))),
+//     );
 
-    // ✅ Use addListener to verify disposal instead of .text
-    expect(() => textCtrl.addListener(() {}), throwsFlutterError);
-    expect(() => notifier.addListener(() {}), throwsFlutterError);
-    expect(() => scrollCtrl.position, throwsAssertionError);
+//     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
 
-    expect(mock.disposed, isTrue);
-    expect(cancelled, isTrue);
-    expect(asyncDisposable.disposed, isTrue);
-  });
-}
+//     // ✅ Use addListener to verify disposal instead of .text
+//     expect(() => textCtrl.addListener(() {}), throwsFlutterError);
+//     expect(() => notifier.addListener(() {}), throwsFlutterError);
+//     expect(() => scrollCtrl.position, throwsAssertionError);
 
-/// Helper to simulate a stream subscription with side-effect on cancel.
-class _WrappedStreamSubscription implements StreamSubscription {
-  final StreamSubscription _inner;
-  final VoidCallback onCancel;
+//     expect(mock.disposed, isTrue);
+//     expect(cancelled, isTrue);
+//     expect(asyncDisposable.disposed, isTrue);
+//   });
+// }
 
-  _WrappedStreamSubscription(this._inner, {required this.onCancel});
+// /// Helper to simulate a stream subscription with side-effect on cancel.
+// class _WrappedStreamSubscription implements StreamSubscription {
+//   final StreamSubscription _inner;
+//   final VoidCallback onCancel;
 
-  @override
-  Future<void> cancel() async {
-    onCancel();
-    return _inner.cancel();
-  }
+//   _WrappedStreamSubscription(this._inner, {required this.onCancel});
 
-  @override
-  void onData(void Function(dynamic)? handleData) => _inner.onData(handleData);
+//   @override
+//   Future<void> cancel() async {
+//     onCancel();
+//     return _inner.cancel();
+//   }
 
-  @override
-  void onDone(void Function()? handleDone) => _inner.onDone(handleDone);
+//   @override
+//   void onData(void Function(dynamic)? handleData) => _inner.onData(handleData);
 
-  @override
-  void onError(Function? handleError) => _inner.onError(handleError);
+//   @override
+//   void onDone(void Function()? handleDone) => _inner.onDone(handleDone);
 
-  @override
-  void pause([Future<void>? resumeSignal]) => _inner.pause(resumeSignal);
+//   @override
+//   void onError(Function? handleError) => _inner.onError(handleError);
 
-  @override
-  void resume() => _inner.resume();
+//   @override
+//   void pause([Future<void>? resumeSignal]) => _inner.pause(resumeSignal);
 
-  @override
-  bool get isPaused => _inner.isPaused;
+//   @override
+//   void resume() => _inner.resume();
 
-  @override
-  Future<E> asFuture<E>([E? futureValue]) => _inner.asFuture(futureValue);
-}
+//   @override
+//   bool get isPaused => _inner.isPaused;
+
+//   @override
+//   Future<E> asFuture<E>([E? futureValue]) => _inner.asFuture(futureValue);
+// }

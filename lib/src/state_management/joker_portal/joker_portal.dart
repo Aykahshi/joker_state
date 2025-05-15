@@ -50,6 +50,8 @@ import '../joker/joker.dart';
 /// // Accessing timer:
 /// // JokerPortal.of<int>(context, tag: 'timer')
 /// ```
+@Deprecated(
+    'Joker should be only used for local variables. And it is not recommended to use JokerPortal.')
 class JokerPortal<T> extends InheritedNotifier<Joker<T>> {
   /// An optional, unique tag used to differentiate `JokerPortal` instances
   /// with the same generic type `T` within the widget tree.

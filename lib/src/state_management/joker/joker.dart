@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../joker_exception.dart';
 
@@ -42,14 +42,6 @@ import '../joker_exception.dart';
 /// manualCounter.whisper(42);   // silently set state
 /// manualCounter.yell();        // manually notify
 /// ```
-///
-/// 🎪 With CircusRing dependency injection:
-///
-/// ```dart
-/// final counter = Circus.summon<int>(0, tag: 'counter');
-/// final retrieved = Circus.spotlight<int>(tag: 'counter');
-/// Circus.vanish<int>(tag: 'counter');
-/// ```
 class Joker<T> extends ChangeNotifier {
   /// Creates a Joker with the given [initialState].
   ///
@@ -68,6 +60,8 @@ class Joker<T> extends ChangeNotifier {
         _previousState = initialState;
 
   /// Optional global tag for Joker registration or debugging.
+  /// Jokers now should only be used for local variables.
+  @Deprecated('Joker is no longer CircusRing dependent')
   final String? tag;
 
   /// Controls whether [trick] and friends automatically call [notifyListeners].
@@ -99,8 +93,7 @@ class Joker<T> extends ChangeNotifier {
   @override
   void addListener(VoidCallback listener) {
     if (_isDisposed) {
-      throw JokerException(
-          'Cannot add listener to a disposed Joker (tag: $tag)');
+      throw JokerException('Cannot add listener to a disposed $runtimeType');
     }
     // Cancel any pending disposal microtask by resetting the flag
     _isDisposalScheduled = false;
@@ -124,8 +117,10 @@ class Joker<T> extends ChangeNotifier {
   void _scheduleDispose() {
     // Set flag first
     _isDisposalScheduled = true;
-    // Schedule microtask
-    Future.microtask(_disposeIfUnused);
+    // Wait for next frame to dispose
+    _engine.addPostFrameCallback((_) {
+      _disposeIfUnused();
+    });
   }
 
   // Disposes the Joker if it's still unused and disposal was scheduled.
@@ -158,8 +153,7 @@ class Joker<T> extends ChangeNotifier {
   /// Throws [JokerException] if called on a disposed Joker.
   void trick(T newState) {
     if (_isDisposed) {
-      throw JokerException(
-          'Cannot call trick() on a disposed Joker (tag: $tag)');
+      throw JokerException('Cannot call trick() on a disposed $runtimeType');
     }
     if (!autoNotify) {
       throw JokerException(
@@ -176,7 +170,7 @@ class Joker<T> extends ChangeNotifier {
   void trickWith(T Function(T currentState) performer) {
     if (_isDisposed) {
       throw JokerException(
-          'Cannot call trickWith() on a disposed Joker (tag: $tag)');
+          'Cannot call trickWith() on a disposed $runtimeType');
     }
     if (!autoNotify) {
       throw JokerException(
@@ -195,7 +189,7 @@ class Joker<T> extends ChangeNotifier {
   Future<void> trickAsync(Future<T> Function(T current) performer) async {
     if (_isDisposed) {
       throw JokerException(
-          'Cannot call trickAsync() on a disposed Joker (tag: $tag)');
+          'Cannot call trickAsync() on a disposed $runtimeType');
     }
     if (!autoNotify) {
       throw JokerException(
@@ -215,8 +209,7 @@ class Joker<T> extends ChangeNotifier {
   /// Throws [JokerException] if called on a disposed Joker.
   T whisper(T newState) {
     if (_isDisposed) {
-      throw JokerException(
-          'Cannot call whisper() on a disposed Joker (tag: $tag)');
+      throw JokerException('Cannot call whisper() on a disposed $runtimeType');
     }
     if (autoNotify) {
       throw JokerException('whisper() is not allowed in autoNotify mode.');
@@ -231,7 +224,7 @@ class Joker<T> extends ChangeNotifier {
   T whisperWith(T Function(T currentState) updater) {
     if (_isDisposed) {
       throw JokerException(
-          'Cannot call whisperWith() on a disposed Joker (tag: $tag)');
+          'Cannot call whisperWith() on a disposed $runtimeType');
     }
     if (autoNotify) {
       throw JokerException('whisperWith() is not allowed in autoNotify mode.');
@@ -267,8 +260,7 @@ class Joker<T> extends ChangeNotifier {
   /// Throws [JokerException] if called on a disposed Joker.
   JokerBatch<T> batch() {
     if (_isDisposed) {
-      throw JokerException(
-          'Cannot start batch on a disposed Joker (tag: $tag)');
+      throw JokerException('Cannot start batch on a disposed $runtimeType');
     }
     return JokerBatch<T>(this);
   }
@@ -291,7 +283,7 @@ class JokerBatch<T> {
   JokerBatch<T> apply(T Function(T state) updater) {
     if (_joker.isDisposed) {
       throw JokerException(
-          'Cannot apply batch update to a disposed Joker (tag: ${_joker.tag})');
+          'Cannot apply batch update to a disposed $runtimeType');
     }
     if (_isAutoNotify) {
       final newState = updater(_joker.state);
@@ -320,3 +312,5 @@ class JokerBatch<T> {
     }
   }
 }
+
+final _engine = WidgetsFlutterBinding.ensureInitialized();

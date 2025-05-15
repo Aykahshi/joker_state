@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 
-import '../../di/circus_ring/src/circus_ring.dart';
 import '../joker/joker.dart';
 
 /// Builder function for [JokerTroupe].

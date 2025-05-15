@@ -2,7 +2,8 @@
 
 # 🃏 JokerState
 
-**⚠️ v3.0.0 重大變更提醒：** `CircusRing` 對 `Joker`/`Presenter` 實例的銷毀邏輯已顯著改變。`keepAlive: false` 的實例現在會在被 `CircusRing` 移除時被銷毀。升級前請務必詳閱[變更日誌](CHANGELOG.md)和下方說明。
+**⚠️ v4.0.0 重大變更提醒：** 
+`CircusRing` 現在是獨立的 Package，不再專為 Joker 整合，請使用 [circus_ring](https://pub.dev/packages/circus_ring) 包。
 
 JokerState 是一套輕量級的 Flutter 響應式狀態管理工具，還直接整合了依賴注入。你只要用 `Joker` API 和幾個配套小部件，就能靈活管理狀態，樣板程式碼也很少。
 

@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../di/circus_ring/src/disposable.dart';
-
 /// A widget that safely handles the disposal of controllers when removed from the tree.
 class JokerTrap extends StatefulWidget {
   /// The child widget.
@@ -38,10 +36,6 @@ class _JokerTrapState extends State<JokerTrap> {
         controller.dispose();
       } else if (controller is StreamSubscription) {
         controller.cancel();
-      } else if (controller is Disposable) {
-        controller.dispose();
-      } else if (controller is AsyncDisposable) {
-        controller.dispose();
       }
     }
     super.dispose();

@@ -1,23 +1,27 @@
+import 'dart:developer';
+
 import 'package:flutter/widgets.dart';
 
-import '../joker/joker.dart';
+import 'presenter_interface.dart';
 
 /// Abstract base class providing a simple lifecycle (init -> ready -> done)
-/// on top of a Joker, designed for Flutter integration.
+/// on top of a PresenterInterface, designed for Flutter integration.
 ///
 /// Commonly used as a Controller or Presenter in UI patterns.
-abstract class Presenter<T> extends Joker<T> {
+abstract class Presenter<T> extends PresenterInterface<T> {
+  /// Optional tag for identification or debugging purposes
+  final String? tag;
+
   Presenter(
     super.initialState, {
+    this.tag = '',
+    super.keepAlive = false,
     super.autoNotify,
-    super.keepAlive,
-    super.tag,
   }) {
     try {
       onInit(); // Call initialization logic immediately.
     } catch (e, s) {
-      debugPrint(
-          '[Presenter] Error during onInit for ${tag ?? runtimeType}: $e\n$s');
+      _log('Error during onInit for ${tag ?? runtimeType}: $e\n$s');
     }
 
     // Schedule onReady after the first frame.
@@ -27,60 +31,53 @@ abstract class Presenter<T> extends Joker<T> {
       binding.addPostFrameCallback((_) {
         // Only call onReady if the instance hasn't been disposed in the meantime.
         if (!isDisposed) {
-          // Use the getter from Joker
+          // Use the getter from PresenterInterface
           try {
             onReady();
           } catch (e, s) {
-            debugPrint(
-                '[Presenter] Error during onReady for ${tag ?? runtimeType}: $e\n$s');
+            _log('Error during onReady for ${tag ?? runtimeType}: $e\n$s');
           }
         }
       });
     } catch (e, s) {
-      debugPrint(
-          '[Presenter] Error scheduling onReady for ${tag ?? runtimeType}: $e\n$s');
+      _log('Error scheduling onReady for ${tag ?? runtimeType}: $e\n$s');
     }
   }
 
   /// Called immediately after the Presenter instance is constructed.
   /// Ideal for basic setup and internal initializations.
-  @protected
-  @mustCallSuper
+  @override
   void onInit() {
-    debugPrint('[Presenter] onInit: ${tag ?? runtimeType}');
+    super.onInit();
+    _log('onInit: $runtimeType tag: $tag');
   }
 
   /// Called 1 frame after [onInit].
   /// Suitable for actions requiring the first frame to be built
   /// (e.g., showing dialogs, navigation, async calls based on initial UI).
-  @protected
-  @mustCallSuper
+  @override
   void onReady() {
-    debugPrint('[Presenter] onReady: ${tag ?? runtimeType}');
+    super.onReady();
+    _log('onReady: $runtimeType tag: $tag');
   }
 
   /// Called just before the Presenter instance is disposed.
   /// Use this for cleanup (canceling timers, closing streams, etc.).
-  @protected
-  @mustCallSuper
+  @override
   void onDone() {
-    debugPrint('[Presenter] onDone: ${tag ?? runtimeType}');
+    _log('onDone: $runtimeType tag: $tag');
+    super.onDone();
   }
 
-  /// Overrides Joker's dispose to incorporate the onDone lifecycle hook.
+  /// Overrides PresenterInterface's dispose method.
   @override
-  @mustCallSuper
   void dispose() {
-    // Use isDisposed getter from Joker base class
     if (!isDisposed) {
-      try {
-        onDone(); // Call the cleanup hook first.
-      } catch (e, s) {
-        debugPrint(
-            '[Presenter] Error during onDone for ${tag ?? runtimeType}: $e\n$s');
-      }
-      // Call Joker's dispose method (which handles _isDisposed flag and ChangeNotifier disposal)
       super.dispose();
     }
   }
+}
+
+void _log(String message) {
+  log('--- $message ---', name: 'Presenter');
 }

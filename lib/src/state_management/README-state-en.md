@@ -229,7 +229,7 @@ userPresenter.focusOn<String>(...);
 - **`keepAlive`**: Set `keepAlive: true` to prevent listener-based disposal. The instance remains until explicitly disposed or removed by CircusRing (see below).
 - **Manual disposal**: You can always call `joker.dispose()` or `presenter.dispose()` yourself.
 - **Widget integration**: Widgets like `JokerStage`, `JokerFrame` manage listeners. Removing the widget may trigger auto-disposal if `keepAlive` is false.
-- **CircusRing Interaction (v3.0.0+)**: When removing a `Joker` or `Presenter` via `Circus.fire*` or `Circus.vanish`, CircusRing **WILL** call `dispose()` on the instance **IF `keepAlive` is `false`**. If `keepAlive` is `true`, CircusRing only removes it from the registry, and you need to manage disposal manually.
+- **CircusRing Interaction (v4.0.0+)**: When removing a `Joker` or `Presenter` via `circus_ring.fire*` or `circus_ring.vanish`, CircusRing **WILL** call `dispose()` on the instance **IF `keepAlive` is `false`**. If `keepAlive` is `true`, CircusRing only removes it from the registry, and you need to manage disposal manually.
 
 ## 🧪 Best Practices
 

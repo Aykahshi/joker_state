@@ -8,4 +8,7 @@ export 'joker_portal/joker_portal.dart';
 export 'joker_stage/joker_stage.dart';
 export 'joker_troupe/joker_troupe.dart';
 export 'presenter/presenter.dart';
+export 'presenter/presenter_interface.dart';
+export 'presenter/presenter_life_cycle.dart';
 export 'presenter/presenterx.dart';
+export 'presenter_troupe/presenter_troupe.dart';

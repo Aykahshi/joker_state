@@ -5,6 +5,6 @@ class JokerException implements Exception {
 
   @override
   String toString() {
-    return 'JokerException: $message';
+    return '---[JokerException] -> $message---';
   }
 }

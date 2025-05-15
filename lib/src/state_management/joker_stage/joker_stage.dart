@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 
-import '../../di/circus_ring/circus_ring.dart';
 import '../joker/joker.dart';
 
 /// Builder function for [JokerStage].
@@ -57,7 +56,7 @@ class JokerStage<T> extends StatefulWidget {
   /// The [builder] receives the current state and should return a widget.
   /// If [autoDispose] is true, the Joker is removed from the [CircusRing] or disposed when unmounted.
   /// The `autoDispose` parameter is removed, as Joker now manages its own lifecycle.
-  const JokerStage({
+  const JokerStage._({
     super.key,
     required this.joker,
     required this.builder,
@@ -114,5 +113,45 @@ class _JokerStageState<T> extends State<JokerStage<T>> {
   @override
   Widget build(BuildContext context) {
     return widget.builder(context, _state);
+  }
+}
+
+/// Extension for Joker to easily create a [JokerStage] widget.
+///
+/// Provides a more fluent, builder-like API for creating [JokerStage]s
+/// without explicitly wrapping it in widget constructors.
+///
+/// This is ideal when you want the entire Joker state to trigger the rebuild.
+///
+/// Example:
+/// ```dart
+/// final counter = Joker<int>(0);
+///
+/// // Wrap with perform
+/// counter.perform(
+///   builder: (context, count) => Text('$count'),
+/// );
+/// ```
+///
+/// Note: The `autoDispose` parameter has been removed as Joker now manages
+/// its own lifecycle based on listeners and the `keepAlive` flag.
+extension JokerStageExtension<T> on Joker<T> {
+  /// Creates a [JokerStage] that watches the entire state changes of this Joker.
+  ///
+  /// The [builder] will be rebuilt whenever this Joker calls notifyListeners().
+  ///
+  /// [autoDispose]: Whether to automatically remove/dispose the Joker when the widget is removed.
+  /// The Joker now manages its own lifecycle. This parameter is removed.
+  ///
+  /// Returns a [JokerStage] widget.
+  JokerStage<T> perform({
+    Key? key,
+    required JokerStageBuilder<T> builder,
+  }) {
+    return JokerStage<T>._(
+      key: key,
+      joker: this,
+      builder: builder,
+    );
   }
 }

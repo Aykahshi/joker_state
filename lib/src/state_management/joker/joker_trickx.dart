@@ -1,94 +1,8 @@
+import 'package:circus_ring/circus_ring.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../di/circus_ring/src/circus_ring.dart';
-import '../../di/circus_ring/src/circus_ring_exception.dart';
-import '../joker_frame/joker_frame.dart';
-import '../joker_stage/joker_stage.dart';
 import '../joker_troupe/joker_troupe.dart';
 import 'joker.dart';
-
-/// Extension for Joker to easily create a [JokerStage] widget.
-///
-/// Provides a more fluent, builder-like API for creating [JokerStage]s
-/// without explicitly wrapping it in widget constructors.
-///
-/// This is ideal when you want the entire Joker state to trigger the rebuild.
-///
-/// Example:
-/// ```dart
-/// final counter = Joker<int>(0);
-///
-/// // Wrap with perform
-/// counter.perform(
-///   builder: (context, count) => Text('$count'),
-/// );
-/// ```
-///
-/// Note: The `autoDispose` parameter has been removed as Joker now manages
-/// its own lifecycle based on listeners and the `keepAlive` flag.
-extension JokerStageExtension<T> on Joker<T> {
-  /// Creates a [JokerStage] that watches the entire state changes of this Joker.
-  ///
-  /// The [builder] will be rebuilt whenever this Joker calls notifyListeners().
-  ///
-  /// [autoDispose]: Whether to automatically remove/dispose the Joker when the widget is removed.
-  /// The Joker now manages its own lifecycle. This parameter is removed.
-  ///
-  /// Returns a [JokerStage] widget.
-  JokerStage<T> perform({
-    Key? key,
-    required JokerStageBuilder<T> builder,
-  }) {
-    return JokerStage<T>(
-      key: key,
-      joker: this,
-      builder: builder,
-    );
-  }
-}
-
-/// Extension for Joker to easily create a [JokerFrame] widget.
-///
-/// Similar to [perform], but allows selective listening using a [selector]
-/// function. Only when the selector's return value changes (`==` comparison)
-/// will the widget rebuild.
-///
-/// Useful for optimizing UI updates.
-///
-/// Example:
-/// ```dart
-/// final userJoker = Joker<User>(User(name: 'Alice', age: 20));
-///
-/// userJoker.observe<String>(
-///   selector: (user) => user.name,
-///   builder: (context, name) => Text('Hi $name'),
-/// );
-/// ```
-///
-/// Note: The `autoDispose` parameter has been removed as Joker now manages
-/// its own lifecycle based on listeners and the `keepAlive` flag.
-extension JokerFrameExtension<T> on Joker<T> {
-  /// Creates a [JokerFrame] that focuses on a selected portion of the Joker state.
-  ///
-  /// [selector]: Function to extract the slice of state to observe.
-  /// [builder]: Function called when the selected value changes.
-  /// [autoDispose]: Whether to automatically dispose the Joker when removed.
-  /// The Joker now manages its own lifecycle. This parameter is removed.
-  ///
-  /// Returns a [JokerFrame] widget that only rebuilds when selector result changes.
-  JokerFrame<T, S> focusOn<S>({
-    Key? key,
-    required JokerFrameSelector<T, S> selector,
-    required JokerFrameBuilder<S> builder,
-  }) {
-    return JokerFrame<T, S>(
-      key: key,
-      joker: this,
-      selector: selector,
-      builder: builder,
-    );
-  }
-}
 
 /// Extension for List of Jokers to quickly create a [JokerTroupe] widget.
 ///
@@ -153,6 +67,8 @@ extension JokerTroupeExtension on List<Joker> {
 /// final counter = Circus.spotlight<int>(tag: 'counter');
 /// counter.trick(1);
 /// ```
+@Deprecated(
+    'CircusRing is split package now, and Joker should only be used for local variables.')
 extension JokerRingExtension on CircusRing {
   /// Registers a new auto-notify Joker in the [CircusRing].
   ///

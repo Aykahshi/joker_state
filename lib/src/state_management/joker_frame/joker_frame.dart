@@ -25,10 +25,9 @@ typedef JokerFrameSelector<T, S> = S Function(T state);
 ///
 /// Basic usage:
 /// ```dart
-/// Joker<UserData> userJoker = Joker(UserData(name: 'Alice', age: 20));
+/// final userJoker = Joker<UserData>(UserData(name: 'Alice', age: 20));
 ///
-/// JokerFrame<UserData, String>(
-///   joker: userJoker,
+/// userJoker.focusOn<String>(
 ///   selector: (user) => user.name,
 ///   builder: (context, name) => Text('User: $name'),
 /// );
@@ -44,22 +43,13 @@ typedef JokerFrameSelector<T, S> = S Function(T state);
 ///
 /// Use [autoDispose] to clean up the Joker automatically on removal.
 ///
-/// With CircusRing:
-/// ```dart
-/// final userJoker = Circus.spotlight<UserData>(tag: 'user');
-///
-/// JokerFrame<UserData, String>(
-///   joker: userJoker,
-///   selector: (user) => user.name,
-///   builder: (context, name) => Text('Hello $name'),
-/// );
 /// ```
 class JokerFrame<T, S> extends StatefulWidget {
   /// Creates a JokerFrame that only rebuilds when the selected value changes.
   ///
   /// The [selector] should return a derived value from the Joker state to watch.
   /// The [builder] will be run only when this selected value changes.
-  const JokerFrame({
+  const JokerFrame._({
     super.key,
     required this.joker,
     required this.selector,
@@ -112,5 +102,48 @@ class _JokerFrameState<T, S> extends State<JokerFrame<T, S>> {
   @override
   Widget build(BuildContext context) {
     return widget.builder(context, selected);
+  }
+}
+
+/// Extension for Joker to easily create a [JokerFrame] widget.
+///
+/// Similar to [perform], but allows selective listening using a [selector]
+/// function. Only when the selector's return value changes (`==` comparison)
+/// will the widget rebuild.
+///
+/// Useful for optimizing UI updates.
+///
+/// Example:
+/// ```dart
+/// final userJoker = Joker<User>(User(name: 'Alice', age: 20));
+///
+/// userJoker.observe<String>(
+///   selector: (user) => user.name,
+///   builder: (context, name) => Text('Hi $name'),
+/// );
+/// ```
+///
+/// Note: The `autoDispose` parameter has been removed as Joker now manages
+/// its own lifecycle based on listeners and the `keepAlive` flag.
+extension JokerFrameExtension<T> on Joker<T> {
+  /// Creates a [JokerFrame] that focuses on a selected portion of the Joker state.
+  ///
+  /// [selector]: Function to extract the slice of state to observe.
+  /// [builder]: Function called when the selected value changes.
+  /// [autoDispose]: Whether to automatically dispose the Joker when removed.
+  /// The Joker now manages its own lifecycle. This parameter is removed.
+  ///
+  /// Returns a [JokerFrame] widget that only rebuilds when selector result changes.
+  JokerFrame<T, S> focusOn<S>({
+    Key? key,
+    required JokerFrameSelector<T, S> selector,
+    required JokerFrameBuilder<S> builder,
+  }) {
+    return JokerFrame<T, S>._(
+      key: key,
+      joker: this,
+      selector: selector,
+      builder: builder,
+    );
   }
 }
