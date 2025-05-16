@@ -22,6 +22,8 @@ extension JokerListenerExtension<T> on Joker<T> {
   ///   print('[LOG] State changed: $prev -> $curr');
   /// });
   /// ```
+  @Deprecated(
+      'For complex state management, consider using a Presenter. This will be removed in a future version.')
   VoidCallback listen(JokerListener<T> listener) {
     return listenWhen(
       listener: listener,
@@ -43,14 +45,16 @@ extension JokerListenerExtension<T> on Joker<T> {
   ///   (prev, next) => next > (prev ?? 0),
   /// );
   /// ```
+  @Deprecated(
+      'For complex state management, consider using a Presenter. This will be removed in a future version.')
   VoidCallback listenWhen({
     required JokerListener<T> listener,
     JokerListenCondition<T>? shouldListen,
   }) {
-    T? previous = state;
+    T? previous = value;
 
     void callback() {
-      final current = state;
+      final current = value;
       if (shouldListen != null && shouldListen(previous, current)) {
         listener(previous, current);
       }

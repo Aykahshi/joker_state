@@ -29,25 +29,23 @@ void main() {
       expect(buildCalls, 1);
 
       // Unchanged selected value -> no rebuild
-      joker.trick(const UserModel(name: 'Dan', age: 41));
+      joker.value = const UserModel(name: 'Dan', age: 41);
       await tester.pump();
       expect(buildCalls, 1);
 
       // Changed selected value -> rebuild
-      joker.trick(const UserModel(name: 'Ed', age: 41));
+      joker.value = const UserModel(name: 'Ed', age: 41);
       await tester.pump();
       expect(find.text('Name: Ed'), findsOneWidget);
       expect(buildCalls, 2);
     });
 
-    testWidgets('Joker with keepAlive=false should dispose after frame removal',
+    testWidgets('Joker should dispose after frame removal and no other listeners exist',
         (tester) async {
       // Arrange
       final joker = Joker<UserModel>(
         const UserModel(name: 'DisposeMe', age: 0),
-        keepAlive: false,
       );
-      expect(joker.isDisposed, isFalse);
 
       final widget = joker.focusOn<String>(
         selector: (user) => user.name,
@@ -55,25 +53,25 @@ void main() {
       );
 
       await tester.pumpWidget(MaterialApp(home: widget));
-      expect(joker.isDisposed, isFalse);
 
       // Act: Remove widget
       await tester.pumpWidget(Container());
       await tester.pumpAndSettle(); // Wait for dispose timer
 
       // Assert: Joker should be disposed
-      expect(joker.isDisposed, isTrue);
+      expect(() => joker.value, throwsA(isA<JokerException>()));
+      expect(() => joker.addListener(() {}), throwsA(isA<JokerException>()));
     });
 
     testWidgets(
-        'Joker with keepAlive=true should NOT dispose after frame removal',
+        'Joker should NOT dispose after frame removal IF other listeners exist',
         (tester) async {
       // Arrange
       final joker = Joker<UserModel>(
         const UserModel(name: 'KeepMe', age: 0),
-        keepAlive: true,
       );
-      expect(joker.isDisposed, isFalse);
+      void myListener() {}
+      joker.addListener(myListener); // Add an external listener
 
       final widget = joker.focusOn<String>(
         selector: (user) => user.name,
@@ -81,17 +79,21 @@ void main() {
       );
 
       await tester.pumpWidget(MaterialApp(home: widget));
-      expect(joker.isDisposed, isFalse);
 
       // Act: Remove widget
       await tester.pumpWidget(Container());
       await tester.pumpAndSettle(); // Wait potential dispose time
 
-      // Assert: Joker should NOT be disposed
-      expect(joker.isDisposed, isFalse);
-      expect(() => joker.trick(const UserModel(name: 'Still Alive', age: 1)),
-          returnsNormally);
-      expect(joker.state.name, 'Still Alive');
+      // Assert: Joker should NOT be disposed because myListener still exists
+      expect(() => joker.value = const UserModel(name: 'Still Alive', age: 1), returnsNormally);
+      expect(joker.value.name, 'Still Alive');
+
+      // Clean up external listener
+      joker.removeListener(myListener);
+      // Now, Joker should dispose as JokerFrame (widget) and myListener are gone.
+      await tester.pumpAndSettle(); // Allow potential dispose to happen
+      expect(() => joker.value, throwsA(isA<JokerException>()));
+      expect(() => joker.addListener(() {}), throwsA(isA<JokerException>()));
     });
   });
 }

@@ -4,239 +4,87 @@ import 'package:flutter/widgets.dart';
 
 import '../joker_exception.dart';
 
-/// Joker - a reactive state container based on [ChangeNotifier].
+/// Joker - A simple, locally reactive state container with auto-dispose capabilities.
 ///
-/// A lightweight state management solution that wraps any Dart object as a reactive
-/// state unit. Joker supports two notification modes:
+/// Joker wraps a single value and notifies its listeners when the value changes.
+/// It automatically disposes itself when it no longer has any listeners,
+/// making it suitable for managing local, transient state within widgets or services.
 ///
-/// - autoNotify = true (default): automatically notifies listeners on change
-/// - autoNotify = false: changes occur silently and require manual [yell()]
+/// For more complex state management, involving multiple interdependent states,
+/// asynchronous operations with loading/error states, or business logic, consider
+/// using a `Presenter` or a more comprehensive state management solution.
 ///
-/// 🎯 Ideal for reactive UI patterns like Flutter widgets.
+/// 🎯 Ideal for simple reactive UI updates for local variables.
 ///
-/// Use with companion widgets like [JokerStage], [JokerFrame], and [JokerTroupe]
-/// for efficient UI updates.
-///
-/// Joker instances manage their own lifecycle based on listeners and the [keepAlive] flag.
-/// When the last listener is removed and [keepAlive] is false, the Joker will
-/// schedule itself for disposal after a short delay. Adding a listener before
-/// disposal cancels the process.
-///
-/// 🎮 Basic example (auto-notify mode):
+/// Example:
 ///
 /// ```dart
 /// final counter = Joker<int>(0);
 ///
-/// counter.trick(1);             // state = 1, auto notifies
-/// counter.trickWith((s) => s + 1); // state = 2
+/// print(counter.value); // Output: 0
 ///
-/// counter.batch()
-///   .apply((s) => s * 2)
-///   .commit();                  // state = 4, notifies once
-/// ```
+/// counter.addListener(() {
+///   print('Counter changed: ${counter.value}');
+/// });
 ///
-/// 🔇 Manual mode example:
+/// counter.value = 1; // Output: Counter changed: 1
+/// counter.value = 2; // Output: Counter changed: 2
 ///
-/// ```dart
-/// final manualCounter = Joker<int>(0, autoNotify: false);
-/// manualCounter.whisper(42);   // silently set state
-/// manualCounter.yell();        // manually notify
+/// // When all listeners are removed, Joker will automatically dispose itself.
 /// ```
 class Joker<T> extends ChangeNotifier {
   /// Creates a Joker with the given [initialState].
-  ///
-  /// If [autoNotify] is true, all mutations will auto-call [notifyListeners()].
-  ///
-  /// Optional [tag] may be used for identification in CircusRing or debugging.
-  ///
-  /// If [keepAlive] is true, the Joker will not be automatically disposed
-  /// when it has no listeners. Defaults to false.
-  Joker(
-    T initialState, {
-    this.autoNotify = true,
-    this.keepAlive = false,
-    this.tag,
-  })  : _state = initialState,
-        _previousState = initialState;
+  Joker(T initialState) : _value = initialState;
 
-  /// Optional global tag for Joker registration or debugging.
-  /// Jokers now should only be used for local variables.
-  final String? tag;
-
-  /// Controls whether [trick] and friends automatically call [notifyListeners].
-  final bool autoNotify;
-
-  /// If true, prevents the Joker from being auto-disposed when listeners drop to zero.
-  final bool keepAlive;
-
-  /// The current state.
-  T _state;
-
-  /// The previous state before the most recent update.
-  ///
-  /// Useful for comparison, undo, or transition analysis.
-  T? _previousState;
-
-  /// Returns the current state.
-  T get state => _state;
-
-  /// Returns the previous state.
-  T? get previousState => _previousState;
-
-  // Flag to track if dispose has been called explicitly or internally
+  T _value;
   bool _isDisposed = false;
 
-  // Flag to track if a microtask for disposal has been scheduled
-  bool _isDisposalScheduled = false;
+  /// Returns the current value.
+  T get value {
+    if (_isDisposed) {
+      throw JokerException('Cannot access value on a disposed $runtimeType');
+    }
+    return _value;
+  }
+
+  /// Sets the current value and notifies listeners if the new value is different.
+  ///
+  /// Throws [JokerException] if called on a disposed Joker.
+  set value(T newValue) {
+    if (_isDisposed) {
+      throw JokerException('Cannot set value on a disposed $runtimeType');
+    }
+    if (_value == newValue) return;
+    _value = newValue;
+    notifyListeners();
+  }
 
   @override
   void addListener(VoidCallback listener) {
     if (_isDisposed) {
       throw JokerException('Cannot add listener to a disposed $runtimeType');
     }
-    // Cancel any pending disposal microtask by resetting the flag
-    _isDisposalScheduled = false;
     super.addListener(listener);
   }
 
   @override
   void removeListener(VoidCallback listener) {
-    // Don't try to remove listener if already disposed
     if (_isDisposed) return;
 
     super.removeListener(listener);
 
-    // If no listeners left, not kept alive, and disposal not already scheduled
-    if (!hasListeners && !keepAlive && !_isDisposalScheduled) {
-      _scheduleDispose();
-    }
-  }
-
-  // Schedules disposal via a microtask.
-  void _scheduleDispose() {
-    // Set flag first
-    _isDisposalScheduled = true;
-    // Wait for next frame to dispose
-    _engine.addPostFrameCallback((_) {
-      _disposeIfUnused();
-    });
-  }
-
-  // Disposes the Joker if it's still unused and disposal was scheduled.
-  void _disposeIfUnused() {
-    // Only dispose if the microtask was scheduled and conditions still hold
-    if (_isDisposalScheduled && !hasListeners && !keepAlive && !_isDisposed) {
+    if (!hasListeners && !_isDisposed) {
       dispose();
     }
-    // Reset the flag regardless of whether dispose was called
-    _isDisposalScheduled = false;
   }
 
   @override
   void dispose() {
-    if (!_isDisposed) {
-      _isDisposed = true;
-      _isDisposalScheduled = false; // Ensure flag is reset on explicit dispose
-      super.dispose();
-    }
+    if (_isDisposed) return;
+    _isDisposed = true;
+    super.dispose();
   }
 
-  /// Returns true if the Joker has been disposed.
-  bool get isDisposed => _isDisposed;
-
-  // ----------------- Auto-notify APIs -----------------
-
-  /// Updates state and automatically calls [notifyListeners].
-  ///
-  /// Only usable in autoNotify mode.
-  /// Throws [JokerException] if called on a disposed Joker.
-  void trick(T newState) {
-    if (_isDisposed) {
-      throw JokerException('Cannot call trick() on a disposed $runtimeType');
-    }
-    if (!autoNotify) {
-      throw JokerException(
-        'trick() called on manual Joker. Use whisper() and yell() instead.',
-      );
-    }
-    _previousState = _state;
-    _state = newState;
-    notifyListeners();
-  }
-
-  /// Updates state using a transform function and notifies.
-  /// Throws [JokerException] if called on a disposed Joker.
-  void trickWith(T Function(T currentState) performer) {
-    if (_isDisposed) {
-      throw JokerException(
-          'Cannot call trickWith() on a disposed $runtimeType');
-    }
-    if (!autoNotify) {
-      throw JokerException(
-        'trickWith(): Use whisperWith() in manual mode.',
-      );
-    }
-    _previousState = _state;
-    _state = performer(_state);
-    notifyListeners();
-  }
-
-  /// Async version of [trickWith].
-  ///
-  /// Waits for value transformation then notifies listeners.
-  /// Throws [JokerException] if called on a disposed Joker.
-  Future<void> trickAsync(Future<T> Function(T current) performer) async {
-    if (_isDisposed) {
-      throw JokerException(
-          'Cannot call trickAsync() on a disposed $runtimeType');
-    }
-    if (!autoNotify) {
-      throw JokerException(
-        'trickAsync(): Use whisperWith() and yell() in manual mode.',
-      );
-    }
-    _previousState = _state;
-    _state = await performer(_state);
-    notifyListeners();
-  }
-
-  // ------------- Manual-notify APIs -------------
-
-  /// Updates state silently (no notify).
-  ///
-  /// Only usable when [autoNotify] is false.
-  /// Throws [JokerException] if called on a disposed Joker.
-  T whisper(T newState) {
-    if (_isDisposed) {
-      throw JokerException('Cannot call whisper() on a disposed $runtimeType');
-    }
-    if (autoNotify) {
-      throw JokerException('whisper() is not allowed in autoNotify mode.');
-    }
-    _previousState = _state;
-    _state = newState;
-    return _state;
-  }
-
-  /// Functor version of [whisper].
-  /// Throws [JokerException] if called on a disposed Joker.
-  T whisperWith(T Function(T currentState) updater) {
-    if (_isDisposed) {
-      throw JokerException(
-          'Cannot call whisperWith() on a disposed $runtimeType');
-    }
-    if (autoNotify) {
-      throw JokerException('whisperWith() is not allowed in autoNotify mode.');
-    }
-    _previousState = _state;
-    _state = updater(_state);
-    return _state;
-  }
-
-  /// Manually triggers all registered listeners.
-  ///
-  /// Used in manual mode after one or more silent updates ([whisper]).
-  /// Does nothing if the Joker is disposed.
   @override
   void notifyListeners() {
     if (!_isDisposed) {
@@ -244,72 +92,120 @@ class Joker<T> extends ChangeNotifier {
     }
   }
 
-  /// Alias for [notifyListeners] specific to manual mode clarity.
-  /// Does nothing if the Joker is disposed.
-  void yell() {
-    notifyListeners();
+  // --- Deprecated Methods ---
+  // The following methods are deprecated and will be removed in a future version.
+  // For simple state updates, use the `value` setter.
+  // For more complex scenarios, consider using a Presenter.
+
+  /// Deprecated: Optional global tag for Joker registration or debugging.
+  /// Jokers are now intended for local, auto-disposing variables.
+  @Deprecated('Tags are no longer supported as Jokers are for local state. Consider Presenter for tagged/global state. This will be removed in a future version.')
+  final String? tag = null; // ignore: deprecated_member_use_from_same_package
+
+  /// Deprecated: Controls whether mutations automatically call [notifyListeners].
+  /// Joker now always auto-notifies via the `value` setter.
+  @Deprecated('autoNotify is no longer supported. Joker always auto-notifies. Consider Presenter for manual control. This will be removed in a future version.')
+  final bool autoNotify = true; // ignore: deprecated_member_use_from_same_package
+
+  /// Deprecated: If true, prevents the Joker from being auto-disposed.
+  /// Joker now always auto-disposes when listeners drop to zero.
+  @Deprecated('keepAlive is no longer supported. Joker always auto-disposes. Consider Presenter if state needs to be explicitly kept alive. This will be removed in a future version.')
+  final bool keepAlive = false; // ignore: deprecated_member_use_from_same_package
+
+  /// Deprecated: Returns the current state. Use `value` instead.
+  @Deprecated('Use `value` getter instead. This will be removed in a future version.')
+  T get state => value;
+
+  /// Deprecated: Returns the previous state. This functionality is removed for simplicity.
+  /// Manage previous state externally if needed, or use a Presenter.
+  @Deprecated('Previous state tracking is removed. Manage externally or use Presenter. This will be removed in a future version.')
+  T? get previousState {
+    throw JokerException('previousState is removed. Manage externally or use Presenter.');
   }
 
-  /// Whether the state has changed since the previous update.
-  bool isDifferent() => _state != _previousState;
-
-  /// Begins a batch update session.
-  ///
-  /// Use [JokerBatch.commit] to notify once after multiple updates.
-  /// Throws [JokerException] if called on a disposed Joker.
-  JokerBatch<T> batch() {
+  /// Deprecated: Use `value = newValue` instead.
+  /// For complex scenarios, consider using a Presenter.
+  @Deprecated('Use `value = newValue` instead. For complex scenarios, consider Presenter. This will be removed in a future version.')
+  void trick(T newState) {
     if (_isDisposed) {
-      throw JokerException('Cannot start batch on a disposed $runtimeType');
+      throw JokerException('Cannot call trick() on a disposed $runtimeType');
     }
-    return JokerBatch<T>(this);
+    value = newState;
+  }
+
+  /// Deprecated: Use `value = performer(value)` instead.
+  /// For complex scenarios, consider using a Presenter.
+  @Deprecated('Use `value = performer(value)` instead. For complex scenarios, consider Presenter. This will be removed in a future version.')
+  void trickWith(T Function(T currentState) performer) {
+    if (_isDisposed) {
+      throw JokerException('Cannot call trickWith() on a disposed $runtimeType');
+    }
+    value = performer(value);
+  }
+
+  /// Deprecated: Use `value = await performer(value)` instead.
+  /// For complex scenarios, consider using a Presenter.
+  @Deprecated('Use `value = await performer(value)` instead. For complex scenarios, consider Presenter. This will be removed in a future version.')
+  Future<void> trickAsync(Future<T> Function(T current) performer) async {
+    if (_isDisposed) {
+      throw JokerException('Cannot call trickAsync() on a disposed $runtimeType');
+    }
+    value = await performer(value);
+  }
+
+  /// Deprecated: This method is removed. Joker now always notifies on change via `value` setter.
+  /// For complex non-notifying scenarios, consider using a Presenter.
+  @Deprecated('whisper() is removed. Use `value = newValue` (always notifies) or Presenter. This will be removed in a future version.')
+  T whisper(T newState) {
+    throw JokerException('whisper() is removed. Use `value = newValue` (always notifies) or Presenter for more complex needs.');
+  }
+
+  /// Deprecated: This method is removed. Joker now always notifies on change via `value` setter.
+  /// For complex non-notifying scenarios, consider using a Presenter.
+  @Deprecated('whisperWith() is removed. Use `value = updater(value)` (always notifies) or Presenter. This will be removed in a future version.')
+  T whisperWith(T Function(T currentState) updater) {
+    throw JokerException('whisperWith() is removed. Use `value = updater(value)` (always notifies) or Presenter for more complex needs.');
+  }
+
+  /// Deprecated: This method is removed. Joker now always notifies on change via `value` setter.
+  /// For complex manual notification scenarios, consider using a Presenter.
+  @Deprecated('yell() is removed. Joker auto-notifies via `value` setter. Consider Presenter for manual control. This will be removed in a future version.')
+  void yell() {
+    throw JokerException('yell() is removed. Joker auto-notifies. Consider Presenter for manual control.');
+  }
+
+  /// Deprecated: This functionality is removed due to removal of previousState.
+  /// Compare externally if needed, or use a Presenter.
+  @Deprecated('isDifferent() is removed. Compare externally or use Presenter. This will be removed in a future version.')
+  bool isDifferent() {
+    throw JokerException('isDifferent() is removed. Compare externally or use Presenter.');
+  }
+
+  /// Deprecated: Batch updates are removed. For complex scenarios requiring batching, use a Presenter.
+  @Deprecated('batch() and JokerBatch are removed. Use a Presenter for complex state management. This will be removed in a future version.')
+  JokerBatch<T> batch() {
+    throw JokerException('batch() and JokerBatch are removed. Use a Presenter for complex state management.');
   }
 }
 
-/// A batch update session for a [Joker].
-///
-/// Use [apply] multiple times to mutate state, and
-/// notify listeners once via [commit]. Use [discard] to undo changes.
+/// Deprecated: JokerBatch is removed. For complex scenarios requiring batch updates, use a Presenter.
+@Deprecated('JokerBatch is removed. Use a Presenter for complex state management. This will be removed in a future version.')
 class JokerBatch<T> {
-  final Joker<T> _joker;
-  final T _originalState;
-  final bool _isAutoNotify;
+  // This class is kept for backward compatibility to avoid breaking changes immediately,
+  // but its functionality is removed.
+  JokerBatch(dynamic joker) {
+    throw JokerException('JokerBatch is deprecated and non-functional. Use a Presenter for complex state management.');
+  }
 
-  JokerBatch(this._joker)
-      : _originalState = _joker.state,
-        _isAutoNotify = _joker.autoNotify;
-
-  /// Applies a field-level change to the Joker state.
   JokerBatch<T> apply(T Function(T state) updater) {
-    if (_joker.isDisposed) {
-      throw JokerException(
-          'Cannot apply batch update to a disposed $runtimeType');
-    }
-    if (_isAutoNotify) {
-      final newState = updater(_joker.state);
-      (_joker as dynamic)._state = newState;
-    } else {
-      _joker.whisperWith(updater);
-    }
-    return this;
+    throw JokerException('JokerBatch is deprecated and non-functional.');
   }
 
-  /// Commits and triggers force update if any change occurred.
   void commit() {
-    if (_joker.isDisposed) return; // Do nothing if disposed
-    if (_joker.state != _originalState) {
-      _joker.yell();
-    }
+    throw JokerException('JokerBatch is deprecated and non-functional.');
   }
 
-  /// Restores original snapshot and discards any changes.
   void discard() {
-    if (_joker.isDisposed) return; // Do nothing if disposed
-    if (_isAutoNotify) {
-      (_joker as dynamic)._state = _originalState;
-    } else {
-      _joker.whisper(_originalState);
-    }
+    throw JokerException('JokerBatch is deprecated and non-functional.');
   }
 }
-
-final _engine = WidgetsFlutterBinding.ensureInitialized();

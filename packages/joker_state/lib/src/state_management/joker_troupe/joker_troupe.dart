@@ -109,7 +109,7 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
 
   /// Initializes [_states] from current joker values.
   void _initStates() {
-    _states = List.from(widget.jokers.map((joker) => joker.state));
+    _states = List.from(widget.jokers.map((joker) => joker.value));
   }
 
   /// Adds listeners to all [Joker]s so we can detect changes and rebuild.
@@ -122,7 +122,7 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
         if (mounted) {
           setState(() {
             if (index < _states.length) {
-              _states[index] = joker.state;
+              _states[index] = joker.value;
             }
           });
         }

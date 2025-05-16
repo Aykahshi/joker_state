@@ -33,45 +33,54 @@ void main() {
       expect(find.text('42'), findsOneWidget);
 
       // Test reactivity
-      joker.trick(100);
+      joker.value = 100;
       await tester.pump();
       expect(find.text('100'), findsOneWidget);
     });
 
     testWidgets(
-        'perform() with Joker(keepAlive=false) should lead to disposal after removal',
+        'perform() with Joker should lead to disposal after removal if no other listeners',
         (WidgetTester tester) async {
-      // Arrange: Joker will auto-dispose
-      final joker = Joker<int>(42, keepAlive: false);
+      // Arrange: Joker will auto-dispose if no other listeners
+      final joker = Joker<int>(42);
       final stage = joker.perform(builder: (context, value) => Text('$value'));
 
       await pumpWidgetWithMaterial(tester, stage);
-      expect(joker.isDisposed, isFalse);
+      // Joker is listened to by JokerStage
 
-      // Act: Remove the widget (removes listener, schedules microtask)
+      // Act: Remove the widget (removes listener from JokerStage, then Joker)
       await tester.pumpWidget(Container());
-      await tester.pump(); // Pump once for microtask
+      await tester.pump(); // Pump once for microtask or synchronous dispose
 
       // Assert: Joker should be disposed
-      expect(joker.isDisposed, isTrue);
+      expect(() => joker.value, throwsA(isA<JokerException>()));
+      expect(() => joker.addListener(() {}), throwsA(isA<JokerException>()));
     });
 
     testWidgets(
-        'perform() with Joker(keepAlive=true) should NOT lead to disposal after removal',
+        'perform() with Joker should NOT lead to disposal after removal if other listeners exist',
         (WidgetTester tester) async {
-      // Arrange: Joker will NOT auto-dispose
-      final joker = Joker<int>(42, keepAlive: true);
+      // Arrange: Joker has an external listener
+      final joker = Joker<int>(42);
+      void myListener() {}
+      joker.addListener(myListener);
+
       final stage = joker.perform(builder: (context, value) => Text('$value'));
 
       await pumpWidgetWithMaterial(tester, stage);
-      expect(joker.isDisposed, isFalse);
 
-      // Act: Remove the widget
+      // Act: Remove the JokerStage widget
       await tester.pumpWidget(Container());
-      await tester.pump(); // Pump once
+      await tester.pump(); 
 
-      // Assert: Joker should NOT be disposed
-      expect(joker.isDisposed, isFalse);
+      // Assert: Joker should NOT be disposed due to myListener
+      expect(() => joker.value = 50, returnsNormally); // Should not throw
+      expect(joker.value, 50);
+
+      // Clean up
+      joker.removeListener(myListener);
+      await tester.pump(); // Allow disposal to occur
+      expect(() => joker.value, throwsA(isA<JokerException>()));
     });
   });
 
@@ -102,7 +111,7 @@ void main() {
       expect(find.text('Count: 0'), findsOneWidget);
 
       // Test reactivity (change tracked value)
-      joker.trick({'count': 1});
+      joker.value = {'count': 1};
       await tester.pump();
       expect(find.text('Count: 1'), findsOneWidget);
     });
@@ -123,73 +132,72 @@ void main() {
       );
 
       await pumpWidgetWithMaterial(tester, frame);
+      expect(buildCount, 1);
 
-      // Assert initial build
-      expect(find.text('Name: Alice'), findsOneWidget);
-      expect(buildCount, equals(1));
-
-      // Act: Change unrelated field ('age')
-      joker.trick({'name': 'Alice', 'age': 21});
+      // Change non-observed value (age) -> no rebuild
+      joker.value = {'name': 'Alice', 'age': 21};
       await tester.pump();
+      expect(buildCount, 1);
 
-      // Assert: Should not rebuild
-      expect(buildCount, equals(1));
-
-      // Act: Now change tracked field ('name')
-      joker.trick({'name': 'Bob', 'age': 21});
+      // Change observed value (name) -> rebuild
+      joker.value = {'name': 'Bob', 'age': 21};
       await tester.pump();
-
-      // Assert: Should rebuild
+      expect(buildCount, 2);
       expect(find.text('Name: Bob'), findsOneWidget);
-      expect(buildCount, equals(2));
     });
 
     testWidgets(
-        'observe() with Joker(keepAlive=false) should lead to disposal after removal',
+        'observe() with Joker should lead to disposal after removal if no other listeners',
         (WidgetTester tester) async {
-      // Arrange: Joker will auto-dispose
-      final joker =
-          Joker<Map<String, dynamic>>({'key': 'value'}, keepAlive: false);
+      // Arrange
+      final joker = Joker<Map<String, dynamic>>({'name': 'Test'});
       final frame = joker.focusOn<String>(
-        selector: (state) => state['key'] as String,
-        builder: (context, value) => Text(value),
+        selector: (state) => state['name'] as String,
+        builder: (context, name) => Text(name),
       );
 
       await pumpWidgetWithMaterial(tester, frame);
-      expect(joker.isDisposed, isFalse);
+      // Joker is listened to by JokerFrame
 
-      // Act: Remove widget (removes listener, schedules microtask)
+      // Act: Remove the widget
       await tester.pumpWidget(Container());
-      await tester.pump(); // Pump once for microtask
+      await tester.pump(); // Pump for dispose
 
       // Assert: Joker should be disposed
-      expect(joker.isDisposed, isTrue);
+      expect(() => joker.value, throwsA(isA<JokerException>()));
+      expect(() => joker.addListener(() {}), throwsA(isA<JokerException>()));
     });
 
     testWidgets(
-        'observe() with Joker(keepAlive=true) should NOT lead to disposal after removal',
+        'observe() with Joker should NOT lead to disposal after removal if other listeners exist',
         (WidgetTester tester) async {
-      // Arrange: Joker will NOT auto-dispose
-      final joker =
-          Joker<Map<String, dynamic>>({'key': 'value'}, keepAlive: true);
+      // Arrange
+      final joker = Joker<Map<String, dynamic>>({'name': 'Test'});
+      void myListener() {}
+      joker.addListener(myListener);
+
       final frame = joker.focusOn<String>(
-        selector: (state) => state['key'] as String,
-        builder: (context, value) => Text(value),
+        selector: (state) => state['name'] as String,
+        builder: (context, name) => Text(name),
       );
-
       await pumpWidgetWithMaterial(tester, frame);
-      expect(joker.isDisposed, isFalse);
 
-      // Act: Remove widget
+      // Act: Remove the JokerFrame widget
       await tester.pumpWidget(Container());
-      await tester.pump(); // Pump once
+      await tester.pump();
 
-      // Assert: Joker should NOT be disposed
-      expect(joker.isDisposed, isFalse);
+      // Assert: Joker should NOT be disposed due to myListener
+      expect(() => joker.value = {'name': 'NewName'}, returnsNormally);
+      expect(joker.value['name'], 'NewName');
+
+      // Clean up
+      joker.removeListener(myListener);
+      await tester.pump(); // Allow disposal
+      expect(() => joker.value, throwsA(isA<JokerException>()));
     });
   });
 
-  group('JokerTroupeExtension', () {
+  group('JokerTroupe Extension', () {
     testWidgets(
         'assemble() should create JokerTroupe observing multiple Jokers',
         (WidgetTester tester) async {
@@ -232,84 +240,34 @@ void main() {
       expect(find.text('Bool: true'), findsOneWidget);
 
       // Test reactivity
-      joker1.trick(20);
+      joker1.value = 20;
       await tester.pump();
       expect(find.text('Int: 20'), findsOneWidget);
-      joker2.trick('updated');
+      joker2.value = 'updated';
       await tester.pump();
       expect(find.text('String: updated'), findsOneWidget);
     });
 
-    testWidgets(
-        'assemble() with Jokers(keepAlive=false) should lead to disposal after removal',
+    testWidgets('assemble() should handle disposal of jokers correctly when troupe is removed',
         (WidgetTester tester) async {
-      // Arrange: Jokers will auto-dispose
-      final joker1 = Joker<int>(10, keepAlive: false);
-      final joker2 = Joker<String>('test', keepAlive: false);
-      final troupe = [joker1, joker2].assemble<(int, String)>(
+      // Arrange
+      final jokerA = Joker<int>(10);
+      final jokerB = Joker<String>('test');
+      final troupe = [jokerA, jokerB].assemble<(int, String)>(
         converter: (values) => (values[0] as int, values[1] as String),
         builder: (context, values) => Text('${values.$1}, ${values.$2}'),
       );
 
       await pumpWidgetWithMaterial(tester, troupe);
-      expect(joker1.isDisposed, isFalse);
-      expect(joker2.isDisposed, isFalse);
+      // Both jokers are listened to by JokerTroupe
 
-      // Act: Remove widget (removes listeners, schedules microtasks)
+      // Act: Remove widget (removes listeners from JokerTroupe, then from Jokers)
       await tester.pumpWidget(Container());
-      await tester.pump(); // Pump once for microtasks
+      await tester.pump(); // Pump for dispose
 
-      // Assert: Both Jokers should be disposed
-      expect(joker1.isDisposed, isTrue);
-      expect(joker2.isDisposed, isTrue);
-    });
-
-    testWidgets(
-        'assemble() with Jokers(keepAlive=true) should NOT lead to disposal after removal',
-        (WidgetTester tester) async {
-      // Arrange: Jokers will NOT auto-dispose
-      final joker1 = Joker<int>(10, keepAlive: true);
-      final joker2 = Joker<String>('test', keepAlive: true);
-      final troupe = [joker1, joker2].assemble<(int, String)>(
-        converter: (values) => (values[0] as int, values[1] as String),
-        builder: (context, values) => Text('${values.$1}, ${values.$2}'),
-      );
-
-      await pumpWidgetWithMaterial(tester, troupe);
-      expect(joker1.isDisposed, isFalse);
-      expect(joker2.isDisposed, isFalse);
-
-      // Act: Remove widget
-      await tester.pumpWidget(Container());
-      await tester.pump(); // Pump once
-
-      // Assert: Both Jokers should NOT be disposed
-      expect(joker1.isDisposed, isFalse);
-      expect(joker2.isDisposed, isFalse);
-    });
-
-    testWidgets(
-        'assemble() with mixed keepAlive Jokers behaves correctly after removal',
-        (WidgetTester tester) async {
-      // Arrange: One Joker will auto-dispose, the other won't
-      final disposeJoker = Joker<int>(10, keepAlive: false);
-      final keepJoker = Joker<String>('test', keepAlive: true);
-      final troupe = [disposeJoker, keepJoker].assemble<(int, String)>(
-        converter: (values) => (values[0] as int, values[1] as String),
-        builder: (context, values) => Text('${values.$1}, ${values.$2}'),
-      );
-
-      await pumpWidgetWithMaterial(tester, troupe);
-      expect(disposeJoker.isDisposed, isFalse);
-      expect(keepJoker.isDisposed, isFalse);
-
-      // Act: Remove widget (removes listeners, schedules microtask for one)
-      await tester.pumpWidget(Container());
-      await tester.pump(); // Pump once for microtask
-
-      // Assert: Only the non-keepAlive Joker should be disposed
-      expect(disposeJoker.isDisposed, isTrue);
-      expect(keepJoker.isDisposed, isFalse);
+      // Assert: Both Jokers should be disposed as JokerTroupe was their only listener
+      expect(() => jokerA.value, throwsA(isA<JokerException>()));
+      expect(() => jokerB.value, throwsA(isA<JokerException>()));
     });
 
     testWidgets('assemble() should handle complex Record types',
@@ -350,7 +308,7 @@ void main() {
       expect(find.text('User: John, 30'), findsOneWidget);
 
       // Test update
-      joker3.trick({'name': 'Jane', 'age': 25});
+      joker3.value = {'name': 'Jane', 'age': 25};
       await tester.pump();
       expect(find.text('User: Jane, 25'), findsOneWidget);
     });

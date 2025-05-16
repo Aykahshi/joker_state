@@ -2,7 +2,7 @@
 
 ### 建立 Joker 或 Presenter
 
-- JokerState 提供了簡潔的 `Joker` 容器，可以輕鬆掌握區域變數，實現精細的重建控制。
+- JokerState 提供了簡潔的 `Joker` 容器，可以輕鬆掌握區域變數就像 `Vue ref`。
 - `Presenter`。建立在 `BehaviorSubject` 之上，並加入了 `onInit`、`onReady`、`onDone` 這三大生命週期掛勾，讓你能輕鬆管理生命週期，也能簡單的實現 `Clean Architecture` 等架構。
 
 ```dart
@@ -18,12 +18,13 @@ class CounterPresenter extends Presenter<int> {
 }
 final counterPresenter = CounterPresenter();
 
-// 常見操作對兩者都適用:
-counterJoker.trick(1);
-counterPresenter.increment(); 
+// Joker直接使用 setter
+counterJoker.value = 1;
+
+// Presenter使用 trick
+counterPresenter.trick(1);
 
 // keepAlive 選項
-final persistentJoker = Joker<String>("data", keepAlive: true);
 final persistentPresenter = CounterPresenter(keepAlive: true);
 ```
 
@@ -50,18 +51,18 @@ userPresenter.focusOn<String>(
 
 ### 狀態怎麼改
 
-Joker 提供多種方法讓你更新狀態：
+Presenter 提供多種方法讓你更新狀態：
 
 ```dart
 // 自動通知（預設）
-counterJoker.trick(42);                      // 直接賦值
-counterJoker.trickWith((state) => state + 1); // 用函數轉換
-await counterJoker.trickAsync(fetchValue);    // 非同步更新
+counterPresenter.trick(42);                      // 直接賦值
+counterPresenter.trickWith((state) => state + 1); // 用函數轉換
+await counterPresenter.trickAsync(fetchValue);    // 非同步更新
 
 // 手動通知
-counterJoker.whisper(42);                     // 只改值不通知
-counterJoker.whisperWith((s) => s + 1);       // 靜默轉換
-counterJoker.yell();                          // 需要時再通知
+counterPresenter.whisper(42);                     // 只改值不通知
+counterPresenter.whisperWith((s) => s + 1);       // 靜默轉換
+counterPresenter.yell();                          // 需要時再通知
 ```
 
 ### 批次更新
@@ -174,17 +175,11 @@ PresenterTroupe<UserProfile>(
 不重建 UI 也能監聽狀態變化：
 
 ```dart
-// 監聽所有變化
-final cancel = counterJoker.listen((previous, current) {
-  print('計數從$previous變為$current');
-});
-
-// 條件監聽
-final cancel = counterJoker.listenWhen(
-  listener: (prev, curr) => print('計數增加了！'),
-  shouldListen: (prev, curr) => curr > (prev ?? 0),
-);
-
-// 不用時記得取消監聽
-cancel();
+// 監聽狀態變化執行副作用
+presenter.effect(
+  child: Container(),
+  effect: (s, _) => log.add('effect:${s.value}'),
+  runOnInit: false,
+  effectWhen: (prev, val) => (prev.value ~/ 5) != (val.value ~/ 5),
+)
 ```

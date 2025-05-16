@@ -81,7 +81,7 @@ class _JokerStageState<T> extends State<JokerStage<T>> {
   void _updateState() {
     if (mounted) {
       setState(() {
-        _state = widget.joker.state;
+        _state = widget.joker.value;
       });
     }
   }
@@ -89,7 +89,7 @@ class _JokerStageState<T> extends State<JokerStage<T>> {
   @override
   void initState() {
     super.initState();
-    _state = widget.joker.state;
+    _state = widget.joker.value;
     widget.joker.addListener(_updateState);
   }
 
@@ -98,7 +98,7 @@ class _JokerStageState<T> extends State<JokerStage<T>> {
     super.didUpdateWidget(oldWidget);
     if (widget.joker != oldWidget.joker) {
       oldWidget.joker.removeListener(_updateState);
-      _state = widget.joker.state;
+      _state = widget.joker.value;
       widget.joker.addListener(_updateState);
     }
   }

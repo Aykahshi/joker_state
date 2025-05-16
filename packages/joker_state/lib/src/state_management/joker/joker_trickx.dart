@@ -87,7 +87,7 @@ extension JokerRingExtension on CircusRing {
       return existingJoker;
     }
 
-    final joker = Joker<T>(initialValue, keepAlive: keepAlive, tag: tag);
+    final joker = Joker<T>(initialValue);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
   }
@@ -103,15 +103,17 @@ extension JokerRingExtension on CircusRing {
   Joker<T> recruit<T>(
     T initialValue, {
     required String tag,
-    bool keepAlive = false,
+    bool keepAlive = false, // keepAlive is no longer used by Joker
   }) {
     final existingJoker = trySpotlight<T>(tag: tag);
     if (existingJoker != null) {
       return existingJoker;
     }
 
-    final joker = Joker<T>(initialValue,
-        autoNotify: false, keepAlive: keepAlive, tag: tag);
+    // autoNotify: false is no longer supported by Joker constructor
+    // Joker now always auto-notifies. This method's original intent
+    // of creating a manual-notify Joker is no longer achievable with the new Joker.
+    final joker = Joker<T>(initialValue);
     hire<Joker<T>>(joker, tag: tag);
     return joker;
   }

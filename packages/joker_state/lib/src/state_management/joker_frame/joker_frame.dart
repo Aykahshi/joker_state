@@ -77,7 +77,7 @@ class _JokerFrameState<T, S> extends State<JokerFrame<T, S>> {
   /// Called by Joker when state changes. Updates the selected value
   /// and rebuilds if it changed.
   void _onChange() {
-    final newSelected = widget.selector(widget.joker.state);
+    final newSelected = widget.selector(widget.joker.value);
     if (newSelected != selected) {
       setState(() {
         selected = newSelected;
@@ -88,7 +88,7 @@ class _JokerFrameState<T, S> extends State<JokerFrame<T, S>> {
   @override
   void initState() {
     super.initState();
-    selected = widget.selector(widget.joker.state);
+    selected = widget.selector(widget.joker.value);
     widget.joker.addListener(_onChange);
   }
 

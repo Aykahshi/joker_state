@@ -3,24 +3,29 @@
 # 🃏 JokerState
 
 **⚠️ v4.0.0 重大變更提醒：** 
-`CircusRing` 現在是獨立的 Package，不再專為 Joker 整合，請使用 [circus_ring](https://pub.dev/packages/circus_ring) 包。
+- `CircusRing` 現在是獨立的 Package，雖在 JokerState 中仍然可用，但不再專為 Joker 提供整合擴展，請使用 [circus_ring](https://pub.dev/packages/circus_ring) 包。
+- `RingCueMaster` 現在藉助 `rx_dart`，提供更優秀的 Event bus 系統。
+- `JokerStage`, `JokerFrame` 建構子變為私有，請使用 `perform`, `focusOn` API。
+- `Presenter` 完全重構，現在基於 `BehaviorSubject` 而不是 `ChangeNotifier`，提供更靈活的狀態管理方式與更好的效能。
+- `JokerPortal`, `JokerCast` 已棄用，請使用 CircusRing API 結合 `Presenter` 實現無 `context` 的狀態管理。
+- `JokerReveal` 已棄用，請使用 Dart 原生的語言特性來實現條件渲染。
+- `JokerTrap` 已棄用，請使用 `Presenter` 的 `onDone`，或 `StatefulWidget` 的 `dispose` 方法來管理控制器。
 
-JokerState 是一套輕量級的 Flutter 響應式狀態管理工具，還直接整合了依賴注入。你只要用 `Joker` API 和幾個配套小部件，就能靈活管理狀態，樣板程式碼也很少。
+JokerState 是一套輕量級的 Flutter 響應式狀態管理工具，並整合了依賴注入 [circus_ring](https://pub.dev/packages/circus_ring)。
+只要用 `Joker`, `Presenter`, `CircusRing` API 就能靈活管理狀態，大量減少樣板程式碼。
 
 [![pub package](https://img.shields.io/pub/v/joker_state.svg)](https://pub.dev/packages/joker_state)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 特色
 
-- 🧠 **響應式狀態管理**：狀態一變，監聽器馬上收到通知。
-- 💉 **依賴注入**：用 CircusRing API，服務註冊和取得都很直覺。
-- 🎭 **小部件整合彈性高**：多種小部件，UI 怎麼變都能配合。
+- 🧠 **響應式狀態管理**：自動重建小部件，執行副作用。
+- 💉 **依賴注入**：用 CircusRing API，簡單搞定依賴注入。
 - 🪄 **選擇性重建**：你可以細緻控制哪些狀態變動會觸發 UI 重建。
 - 🔄 **批次更新**：多個狀態變更可以合併成一次通知。
 - 🏗️ **Record 支援**：用 Dart Records 組合多個狀態。
-- 🧩 **模組化設計**：只用你需要的功能，或整包一起用都行。
+- 🧩 **模組化設計**：只導入你需要的功能，或整包一起用都行。
 - 📢 **事件總線**：RingCueMaster 提供類型安全的事件系統。
-- 🎪 **特殊 Widgets**：像 JokerReveal、JokerTrap 這類實用小部件。
 - ⏱️ **時間控制**：防抖動、節流等時間控制工具。
 
 ## 快速開始
@@ -40,9 +45,9 @@ import 'package:joker_state/joker_state.dart';
 
 ## 核心概念
 
-### 🎭 Joker：響應式狀態容器
+### 🎭 Joker：局部響應式狀態容器
 
-`Joker<T>` 是一個繼承自 `ChangeNotifier` 的響應式狀態容器。它的生命週期主要靠監聽器和 `keepAlive` 參數來管理。
+`Joker<T>` 是一個繼承自 `ChangeNotifier` 的局部響應式狀態容器。它的生命週期主要靠監聽器和 `keepAlive` 參數來管理。
 
 ```dart
 // 建立一個 Joker，預設會自動通知
@@ -78,11 +83,11 @@ manualCounter.whisperWith((s) => s + 1);
 manualCounter.yell();
 ```
 
-**生命週期說明：** 預設 (`keepAlive: false`) 下，當最後一個監聽器被移除時，Joker 會用 microtask 自動安排銷毀。如果你又加回監聽器，銷毀會自動取消。若希望 Joker 一直存在，請設 `keepAlive: true`。CircusRing 的 `fire*` 方法現在也可能觸發銷毀（如果 `keepAlive` 為 false，見下文）。
+**生命週期說明：** 預設 (`keepAlive: false`) 下，當最後一個監聽器被移除時，Joker 會用 microtask 自動安排銷毀。如果你又加回監聽器，銷毀會自動取消。若希望 Joker 一直存在，請設 `keepAlive: true`。
 
-### ✨ Presenter：輕鬆打造 BLoC、MVC 或 MVVM 架構
+### ✨ Presenter
 
-想用更簡潔的方式搭建 BLoC、MVC 或 MVVM 架構嗎？`Presenter<T>` 繼承自 `Joker<T>`，並額外提供 `onInit`、`onReady`、`onDone` 三大生命週期掛勾，助你分層管理初始化、就緒與清理邏輯，專注核心功能，減少樣板程式碼。
+`Presenter<T>` 建立在 `BehaviorSubject<T>` 之上，並額外提供 `onInit`、`onReady`、`onDone` 生命週期掛勾，提供開發者輕鬆實現 BLoC、MVC、MVVM 模式。
 
 ```dart
 class MyCounterPresenter extends Presenter<int> {
@@ -109,29 +114,19 @@ myPresenter.dispose();
 
 ### 🎪 CircusRing：依賴注入
 
-CircusRing 是一個輕量級的依賴容器。
-
-**🚨 重要銷毀邏輯變更 (v3.0.0):**
-`CircusRing` 的 `fire*` 方法 (`fire`, `fireByTag`, `fireAll` 等) 現在會**主動銷毀**被移除的 `Joker` 和 `Presenter` 實例，**除非**它們的 `keepAlive` 屬性為 `true`。
+CircusRing 是一個輕量級的依賴容器，現已拆分為獨立的 [circus_ring](https://pub.dev/packages/circus_ring)，但在 JokerState 中仍然可用。
 
 ```dart
-// 全域單例存取器
-final ring = Circus;
-
 // 註冊標準 Disposable
-ring.hire(MyDisposableService());
+Circus.hire(MyDisposableService());
 
 // 註冊 Presenter (使用 hire)
 final presenter = MyPresenter(initialState, tag: 'myTag');
-ring.hire<MyPresenter>(presenter, tag: 'myTag');
-
-// 註冊 Joker (使用 summon, 需要 tag)
-Circus.summon<int>(0, tag: 'counter');
+Circus.hire<MyPresenter>(presenter, tag: 'myTag');
 
 // 取得實例
 final service = Circus.find<MyDisposableService>();
 final myPresenter = Circus.find<MyPresenter>(tag: 'myTag');
-final counter = Circus.spotlight<int>(tag: 'counter');
 
 // 移除實例:
 Circus.fire<MyDisposableService>(); // 會銷毀 service

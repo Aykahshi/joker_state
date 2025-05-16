@@ -46,7 +46,7 @@ void main() {
       expect(find.text('Count: 10'), findsOneWidget);
 
       // Update joker
-      joker.trick(20);
+      joker.value = 20;
       await tester.pump(); // Rebuild the widget
 
       // Assert
@@ -54,11 +54,11 @@ void main() {
     });
 
     testWidgets(
-        'Joker with keepAlive=false should dispose after stage is removed',
+        'Joker should dispose after stage is removed and no other listeners exist',
         (WidgetTester tester) async {
       // Arrange
-      final joker = Joker<int>(42, keepAlive: false);
-      expect(joker.isDisposed, isFalse);
+      final joker = Joker<int>(42);
+      // Initially, JokerStage will add a listener.
 
       // Act - build widget
       await tester.pumpWidget(
@@ -68,23 +68,25 @@ void main() {
           ),
         ),
       );
-      expect(joker.isDisposed, isFalse);
+      // At this point, JokerStage is listening.
 
-      // Remove widget - this schedules the dispose microtask
+      // Remove widget - this will trigger removeListener in JokerStage, then in Joker
       await tester.pumpWidget(Container());
-      // One pump should process the microtask
+      // One pump should process the dispose if it's synchronous or via a microtask
       await tester.pump();
 
       // Assert: Joker should now be disposed
-      expect(joker.isDisposed, isTrue);
+      expect(() => joker.value, throwsA(isA<JokerException>()));
+      expect(() => joker.addListener(() {}), throwsA(isA<JokerException>()));
     });
 
     testWidgets(
-        'Joker with keepAlive=true should NOT dispose after stage is removed',
+        'Joker should NOT dispose after stage is removed IF other listeners exist',
         (WidgetTester tester) async {
       // Arrange
-      final joker = Joker<int>(42, keepAlive: true);
-      expect(joker.isDisposed, isFalse);
+      final joker = Joker<int>(42);
+      void myListener() {}
+      joker.addListener(myListener); // Add an external listener
 
       // Act - build and then remove widget
       await tester.pumpWidget(
@@ -95,22 +97,30 @@ void main() {
         ),
       );
 
-      await tester.pumpWidget(Container()); // Remove widget
-      await tester
-          .pump(); // Pump once to be safe, although it shouldn't dispose
+      await tester.pumpWidget(Container()); // Remove JokerStage widget
+      await tester.pump(); 
 
-      // Assert
-      expect(joker.isDisposed, isFalse);
-      // Verify it still works
-      expect(() => joker.trick(100), returnsNormally);
-      expect(joker.state, 100);
+      // Assert: Joker should NOT be disposed because myListener still exists
+      expect(() => joker.value = 100, returnsNormally);
+      expect(joker.value, 100);
+
+      // Clean up external listener for other tests
+      joker.removeListener(myListener);
+      // Now, if no other listeners (like from other tests artifacts), it should dispose.
+      // We can verify this by trying to add a listener again.
+      // If it was the last listener, it's disposed.
+      // This part might be tricky if tests run in parallel or state leaks.
+      // For this specific test, we've shown it didn't dispose while myListener was active.
+      // To be absolutely sure it disposes *after* myListener is removed:
+      await tester.pump(); // Allow potential dispose to happen after removeListener
+      expect(() => joker.value, throwsA(isA<JokerException>()));
+
     });
 
-    testWidgets('should handle joker without tag correctly',
+    testWidgets('should handle joker correctly (auto-dispose scenario)',
         (WidgetTester tester) async {
-      // Arrange - joker without tag, keepAlive=false (default)
+      // Arrange - joker 
       final joker = Joker<String>('No tag');
-      expect(joker.isDisposed, isFalse);
 
       // Act - build and then remove
       await tester.pumpWidget(
@@ -127,14 +137,18 @@ void main() {
       await tester.pump(); // Pump once for microtask
 
       // Assert - Joker should be disposed automatically
-      expect(joker.isDisposed, isTrue);
+       expect(() => joker.value, throwsA(isA<JokerException>()));
+       expect(() => joker.addListener(() {}), throwsA(isA<JokerException>()));
     });
 
     testWidgets('should handle multiple stages with same joker',
         (WidgetTester tester) async {
       // Arrange - single joker used by multiple stages
-      final joker =
-          Joker<int>(10, keepAlive: true); // Use keepAlive for simplicity here
+      final joker = Joker<int>(10);
+      // Add an external listener to prevent disposal when one stage is removed
+      // This makes the test focus on multiple stages rather than auto-dispose.
+      void dummyListener() {}
+      joker.addListener(dummyListener); 
 
       // Act - build multiple stages
       await tester.pumpWidget(
@@ -157,7 +171,7 @@ void main() {
       expect(find.text('Second: 10'), findsOneWidget);
 
       // Update joker
-      joker.trick(20);
+      joker.value = 20;
       await tester.pump();
 
       // Both should update
@@ -179,46 +193,21 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Joker should not be disposed as one listener remains and keepAlive=true
-      expect(joker.isDisposed, isFalse);
+      // Joker should not be disposed as one listener (from perform) and dummyListener remain.
+      expect(() => joker.value, returnsNormally);
       expect(find.text('First: 20'), findsOneWidget);
 
       // Update again
-      joker.trick(30);
+      joker.value = 30;
       await tester.pump();
       expect(find.text('First: 30'), findsOneWidget);
-    });
 
-    testWidgets('should work correctly with manual jokers',
-        (WidgetTester tester) async {
-      // Arrange - manual joker (autoNotify=false)
-      final joker = Joker<int>(5, autoNotify: false);
-
-      // Act - build with manual joker
-      await tester.pumpWidget(
-        MaterialApp(
-          home: joker.perform(
-            builder: (context, value) => Text('Value: $value'),
-          ),
-        ),
-      );
-
-      // Initial state
-      expect(find.text('Value: 5'), findsOneWidget);
-
-      // Update without notification
-      joker.whisper(10);
+      // Clean up the dummy listener
+      joker.removeListener(dummyListener);
+      // Now remove the last stage an expect disposal
+      await tester.pumpWidget(Container());
       await tester.pump();
-
-      // Should not update yet
-      expect(find.text('Value: 5'), findsOneWidget);
-
-      // Now send notification
-      joker.yell();
-      await tester.pump();
-
-      // Should update now
-      expect(find.text('Value: 10'), findsOneWidget);
+      expect(() => joker.value, throwsA(isA<JokerException>()));
     });
   });
 }
