@@ -18,6 +18,7 @@ import 'package:flutter/widgets.dart';
 /// )
 /// ```
 ///
+@Deprecated('This widget is useless, just use Dart ternary operator instead.')
 class JokerReveal extends StatelessWidget {
   final bool condition;
   final WidgetBuilder? whenTrueBuilder;
@@ -55,6 +56,7 @@ class JokerReveal extends StatelessWidget {
 
 extension JokerRevealExtension on bool {
   /// Extension to select one of two widgets based on this boolean.
+  @Deprecated('This widget is useless, just use Dart ternary operator instead.')
   Widget reveal({
     Key? key,
     required Widget whenTrue,
@@ -68,6 +70,7 @@ extension JokerRevealExtension on bool {
     );
   }
 
+  @Deprecated('This widget is useless, just use Dart ternary operator instead.')
   Widget lazyReveal({
     Key? key,
     required WidgetBuilder whenTrueBuilder,

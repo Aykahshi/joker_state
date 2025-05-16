@@ -9,6 +9,6 @@ export 'joker_stage/joker_stage.dart';
 export 'joker_troupe/joker_troupe.dart';
 export 'presenter/presenter.dart';
 export 'presenter/presenter_interface.dart';
-export 'presenter/presenter_life_cycle.dart';
+export 'presenter/presenter_lifecycle.dart';
 export 'presenter/presenter_troupe.dart';
 export 'presenter/presenterx.dart';

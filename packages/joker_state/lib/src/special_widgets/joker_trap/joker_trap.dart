@@ -1,8 +1,11 @@
+// ignore_for_file: deprecated_member_use_from_same_package
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 /// A widget that safely handles the disposal of controllers when removed from the tree.
+@Deprecated('This widget is useless, handle dispose by Presenter\'s lifecycle')
 class JokerTrap extends StatefulWidget {
   /// The child widget.
   final Widget child;

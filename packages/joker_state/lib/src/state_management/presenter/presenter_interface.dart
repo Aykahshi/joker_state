@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart' show DeepCollectionEquality;
 import 'package:flutter/widgets.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -267,7 +268,8 @@ class PresenterBatch<T> {
   /// Commits and triggers force update if any change occurred.
   void commit() {
     if (_presenter.isDisposed) return; // Do nothing if disposed
-    if (_presenter.state != _originalState) {
+    final equality = DeepCollectionEquality();
+    if (!equality.equals(_presenter.state, _originalState)) {
       _presenter.yell();
     }
   }

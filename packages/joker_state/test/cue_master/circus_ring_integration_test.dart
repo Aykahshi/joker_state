@@ -79,15 +79,15 @@ void main() {
     test('disposeCueMaster should remove and dispose the CueMaster', () {
       final tag = 'disposable_bus_test';
       final bus = Circus.getCueMaster(tag: tag)
-          as RingCueMaster; // Cast for _isDisposed check
+          as RingCueMaster; // Cast for isDisposed check
 
       expect(Circus.isHired<CueMaster>(tag), isTrue);
-      expect((bus as dynamic)._isDisposed, isFalse);
+      expect(bus.isDisposed, isFalse);
 
       final success = Circus.disposeCueMaster(tag: tag);
       expect(success, isTrue);
       expect(Circus.isHired<CueMaster>(tag), isFalse);
-      expect((bus as dynamic)._isDisposed, isTrue,
+      expect(bus.isDisposed, isTrue,
           reason:
               "RingCueMaster's dispose should be called by CircusRing.fire");
     });
@@ -101,17 +101,14 @@ void main() {
       final busTagged =
           Circus.getCueMaster(tag: 'another_tagged') as RingCueMaster;
 
-      expect((busDefault as dynamic)._isDisposed, isFalse);
-      expect((busTagged as dynamic)._isDisposed, isFalse);
+      expect(busDefault.isDisposed, isFalse);
+      expect(busTagged.isDisposed, isFalse);
 
       await Circus.fireAll(); // This is the method being tested
 
-      expect((busDefault as dynamic)._isDisposed, isTrue);
-      expect((busTagged as dynamic)._isDisposed, isTrue);
-      expect(
-          Circus.isHired<CueMaster>(
-              (Circus as dynamic)._DEFAULT_RING_CUE_MASTER_TAG_INTERNAL),
-          isFalse); // Assuming you expose this const or have a way to check default
+      expect(busDefault.isDisposed, isTrue);
+      expect(busTagged.isDisposed, isTrue);
+      expect(Circus.isHired<CueMaster>(), isFalse);
       expect(Circus.isHired<CueMaster>('another_tagged'), isFalse);
     });
 
@@ -140,7 +137,7 @@ void main() {
           Circus.getCueMaster(tag: tag, allowReplace: true) as RingCueMaster;
 
       expect(newBus, isNot(same(oldBus)));
-      expect((oldBus as dynamic)._isDisposed, isTrue,
+      expect(oldBus.isDisposed, isTrue,
           reason:
               "Old instance should be disposed by hire's replacement logic");
       await expectLater(oldStreamDone.future, completes,
