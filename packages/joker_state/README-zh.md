@@ -6,12 +6,13 @@
 - `CircusRing` 現在是獨立的 Package，雖在 JokerState 中仍然可用，但不再專為 Joker 提供整合擴展，請使用 [circus_ring](https://pub.dev/packages/circus_ring) 包。
 - `RingCueMaster` 現在藉助 `rx_dart`，提供更優秀的 Event bus 系統。
 - `JokerStage`, `JokerFrame` 建構子變為私有，請使用 `perform`, `focusOn` API。
-- `Presenter` 完全重構，現在基於 `BehaviorSubject` 而不是 `ChangeNotifier`，提供更靈活的狀態管理方式與更好的效能。
+- 現在 `Joker`, `Presenter` 都基於 `RxInterface`，提供更靈活的狀態管理方式與更好的效能。
+- `RxInterface` 基於 `BehaviorSubject`，並在內部基於 `Timer`，提供更好的 autoDispose 處理。
 - `JokerPortal`, `JokerCast` 已棄用，請使用 CircusRing API 結合 `Presenter` 實現無 `context` 的狀態管理。
 - `JokerReveal` 已棄用，請使用 Dart 原生的語言特性來實現條件渲染。
 - `JokerTrap` 已棄用，請使用 `Presenter` 的 `onDone`，或 `StatefulWidget` 的 `dispose` 方法來管理控制器。
 
-JokerState 是一套輕量級的 Flutter 響應式狀態管理工具，並整合了依賴注入 [circus_ring](https://pub.dev/packages/circus_ring)。
+JokerState 是一套基於 `rx_dart` 的輕量級 Flutter 響應式狀態管理工具，並整合了依賴注入 [circus_ring](https://pub.dev/packages/circus_ring)。
 只要用 `Joker`, `Presenter`, `CircusRing` API 就能靈活管理狀態，大量減少樣板程式碼。
 
 [![pub package](https://img.shields.io/pub/v/joker_state.svg)](https://pub.dev/packages/joker_state)
@@ -116,35 +117,12 @@ myPresenter.dispose();
 
 CircusRing 是一個輕量級的依賴容器，現已拆分為獨立的 [circus_ring](https://pub.dev/packages/circus_ring)，但在 JokerState 中仍然可用。
 
-```dart
-// 註冊標準 Disposable
-Circus.hire(MyDisposableService());
 
-// 註冊 Presenter (使用 hire)
-final presenter = MyPresenter(initialState, tag: 'myTag');
-Circus.hire<MyPresenter>(presenter, tag: 'myTag');
-
-// 取得實例
-final service = Circus.find<MyDisposableService>();
-final myPresenter = Circus.find<MyPresenter>(tag: 'myTag');
-
-// 移除實例:
-Circus.fire<MyDisposableService>(); // 會銷毀 service
-
-// 移除 Joker, 如果 keepAlive 為 false, 則觸發 dispose()
-Circus.vanish<int>(tag: 'counter'); 
-
-// 移除 Presenter, 如果 keepAlive 為 false, 則觸發 dispose() (及 onDone())
-Circus.fire<MyPresenter>(tag: 'myTag'); 
-```
-
-### 🎭 UI 整合
+### 🎭 簡易的響應式 UI 整合
 
 JokerState 提供多種小部件，方便你把狀態和 UI 結合：
 
-#### JokerStage & Presenter.perform
-
-只要狀態有變，這個小部件就會重建。同時適用於 `Joker` 和 `Presenter`。
+#### 最簡單的使用方式
 
 ```dart
 // 使用 Joker
@@ -160,116 +138,7 @@ myPresenter.perform(
 )
 ```
 
-#### JokerFrame & Presenter.focusOn
-
-只針對狀態的某一部分重建。同時適用於 `Joker` 和 `Presenter`。
-
-```dart
-// 使用 Joker
-userJoker.focusOn<String>(
-  selector: (user) => user.name,
-  builder: (context, name) => Text('Name: $name'),
-)
-
-// 使用 Presenter
-final userPresenter = UserPresenter(...);
-userPresenter.focusOn<String>(
-  selector: (userProfile) => userProfile.name, 
-  builder: (context, name) => Text('Name: $name'),
-)
-```
-
-#### JokerTroupe
-
-用 Dart Records 組合多個 Joker 狀態：
-
-```dart
-final name = Joker<String>('Alice');
-final age = Joker<int>(30);
-final active = Joker<bool>(true);
-
-typedef UserRecord = (String name, int age, bool active);
-
-[name, age, active].assemble<UserRecord>(
-  converter: (values) => (values[0] as String, values[1] as int, values[2] as bool),
-  builder: (context, user) {
-    final (name, age, active) = user;
-    return Column(
-      children: [
-        Text('Name: $name'),
-        Text('Age: $age'),
-        Icon(active ? Icons.check : Icons.close),
-      ],
-    );
-  },
-)
-```
-
-#### JokerPortal 和 JokerCast
-
-讓 Joker 可以在小部件樹中被提供和取得。**如果是像 `int` 或 `String` 這種通用型別，記得用 `tag` 避免混淆。**
-
-```dart
-// 把 Joker 放進小部件樹
-JokerPortal<int>(
-  joker: counterJoker,
-  tag: 'counter', // tag 很重要！
-  child: MyApp(),
-)
-
-// 之後在任何子元件都能取得
-JokerCast<int>(
-  tag: 'counter', // 要用同一個 tag！
-  builder: (context, count) => Text('Count: $count'),
-)
-
-// 或用擴展直接取得
-Text('Count: ${context.joker<int>(tag: 'counter').state}')
-```
-
-### 🎪 特殊小部件
-
-#### JokerReveal
-
-根據布林值條件顯示不同小部件：
-
-```dart
-// 直接給元件
-JokerReveal(
-  condition: isLoggedIn,
-  whenTrue: ProfileScreen(),
-  whenFalse: LoginScreen(),
-)
-
-// 懶加載
-JokerReveal.lazy(
-  condition: isLoading,
-  whenTrueBuilder: (context) => LoadingIndicator(),
-  whenFalseBuilder: (context) => ContentView(),
-)
-
-// 或用擴展方法
-isLoggedIn.reveal(
-  whenTrue: ProfileScreen(),
-  whenFalse: LoginScreen(),
-)
-```
-
-#### JokerTrap
-
-小部件從樹上移除時，自動幫你釋放控制器：
-
-```dart
-// 一個控制器
-textController.trapeze(
-  TextField(controller: textController),
-)
-
-// 多個控制器
-[textController, scrollController, animationController].trapeze(
-  ComplexWidget(),
-)
-```
+更詳細的使用方式請見 [State Management](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/state_management/README-state-zh.md)。
 
 ### 📢 RingCueMaster：事件總線系統
 
@@ -291,11 +160,13 @@ final subscription = Circus.onCue<UserLoggedIn>((event) {
 });
 
 // 發送事件
-Circus.cue(UserLoggedIn(currentUser));
+Circus.sendCue(UserLoggedIn(currentUser));
 
 // 完成後取消訂閱
 subscription.cancel();
 ```
+
+更詳細的使用方式請見 [Event Bus](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/event_bus/README-event-bus-zh.md)。
 
 ### ⏱️ CueGate：時間控制
 
@@ -343,109 +214,25 @@ class _SearchViewState extends State<SearchView> with CueGateMixin {
 }
 ```
 
+更詳細的使用方式請見 [Timing Controls](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/timing_control/README-gate-zh.md)。
+
 ## 進階功能
 
 ### 🔄 副作用
 
-監聽狀態變化的副作用：
+監聽狀態變化並執行副作用：
 
 ```dart
-// 監聽所有變化
-final cancel = counter.listen((previous, current) {
-  print('Changed from $previous to $current');
-});
+final counter = Joker<int>(0);
 
-// 有條件監聽
-counter.listenWhen(
-  listener: (prev, curr) => showToast('Milestone reached!'), 
-  shouldListen: (prev, curr) => curr > 100 && (prev ?? 0) <= 100,
+counter.effect(
+  child: Container(),
+  effect: (context, state) {
+    print('State changed: $state');
+  },
+  runOnInit: true,
+  effectWhen: (prev, val) => (prev!.value ~/ 5) != (val.value ~/ 5),
 );
-
-// 完成後取消
-cancel();
-```
-
-### 💉 CircusRing 依賴關係
-
-建立依賴關係：
-
-```dart
-// 記錄 UserRepository 依賴於 ApiService
-Circus.bindDependency<UserRepository, ApiService>();
-
-// 現在當 UserRepository 註冊時，ApiService 不能被移除
-```
-
-### 🧹 資源管理
-
-- **Joker/Presenter 生命周期**: 主要由監聽器和 `keepAlive` 標誌管理。
-- **CircusRing 銷毀**: `CircusRing` 的 `fire*` 方法現在會**觸發**被移除的 `Joker`/`Presenter` 實例的 `dispose()` 方法，*前提是* `keepAlive` 為 `false`。
-- **手動清理**: 對於 `keepAlive: true` 的 Jokers/Presenters，或者不由 CircusRing 或 JokerTrap 管理的其他資源，**始終需要手動呼叫 `dispose()`**。
-
-```dart
-// KeepAlive 範例
-final persistentPresenter = MyPresenter(..., keepAlive: true);
-// ... 使用 presenter ...
-Circus.fire<MyPresenter>(tag: 'myTag'); // 從 CircusRing 移除, 不會觸發銷毀
-persistentPresenter.dispose(); // 需要手動銷毀!
-
-// 普通 Disposable 範例
-Circus.hire(MyDisposableService());
-// ... 使用 service ...
-Circus.fire<MyDisposableService>(); // Service 會被 fire() 銷毀
-
-// 預設 Joker 範例 (keepAlive: false)
-final tempJoker = Circus.summon<int>(0, tag: 'temp');
-// ... 使用 joker ...
-Circus.vanish<int>(tag: 'temp'); // 從 Ring 移除並觸發銷毀()
-```
-
-## 範例
-
-完整的計數器範例：
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:joker_state/joker_state.dart';
-
-void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    // 直接註冊 Joker 並獲取實例
-    final counter = Circus.summon<int>(tag: 'counter');
-    
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: Text('JokerState Demo')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('You have pushed the button this many times:'),
-              // 只有當狀態變化時才重建
-              counter.perform(
-                builder: (context, count) => Text(
-                  '$count',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-              ),
-            ],
-          ),
-        ),
-        floatingActionButton: FloatingActionButton(
-          // 更新狀態
-          onPressed: () => counter.trickWith((state) => state + 1),
-          tooltip: 'Increment',
-          child: Icon(Icons.add),
-        ),
-      ),
-    );
-  }
-}
 ```
 
 ## 附加資訊

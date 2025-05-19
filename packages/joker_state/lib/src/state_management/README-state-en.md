@@ -37,6 +37,9 @@ counterPresenter.trick(1);
 
 // keepAlive option (for Presenter)
 final persistentPresenter = CounterPresenter(keepAlive: true);
+
+// autoNotify option (for Presenter)
+final manualPresenter = CounterPresenter(autoNotify: false);
 ```
 
 ### Using Joker/Presenter in Flutter
@@ -66,14 +69,14 @@ userPresenter.focusOn<String>(
 
 ```dart
 // Auto notification (default)
-counterPresenter.trick(42);                      // Direct assignment
+counterPresenter.trick(42);                       // Direct assignment
 counterPresenter.trickWith((state) => state + 1); // Function transform
 await counterPresenter.trickAsync(fetchValue);    // Async update
 
 // Manual notification
-counterPresenter.whisper(42);                     // Change value silently
-counterPresenter.whisperWith((s) => s + 1);       // Silent transform
-counterPresenter.yell();                          // Notify when needed
+manualPresenter.whisper(42);                     // Change value silently
+manualPresenter.whisperWith((s) => s + 1);       // Silent transform
+manualPresenter.yell();                          // Notify when needed
 ```
 
 ### Batch Updates
@@ -124,6 +127,20 @@ userJoker.focusOn<String>(
 userPresenter.focusOn<String>(
   selector: (userProfile) => userProfile.name, // Assuming userProfile has a name property
   builder: (context, name) => Text('Name: $name'),
+);
+```
+
+### Presenter.focusOnMulti
+
+Observe multiple parts of the state to avoid unnecessary rebuilds:
+
+```dart
+userPresenter.focusOnMulti(
+  selectors: [
+    (userProfile) => userProfile.name, 
+    (userProfile) => userProfile.age, 
+  ],
+  builder: (context, [name, age]) => Text('Name: $name, Age: $age'),
 );
 ```
 
@@ -201,14 +218,15 @@ You can react to state changes to perform side effects without rebuilding the UI
 // (Assuming 'presenter' is an instance of a Presenter and 'log' is available)
 presenter.effect(
   child: Container(), // Child widget, often not directly dependent on this effect
-  effect: (stateSnapshot, context) { // stateSnapshot contains the current state
-    log.add('effect:${stateSnapshot.value}');
+  effect: (context, state) { // stateSnapshot contains the current state
+    print('effect:${state.value}');
     // Perform side effects here, e.g., show a snackbar, navigate, etc.
   },
   runOnInit: false, // Whether to run the effect when the widget is first built
-  effectWhen: (previousStateSnapshot, currentStateSnapshot) {
+  effectWhen: (prev, curr) {
     // Condition to run the effect
     // Example: run effect only if value divided by 5 changes category
-    return (previousStateSnapshot.value ~/ 5) != (currentStateSnapshot.value ~/ 5);
+    return (prev.value ~/ 5) != (curr.value ~/ 5);
   },
 );
+```

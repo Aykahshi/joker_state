@@ -9,12 +9,11 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    // You can get a Joker and register it in CircusRing by just call Circus.summon()
-    final counter = Circus.summon<int>(tag: 'counter');
-    
+    final counter = Joker<int>(0);
+
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(title: Text('JokerState Demo')),
+        appBar: AppBar(title: Text('JokerState Counter Demo')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -22,17 +21,14 @@ class MyApp extends StatelessWidget {
               Text('You have pushed the button this many times:'),
               // Rebuild only when the state changes
               counter.perform(
-                builder: (context, count) => Text(
-                  '$count',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
+                builder: (context, count) => Text('$count'),
               ),
             ],
           ),
         ),
         floatingActionButton: FloatingActionButton(
           // Update the state
-          onPressed: () => counter.trickWith((state) => state + 1),
+          onPressed: () => counter.state += 1,
           tooltip: 'Increment',
           child: Icon(Icons.add),
         ),

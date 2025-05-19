@@ -1,9 +1,8 @@
 ## 🎪 基本用法
 
 ### 建立 Joker 或 Presenter
-
-- JokerState 提供了簡潔的 `Joker` 容器，可以輕鬆掌握區域變數就像 `Vue ref`。
-- `Presenter`。建立在 `BehaviorSubject` 之上，並加入了 `onInit`、`onReady`、`onDone` 這三大生命週期掛勾，讓你能輕鬆管理生命週期，也能簡單的實現 `Clean Architecture` 等架構。
+- JokerState 提供了簡潔的 `Joker` 容器，並實作了 `Listenable` 接口，讓你可以在 Flutter 中輕鬆使用。
+- `Presenter`。建立在 `RxInterface` 之上，並加入了 `onInit`、`onReady`、`onDone` 這三大生命週期掛勾，讓你能輕鬆管理生命週期，也能簡單的實現 `Clean Architecture` 等架構。
 
 ```dart
 // 最簡單的計數器狀態 (Joker)
@@ -19,13 +18,16 @@ class CounterPresenter extends Presenter<int> {
 final counterPresenter = CounterPresenter();
 
 // Joker直接使用 setter
-counterJoker.value = 1;
+counterJoker.state = 1;
 
 // Presenter使用 trick
 counterPresenter.trick(1);
 
 // keepAlive 選項
 final persistentPresenter = CounterPresenter(keepAlive: true);
+
+// autoNotify 選項
+final manualPresenter = CounterPresenter(autoNotify: false);
 ```
 
 ### 在 Flutter 裡用 Joker/Presenter
@@ -55,14 +57,14 @@ Presenter 提供多種方法讓你更新狀態：
 
 ```dart
 // 自動通知（預設）
-counterPresenter.trick(42);                      // 直接賦值
+counterPresenter.trick(42);                       // 直接賦值
 counterPresenter.trickWith((state) => state + 1); // 用函數轉換
 await counterPresenter.trickAsync(fetchValue);    // 非同步更新
 
 // 手動通知
-counterPresenter.whisper(42);                     // 只改值不通知
-counterPresenter.whisperWith((s) => s + 1);       // 靜默轉換
-counterPresenter.yell();                          // 需要時再通知
+manualPresenter.whisper(42);                     // 只改值不通知
+manualPresenter.whisperWith((s) => s + 1);       // 靜默轉換
+manualPresenter.yell();                          // 需要時再通知
 ```
 
 ### 批次更新
@@ -108,6 +110,20 @@ userPresenter.focusOn<String>(
   selector: (userProfile) => userProfile.name,
   builder: (context, name) => Text('姓名: $name'),
 )
+```
+
+### Presenter.focusOnMulti
+
+觀察多個狀態的多個部分，避免不必要的重建：
+
+```dart
+userPresenter.focusOnMulti(
+  selectors: [
+    (userProfile) => userProfile.name, 
+    (userProfile) => userProfile.age, 
+  ],
+  builder: (context, [name, age]) => Text('Name: $name, Age: $age'),
+);
 ```
 
 ### JokerTroupe / PresenterTroupe
@@ -177,9 +193,15 @@ PresenterTroupe<UserProfile>(
 ```dart
 // 監聽狀態變化執行副作用
 presenter.effect(
-  child: Container(),
-  effect: (s, _) => log.add('effect:${s.value}'),
-  runOnInit: false,
-  effectWhen: (prev, val) => (prev.value ~/ 5) != (val.value ~/ 5),
-)
+  child: Container(), // 子小部件
+  effect: (context, state) { // 當狀態變化時執行的副作用
+    print('effect:${state.value}');
+    // 例如：顯示 snackbar，導航等
+  },
+  runOnInit: false, // 是否在小部件首次構建時運行效果
+  effectWhen: (prev, curr) {
+    // 是否在狀態變化時運行效果
+    return (prev.value ~/ 5) != (curr.value ~/ 5);
+  },
+);
 ```
