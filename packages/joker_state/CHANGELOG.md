@@ -2,14 +2,14 @@
 
 **BREAKING CHANGES**
 
-* `Joker` is now a simple, locally reactive state container with auto-dispose capabilities, for complex state management, consider using a `Presenter`.
-* `CircusRing` is now a standalone package. While still usable in JokerState, it no longer provides Joker-specific integrations. Please use the [circus_ring](https://pub.dev/packages/circus_ring) package.
-* RingCueMaster now leverages `rx_dart`, offering a superior Event bus system.
-* The constructors for `JokerStage` and `JokerFrame` are now private. Please use the `perform` and `focusOn` APIs.
-* `Presenter` has been completely refactored. It is now based on `BehaviorSubject` instead of `ChangeNotifier`, providing more flexible state management and better performance.
-* `JokerPortal` and `JokerCast` are deprecated. Please use the CircusRing API combined with `Presenter` for context-free state management.
-* `JokerReveal` is deprecated. Please use native Dart language features for conditional rendering.
-* `JokerTrap` is deprecated. Please use the `onDone` method of `Presenter`, or the `dispose` method of `StatefulWidget` to manage controllers.
+* `CircusRing` is now a standalone package. While still usable in JokerState, it no longer provides Joker-specific integration. Please use [circus_ring](https://pub.dev/packages/circus_ring).
+* `RingCueMaster` now leverages `rx_dart` for a more robust Event Bus system.
+* `JokerStage` and `JokerFrame` constructors are now private. Please use the `perform` and `focusOn` APIs instead.
+* Both `Joker` and `Presenter` are now based on `RxInterface`, providing more flexible and efficient state management.
+* `RxInterface` is built on `BehaviorSubject` and internally uses `Timer` for improved autoDispose handling.
+* `JokerPortal` and `JokerCast` are deprecated. For non-context state management, use CircusRing API with `Presenter`.
+* `JokerReveal` is deprecated. Use Dart's native language features for conditional rendering.
+* `JokerTrap` is deprecated. Use `Presenter`'s `onDone` or `StatefulWidget`'s `dispose` for controller management.
 
 ## [3.1.1]
 * Fix RingCueMaster regirestration issue
