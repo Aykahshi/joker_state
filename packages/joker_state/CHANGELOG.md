@@ -1,3 +1,9 @@
+## [4.1.0]
+* Make Joker support keepAlive flag again.
+* Make Joker support whisper/batch API again.
+* Make Joker support debug tag again.
+* Add Joker debug log in constructor/dispose.
+
 ## [4.0.0]
 
 **BREAKING CHANGES**

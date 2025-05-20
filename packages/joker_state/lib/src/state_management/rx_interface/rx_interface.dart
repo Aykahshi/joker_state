@@ -24,6 +24,9 @@ abstract class RxInterface<T> with LifeCycleMixin {
   /// If true, prevents auto-disposal when listeners drop to zero
   final bool keepAlive;
 
+  /// If true, auto notify listeners when state changes
+  final bool autoNotify;
+
   /// Timer for auto-disposal
   Timer? _disposeTimer;
 
@@ -36,6 +39,7 @@ abstract class RxInterface<T> with LifeCycleMixin {
   RxInterface(
     T initialState, {
     this.keepAlive = false,
+    this.autoNotify = true,
     this.autoDisposeDelay,
   }) : _state = initialState {
     _subject = BehaviorSubject<T>.seeded(
@@ -101,7 +105,7 @@ abstract class RxInterface<T> with LifeCycleMixin {
       throw JokerException('Cannot update state on a disposed $runtimeType');
     }
     _state = newValue;
-    _subject.add(_state);
+    if (autoNotify) _subject.add(_state);
   }
 
   /// Returns whether this instance has been disposed

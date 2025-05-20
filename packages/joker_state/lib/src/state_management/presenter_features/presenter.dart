@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:developer';
 
-import 'package:collection/collection.dart' show DeepCollectionEquality;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../../joker_state.dart';
+import '../rx_interface/rx_batch.dart';
 
 final _engine = WidgetsFlutterBinding.ensureInitialized();
 
@@ -20,24 +20,13 @@ final _engine = WidgetsFlutterBinding.ensureInitialized();
 /// - Lifecycle callbacks (onInit, onReady, onDone)
 /// - Optional manual notification mode
 abstract class Presenter<T> extends RxInterface<T> {
-  /// Optional tag for identification or debugging purposes
-  final String? tag;
-
-  /// Optional flag to enable debug logging
-  final bool enableDebugLog;
-
-  /// Previous state value
-  T? _previousState;
-
-  /// Controls whether to automatically notify listeners
-  final bool autoNotify;
-
   Presenter(
     super.initialState, {
     this.tag,
     this.enableDebugLog = kDebugMode,
+    super.autoDisposeDelay,
     super.keepAlive = false,
-    this.autoNotify = true,
+    super.autoNotify = true,
   }) {
     _previousState = state;
     _safeCall(this, onInit, 'onInit');
@@ -52,6 +41,15 @@ abstract class Presenter<T> extends RxInterface<T> {
       }
     });
   }
+
+  /// Optional tag for identification or debugging purposes
+  final String? tag;
+
+  /// Optional flag to enable debug logging
+  final bool enableDebugLog;
+
+  /// Previous state value
+  T? _previousState;
 
   /// Called immediately after the Presenter instance is constructed.
   /// Ideal for basic setup and internal initializations.
@@ -161,7 +159,7 @@ abstract class Presenter<T> extends RxInterface<T> {
       throw JokerException('whisper() is not allowed in autoNotify mode.');
     }
     _previousState = state;
-    (this as dynamic)._state = newState;
+    state = newState;
     return state;
   }
 
@@ -176,25 +174,26 @@ abstract class Presenter<T> extends RxInterface<T> {
       throw JokerException('whisperWith() is not allowed in autoNotify mode.');
     }
     _previousState = state;
-    (this as dynamic)._state = updater(state);
+    state = updater(state);
     return state;
   }
 
   /// Alias for notifyListeners, for clarity in manual mode
   /// Does nothing if the Presenter is already disposed
-  void yell() {
-    notifyListeners();
-  }
+  void yell() => notifyListeners();
 
   /// Starts a batch update session
   ///
-  /// Use [PresenterBatch.commit] to notify once after multiple updates
+  /// Use [RxBatch.commit] to notify once after multiple updates
   /// Throws [JokerException] if the Presenter is already disposed
-  PresenterBatch<T> batch() {
+  RxBatch<T> batch() {
     if (isDisposed) {
       throw JokerException('Cannot start batch on a disposed $runtimeType');
     }
-    return PresenterBatch<T>(this);
+    if (autoNotify) {
+      throw JokerException('batch() is not allowed in autoNotify mode.');
+    }
+    return RxBatch<T>(this);
   }
 }
 
@@ -209,53 +208,5 @@ void _safeCall(
     callback();
   } catch (e) {
     _log('Error during $methodName in ${presenter.runtimeType}');
-  }
-}
-
-/// Batch update session for Presenter
-///
-/// Use [apply] to change state multiple times, then [commit] to notify listeners once
-/// Use [discard] to cancel all changes
-class PresenterBatch<T> {
-  final Presenter<T> _presenter;
-  final T _originalState;
-  final bool _isAutoNotify;
-
-  PresenterBatch(this._presenter)
-      : _originalState = _presenter.state,
-        _isAutoNotify = _presenter.autoNotify;
-
-  /// Applies field-level state changes
-  PresenterBatch<T> apply(T Function(T state) updater) {
-    if (_presenter.isDisposed) {
-      throw JokerException(
-          'Cannot apply batch update to a disposed $runtimeType');
-    }
-    if (_isAutoNotify) {
-      final newState = updater(_presenter.state);
-      (_presenter as dynamic)._state = newState;
-    } else {
-      _presenter.whisperWith(updater);
-    }
-    return this;
-  }
-
-  /// Commits and triggers update if there are changes
-  void commit() {
-    if (_presenter.isDisposed) return; // 若已釋放則不執行任何操作
-    final equality = DeepCollectionEquality();
-    if (!equality.equals(_presenter.state, _originalState)) {
-      _presenter.yell();
-    }
-  }
-
-  /// Restores the original snapshot and discards all changes
-  void discard() {
-    if (_presenter.isDisposed) return; // 若已釋放則不執行任何操作
-    if (_isAutoNotify) {
-      (_presenter as dynamic)._state = _originalState;
-    } else {
-      _presenter.whisper(_originalState);
-    }
   }
 }

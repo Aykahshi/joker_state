@@ -48,7 +48,7 @@ import 'package:joker_state/joker_state.dart';
 
 ### 🎭 Joker: Local Reactive State Container
 
-`Joker<T>` is a local reactive state container extending `ChangeNotifier`. Its lifecycle is managed by listeners and the `keepAlive` flag.
+`Joker<T>` is based on `RxInterface` and provides a local reactive state container. Its lifecycle is mainly managed by listeners and the `keepAlive` parameter, while providing a `whisper` API for manual control and a `batch` API for batch updates.
 
 ```dart
 // Create a Joker (auto-notifies by default)
@@ -60,35 +60,13 @@ counter.trick(1);
 // Update using a function
 counter.trickWith((current) => current + 1);
 
-// Batch multiple updates, notify once
-counter.batch()
-  .apply((s) => s * 2)
-  .apply((s) => s + 10)
-  .commit();
-
-// Persistent Joker (remains alive even without listeners)
-final persistentState = Joker<String>("initial", keepAlive: true);
+// Or simply
+counter.state = 1;
 ```
-
-For manual notification mode:
-
-```dart
-// Create with autoNotify off
-final manualCounter = Joker<int>(0, autoNotify: false);
-
-// Silent updates
-manualCounter.whisper(5);
-manualCounter.whisperWith((s) => s + 1);
-
-// Notify listeners when ready
-manualCounter.yell();
-```
-
-**Lifecycle:** By default (`keepAlive: false`), Joker schedules itself for disposal (via microtask) when its last listener is removed. Adding a listener cancels disposal. Set `keepAlive: true` to keep it alive until manually disposed.
 
 ### ✨ Presenter
 
-`Presenter<T>` is built on `BehaviorSubject<T>` and provides `onInit`, `onReady`, and `onDone` lifecycle hooks—perfect for BLoC, MVC, or MVVM patterns.
+`Presenter<T>` is an advanced version of Joker. Based on the additional `onInit`, `onReady`, and `onDone` lifecycle hooks, it provides developers with more sophisticated operations and can easily implement BLoC, MVC, and MVVM patterns.
 
 ```dart
 class MyCounterPresenter extends Presenter<int> {
@@ -162,9 +140,6 @@ final subscription = Circus.onCue<UserLoggedIn>((event) {
 
 // Send event
 Circus.sendCue(UserLoggedIn(currentUser));
-
-// Cancel subscription when done
-subscription.cancel();
 ```
 
 For more details, see [Event Bus](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/event_bus/README-event-bus-en.md).

@@ -48,7 +48,7 @@ import 'package:joker_state/joker_state.dart';
 
 ### 🎭 Joker：局部響應式狀態容器
 
-`Joker<T>` 是一個繼承自 `ChangeNotifier` 的局部響應式狀態容器。它的生命週期主要靠監聽器和 `keepAlive` 參數來管理。
+`Joker<T>` 基於 `RxInterface` ，提供局部響應式狀態容器。它的生命週期主要靠監聽器和 `keepAlive` 參數來管理，同時提供 `whisper` API 用於手動控制， 以及 `batch` API 用於批次更新。
 
 ```dart
 // 建立一個 Joker，預設會自動通知
@@ -60,35 +60,13 @@ counter.trick(1);
 // 用函數轉換更新
 counter.trickWith((current) => current + 1);
 
-// 批次處理多個更新，只通知一次
-counter.batch()
-  .apply((s) => s * 2)
-  .apply((s) => s + 10)
-  .commit();
-
-// 建立一個即使沒監聽器也會持續存在的 Joker
-final persistentState = Joker<String>("initial", keepAlive: true);
+// 或是更簡單的
+counter.state = 1;
 ```
-
-如果你想自己控制通知時機，可以用手動通知模式：
-
-```dart
-// 建立時關閉自動通知
-final manualCounter = Joker<int>(0, autoNotify: false);
-
-// 靜默更新
-manualCounter.whisper(5);
-manualCounter.whisperWith((s) => s + 1);
-
-// 準備好時再手動通知監聽器
-manualCounter.yell();
-```
-
-**生命週期說明：** 預設 (`keepAlive: false`) 下，當最後一個監聽器被移除時，Joker 會用 microtask 自動安排銷毀。如果你又加回監聽器，銷毀會自動取消。若希望 Joker 一直存在，請設 `keepAlive: true`。
 
 ### ✨ Presenter
 
-`Presenter<T>` 建立在 `BehaviorSubject<T>` 之上，並額外提供 `onInit`、`onReady`、`onDone` 生命週期掛勾，提供開發者輕鬆實現 BLoC、MVC、MVVM 模式。
+`Presenter<T>` 是 Joker 的進階版本，基於額外提供 `onInit`、`onReady`、`onDone` 生命週期掛勾，提供開發者更精細的操作並能輕鬆實現 BLoC、MVC、MVVM 模式。
 
 ```dart
 class MyCounterPresenter extends Presenter<int> {
@@ -161,9 +139,6 @@ final subscription = Circus.onCue<UserLoggedIn>((event) {
 
 // 發送事件
 Circus.sendCue(UserLoggedIn(currentUser));
-
-// 完成後取消訂閱
-subscription.cancel();
 ```
 
 更詳細的使用方式請見 [Event Bus](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/event_bus/README-event-bus-zh.md)。
