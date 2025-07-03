@@ -113,26 +113,25 @@ onPressed: () {
 當您需要在 Widget Tree 外部（例如在 `Presenter` 或服務層中）存取依賴項時，可以直接使用 `CircusRing`。這遵循了服務定位器（Service Locator）模式。
 
 1.  **Hire (註冊) 依賴項**：
-    通常在您的 `main.dart` 中，於應用程式運行前完成。
+    你可以在任何想使用的地方註冊！
 
     ```dart
-    // 註冊一個 ApiService 的單例實例
-    CircusRing.hire<ApiService>(singleton: ApiService());
+    // 註冊一個 CounterPresnter 的單例實例
+    Circus.hire(CounterPresnter());
     ```
 
 2.  **Find (定位) 依賴項**：
     在應用程式的任何地方存取該實例，無需 `BuildContext`。
 
     ```dart
-    class AuthPresenter extends Presenter<AuthState> {
-      // 找到依賴項
-      final _apiService = CircusRing.find<ApiService>();
+    final counter = Circus.find<CounterPresnter>();
 
-      Future<void> login(String user, String pass) async {
-        final result = await _apiService.login(user, pass);
-        // ... 更新狀態
-      }
-    }
+    // 使用該實例
+    Button(
+      onPressed: () {
+        counter.increment();
+      },
+    )
     ```
 
 ### 將狀態綁定到小部件

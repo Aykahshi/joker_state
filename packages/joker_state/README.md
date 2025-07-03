@@ -126,11 +126,11 @@ For accessing dependencies from outside the widget tree (e.g., in a service or a
 
 ```dart
 // 1. Register a dependency (e.g., in main.dart)
-CircusRing.hire<ApiService>(singleton: ApiService());
+Circus.hire<ApiService>(ApiService());
 
 // 2. Find the dependency anywhere, without BuildContext
 class AuthPresenter extends Presenter<AuthState> {
-  final _apiService = CircusRing.find<ApiService>();
+  final _apiService = Circus.find<ApiService>();
 
   Future<void> login(String user, String pass) async {
     final result = await _apiService.login(user, pass);

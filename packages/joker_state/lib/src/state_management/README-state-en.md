@@ -113,26 +113,25 @@ onPressed: () {
 For accessing dependencies from outside the widget tree (e.g., within a `Presenter` or a service layer), you can use `CircusRing` directly. This follows the Service Locator pattern.
 
 1.  **Hire (Register) a dependency**:
-    Typically done in your `main.dart` before the app runs.
+    You can using it anywhere you want in your app.
 
     ```dart
-    // Register a singleton instance of ApiService
-    CircusRing.hire<ApiService>(singleton: ApiService());
+    // Register a singleton instance of CounterPresnter
+    CircusRing.hire(CounterPresnter());
     ```
 
 2.  **Find (Locate) a dependency**:
     Access the instance anywhere in your app without `BuildContext`.
 
     ```dart
-    class AuthPresenter extends Presenter<AuthState> {
-      // Find the dependency
-      final _apiService = CircusRing.find<ApiService>();
+    final counter = Circus.find<CounterPresnter>();
 
-      Future<void> login(String user, String pass) async {
-        final result = await _apiService.login(user, pass);
-        // ... update state
-      }
-    }
+    // Use the instance
+    Button(
+      onPressed: () {
+        counter.increment();
+      },
+    )
     ```
 
 ### Binding State to Widgets

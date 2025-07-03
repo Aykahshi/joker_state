@@ -126,11 +126,11 @@ class MyScreen extends StatelessWidget {
 
 ```dart
 // 1. 註冊依賴項（例如，在 main.dart 中）
-CircusRing.hire<ApiService>(singleton: ApiService());
+Circus.hire<ApiService>(ApiService());
 
 // 2. 在任何地方找到依賴項，無需 BuildContext
 class AuthPresenter extends Presenter<AuthState> {
-  final _apiService = CircusRing.find<ApiService>();
+  final _apiService = Circus.find<ApiService>();
 
   Future<void> login(String user, String pass) async {
     final result = await _apiService.login(user, pass);
