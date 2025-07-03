@@ -2,39 +2,37 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:circus_ring/circus_ring.dart';
-import 'package:rxdart/rxdart.dart';
 
 import 'cue_master.dart';
 
-/// An RxDart-based implementation of [CueMaster].
+/// A Dart Stream-based implementation of [CueMaster].
 ///
-/// This implementation uses a `PublishSubject` for each event type.
-/// `PublishSubject`s are suitable for event buses as they broadcast
-/// events to all subscribers that subscribed *after* the event was emitted.
+/// This implementation uses a `StreamController.broadcast` for each event type,
+/// allowing multiple listeners for each event stream.
 /// It implements [Disposable] for automatic cleanup with CircusRing.
 class RingCueMaster implements CueMaster, Disposable {
-  // A map to hold PublishSubjects for different event types.
-  // The key is the Type of the cue, and the value is the PublishSubject for that cue.
-  // We use `dynamic` for the PublishSubject's generic type here, but it's cast
+  // A map to hold StreamControllers for different event types.
+  // The key is the Type of the cue, and the value is the StreamController for that cue.
+  // We use `dynamic` for the StreamController's generic type here, but it's cast
   // to the correct type `T` in `_getController`.
-  final Map<Type, PublishSubject<dynamic>> _controllers = {};
+  final Map<Type, StreamController<dynamic>> _controllers = {};
 
   bool _isDisposed = false;
 
   bool get isDisposed => _isDisposed;
 
-  /// Retrieves or creates a [PublishSubject] for the given type [T].
-  PublishSubject<T> _getController<T>() {
+  /// Retrieves or creates a [StreamController] for the given type [T].
+  StreamController<T> _getController<T>() {
     if (_isDisposed) {
       throw StateError('Cannot send cues after dispose');
     }
     // `putIfAbsent` ensures that if a controller for type T doesn't exist,
     // a new one is created and added to the map.
-    // It's crucial to cast the result to `PublishSubject<T>` as the map
-    // stores `PublishSubject<dynamic>`. This cast is safe because we always
-    // create `PublishSubject<T>` for key `T`.
-    return _controllers.putIfAbsent(T, () => PublishSubject<T>())
-        as PublishSubject<T>;
+    // It's crucial to cast the result to `StreamController<T>` as the map
+    // stores `StreamController<dynamic>`. This cast is safe because we always
+    // create `StreamController<T>.broadcast()` for key `T`.
+    return _controllers.putIfAbsent(T, () => StreamController<T>.broadcast())
+        as StreamController<T>;
   }
 
   @override
@@ -62,14 +60,6 @@ class RingCueMaster implements CueMaster, Disposable {
       controller.add(cue);
       return true;
     }
-    // This case (controller.isClosed but !_isDisposed) would primarily happen if
-    // reset<T>() was called for this specific T, but the bus itself isn't disposed.
-    // _getController would have provided a fresh, open controller if reset<T> had removed it.
-    // So, this path is less likely with PublishSubject unless a subject is closed externally
-    // without being removed from _controllers.
-    // However, if dispose() was called, _isDisposed is true, and we'd exit earlier.
-    // If reset<T>() was called, the controller for T is removed. _getController would make a new one.
-    // The main guard is _isDisposed.
     return false; // Controller was closed
   }
 

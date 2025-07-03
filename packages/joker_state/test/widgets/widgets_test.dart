@@ -367,7 +367,7 @@ void main() {
           body: Builder(
             builder: (context) {
               // Use the context extension to watch the act.
-              final act = context.watchAct<int>();
+              final act = context.watchJoker<int>();
               return Text('Value: ${act.value}');
             },
           ),

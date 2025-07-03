@@ -2,32 +2,28 @@
 
 # 🃏 JokerState
 
-**⚠️ Breaking Changes in v4.0.0:**
-- `CircusRing` is now a standalone package. While still usable in JokerState, it no longer provides Joker-specific integration. Please use [circus_ring](https://pub.dev/packages/circus_ring).
-- `RingCueMaster` now leverages `rx_dart` for a more robust Event Bus system.
-- `JokerStage` and `JokerFrame` constructors are now private. Please use the `perform` and `focusOn` APIs instead.
-- Both `Joker` and `Presenter` are now based on `RxInterface`, providing more flexible and efficient state management.
-- `RxInterface` is built on `BehaviorSubject` and internally uses `Timer` for improved autoDispose handling.
-- `JokerPortal` and `JokerCast` are deprecated. For context-free state management, use CircusRing API with `Presenter`.
-- `JokerReveal` is deprecated. Use Dart's native language features for conditional rendering.
-- `JokerTrap` is deprecated. Use `Presenter`'s `onDone` or `StatefulWidget`'s `dispose` for controller management.
+**⚠️ Major Refactor Notice:**
+- **No More RxDart**: The package has been completely refactored to remove the dependency on `rxdart`.
+- **Built on ChangeNotifier**: The core is now built on Flutter's native `ChangeNotifier` for a simpler, more lightweight, and predictable API.
+- **Simplified API**: `Joker` and `Presenter` now share a common base class, `JokerAct`, simplifying the overall architecture.
+- **New DI Methods**: Dependency injection via `BuildContext` has been streamlined. Use `context.joker<T>()` to read a value and `context.watchJoker<T>()` to listen for changes.
 
-JokerState is a lightweight, reactive Flutter state management toolkit based on `rx_dart`, with integrated dependency injection via [circus_ring](https://pub.dev/packages/circus_ring).  
-With just the `Joker`, `Presenter`, and `CircusRing` APIs, you can flexibly manage state and dramatically reduce boilerplate.
+JokerState is a lightweight, reactive Flutter state management toolkit built on `ChangeNotifier`, with integrated dependency injection.
+With the `Joker`, `Presenter`, and UI binding widgets, you can flexibly manage state and dramatically reduce boilerplate.
 
 [![pub package](https://img.shields.io/pub/v/joker_state.svg)](https://pub.dev/packages/joker_state)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- 🧠 **Reactive State Management**: Automatic widget rebuilds and side-effect execution.
-- 💉 **Dependency Injection**: Simple DI with the CircusRing API.
-- 🪄 **Selective Rebuilds**: Fine-grained control over what triggers UI updates.
-- 🔄 **Batch Updates**: Combine multiple state changes into a single notification.
-- 🏗️ **Record Support**: Combine multiple states using Dart Records.
-- 🧩 **Modular Design**: Import only what you need, or use the full package.
-- 📢 **Event Bus**: Type-safe event system via RingCueMaster.
-- ⏱️ **Timing Controls**: Debounce, throttle, and more for smooth UX.
+- 🧠 **Reactive State Management**: Automatic widget rebuilds and side-effect execution, powered by `ChangeNotifier`.
+- 💉 **Simple Dependency Injection**: Easily provide `Joker` or `Presenter` instances to the widget tree.
+- 🪄 **Selective Rebuilds**: Fine-grained control over what triggers UI updates to optimize performance.
+- 🔄 **Batch Updates**: Combine multiple state changes into a single UI notification.
+- 🏗️ **Record Support**: Combine multiple states into a single view using Dart Records with `JokerTroupe`.
+- 🧩 **Modular Design**: A clear separation between state logic and UI widgets.
+- 📢 **Event Bus**: A type-safe event system is available for decoupled communication.
+- ⏱️ **Timing Controls**: Debounce and throttle utilities to manage frequent events.
 
 ## Quick Start
 
@@ -48,7 +44,7 @@ import 'package:joker_state/joker_state.dart';
 
 ### 🎭 Joker: Local Reactive State Container
 
-`Joker<T>` is based on `RxInterface` and provides a local reactive state container. Its lifecycle is mainly managed by listeners and the `keepAlive` parameter, while providing a `whisper` API for manual control and a `batch` API for batch updates.
+`Joker<T>` is a lightweight state container based on `ChangeNotifier`. It's perfect for managing simple, local state. Its lifecycle is managed by its listeners and the `keepAlive` parameter.
 
 ```dart
 // Create a Joker (auto-notifies by default)
@@ -57,16 +53,16 @@ final counter = Joker<int>(0);
 // Update state and notify all listeners
 counter.trick(1);
 
+// Or simply use the setter
+counter.state = 2;
+
 // Update using a function
 counter.trickWith((current) => current + 1);
-
-// Or simply
-counter.state = 1;
 ```
 
-### ✨ Presenter
+### ✨ Presenter: State Management with Lifecycle
 
-`Presenter<T>` is an advanced version of Joker. Based on the additional `onInit`, `onReady`, and `onDone` lifecycle hooks, it provides developers with more sophisticated operations and can easily implement BLoC, MVC, and MVVM patterns.
+`Presenter<T>` is an advanced version of `Joker`. It includes lifecycle hooks (`onInit`, `onReady`, `onDone`), making it ideal for complex business logic and implementing patterns like BLoC or MVVM.
 
 ```dart
 class MyCounterPresenter extends Presenter<int> {
@@ -88,142 +84,131 @@ class MyCounterPresenter extends Presenter<int> {
 final myPresenter = MyCounterPresenter();
 myPresenter.increment();
 // dispose() automatically calls onDone()
-myPresenter.dispose(); 
+myPresenter.dispose();
 ```
 
-### 🎪 CircusRing: Dependency Injection
+### 🎪 JokerRing & CircusRing: Dependency Injection
 
-CircusRing is a lightweight dependency container, now a standalone package ([circus_ring](https://pub.dev/packages/circus_ring)), but still usable within JokerState.
+#### Context-based DI with `JokerRing`
+Use `JokerRing` to provide a `Joker` or `Presenter` to the widget tree. Descendants can then access the instance using context extensions.
 
----
+```dart
+// 1. Provide the Joker/Presenter
+JokerRing<int>(
+  act: myPresenter,
+  child: MyScreen(),
+);
+
+// 2. Access it in a descendant widget
+class MyScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // Use watchJoker to listen for changes and rebuild
+    final count = context.watchJoker<int>().value;
+
+    return Scaffold(
+      body: Text('Count: $count'),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Use joker() to get the instance without listening
+          // Cast it to the concrete type to access its methods
+          final presenter = context.joker<int>() as MyCounterPresenter;
+          presenter.increment();
+        },
+      ),
+    );
+  }
+}
+```
+
+#### Context-less DI with `CircusRing`
+For accessing dependencies from outside the widget tree (e.g., in a service or another `Presenter`), you can use `CircusRing` as a service locator.
+
+```dart
+// 1. Register a dependency (e.g., in main.dart)
+CircusRing.hire<ApiService>(singleton: ApiService());
+
+// 2. Find the dependency anywhere, without BuildContext
+class AuthPresenter extends Presenter<AuthState> {
+  final _apiService = CircusRing.find<ApiService>();
+
+  Future<void> login(String user, String pass) async {
+    final result = await _apiService.login(user, pass);
+    // ... update state
+  }
+}
+```
 
 ### 🎭 Simple Reactive UI Integration
 
-JokerState provides various widgets for seamless state and UI integration:
-
-#### The Simplest Usage
+JokerState provides extension methods on any `JokerAct` (`Joker` or `Presenter`) for seamless UI integration.
 
 ```dart
-// Using Joker
-final userJoker = Joker<User>(...);
-userJoker.perform(
-  builder: (context, user) => Text('Name: ${user.name}'),
-)
+// Rebuild a widget when the state changes
+counterJoker.perform(
+  builder: (context, count) => Text('Count: $count'),
+);
 
-// Using Presenter
-final myPresenter = MyPresenter(...);
-myPresenter.perform(
-  builder: (context, state) => Text('State: $state'),
-)
+// Rebuild only when a specific part of the state changes
+userJoker.focusOn<String>(
+  selector: (user) => user.name,
+  builder: (context, name) => Text('Name: $name'),
+);
 ```
 
 For more details, see [State Management](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/state_management/README-state-en.md).
 
-### 📢 RingCueMaster: Event Bus System
+### 📢 Event Bus & ⏱️ Timing Controls
 
-Type-safe event bus for communication between components:
+The package also includes a robust, type-safe event bus (`RingCueMaster`) and timing control utilities (`CueGate`) for throttling and debouncing events. These tools are independent of the state management core but integrate well with it.
+
+**Example: Debouncing search queries with `CueGate` and `RingCueMaster`**
 
 ```dart
-// Define event type
-class UserLoggedIn extends Cue {
-  final User user;
-  UserLoggedIn(this.user);
+// Define a search event
+class SearchQueryChanged {
+  final String query;
+  SearchQueryChanged(this.query);
 }
 
-// Access the global event bus
-final cueMaster = Circus.ringMaster();
-
-// Listen for events
-final subscription = Circus.onCue<UserLoggedIn>((event) {
-  print('User ${event.user.name} logged in at ${event.timestamp}');
-});
-
-// Send event
-Circus.sendCue(UserLoggedIn(currentUser));
-```
-
-For more details, see [Event Bus](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/event_bus/README-event-bus-en.md).
-
-### ⏱️ CueGate: Timing Controls
-
-Manage actions with debounce and throttle:
-
-```dart
 // Create a debounce gate
-final debouncer = CueGate.debounce(delay: Duration(milliseconds: 300));
+final searchGate = CueGate.debounce(delay: const Duration(milliseconds: 300));
 
-// Use in event handlers
+// In your UI:
 TextField(
-  onChanged: (value) {
-    debouncer.trigger(() => performSearch(value));
+  onChanged: (text) {
+    // Trigger the gate. The action will only run after 300ms of inactivity.
+    searchGate.trigger(() {
+      // Send the event through the event bus
+      Circus.cue(SearchQueryChanged(text));
+    });
   },
-),
-// Create a throttle gate
-final throttler = CueGate.throttle(interval: Duration(seconds: 1));
-
-// Limit UI updates
-scrollController.addListener(() {
-  throttler.trigger(() => updatePositionIndicator());
-});
-
-// In StatefulWidget, use the mixin for automatic cleanup
-class SearchView extends StatefulWidget {
-// ...
-}
-
-class _SearchViewState extends State<SearchView> with CueGateMixin {
-  void _handleSearchInput(String query) {
-    debounceTrigger(
-      () => _performSearch(query),
-      Duration(milliseconds: 300),
-    );
-  }
-
-  void _handleScroll() {
-    throttleTrigger(
-      () => _updateScrollPosition(),
-      Duration(milliseconds: 100),
-    );
-  }
-
-// Cleanup handled automatically by mixin
-}
-```
-
-For more details, see [Timing Controls](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/timing_control/README-gate-en.md).
-
-## Advanced Features
-
-### 🔄 Side-Effects
-
-Listen for state changes and execute side-effects:
-
-```dart
-final counter = Joker<int>(0);
-
-counter.effect(
-  child: Container(),
-  effect: (context, state) {
-    print('State changed: $state');
-  },
-  runOnInit: true,
-  effectWhen: (prev, val) => (prev!.value ~/ 5) != (val.value ~/ 5),
 );
+
+// In your Presenter or another service, listen for the debounced event:
+class SearchPresenter extends Presenter<List<String>> {
+  SearchPresenter() : super([]) {
+    // Listen for debounced search queries
+    Circus.onCue<SearchQueryChanged>((event) {
+      _performSearch(event.query);
+    });
+  }
+
+  void _performSearch(String query) {
+    // ... your search logic
+  }
+}
 ```
 
-## Additional Info
+For more details, see their respective READMEs within the `lib` directory.
 
-JokerState is designed to be lightweight, flexible, and powerful—offering reactive state management and dependency injection in one cohesive package.
+## When to use JokerState
 
-### When should you use JokerState?
-
-- You want something simpler than BLoC or other complex state solutions
-- You need reactive UI updates with minimal boilerplate
-- You want the flexibility to control things manually when needed
-- You need integrated dependency management
-- You prefer clear, direct state operations (not abstract concepts)
-- You need a type-safe event bus for decoupled communication
-- You want utility widgets that work well with your state management
+- You want a simpler alternative to complex state management solutions.
+- You need reactive UI updates with minimal boilerplate.
+- You want the flexibility of both automatic and manual state notifications.
+- You need a simple, integrated dependency injection solution.
+- You prefer clear, direct state manipulation.
 
 ## License
 

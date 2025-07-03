@@ -10,8 +10,10 @@ import '../foundation/joker_act.dart';
 /// instances by placing them into the widget tree's context.
 /// Descendant widgets can then easily access these instances using standard
 /// `context.watch<JokerAct<T>>()` or `context.read<JokerAct<T>>()` methods,
-/// or the convenient `context.watchAct<T>()`, `context.readAct<T>()` and
-/// `context.selectAct<T, S>()` extensions.
+/// or the convenient `context.watchJoker<T>()` and `context.joker<T>()` extensions.
+///
+/// For dependency injection outside of the widget tree (e.g., in services or
+/// other presenters), consider using `CircusRing` as a service locator.
 ///
 /// This widget is designed to provide a single [JokerAct] instance of a given
 /// type [T] to its subtree. If you need to provide multiple instances of the
@@ -59,13 +61,8 @@ import '../foundation/joker_act.dart';
 ///
 /// ```dart
 /// // Inside a build method:
-/// final counter = context.watchAct<int>(); // Watches for changes
-/// final anotherCounter = context.readAct<int>(); // Reads without watching
-///
-/// // Select a specific part of the state:
-/// final userName = context.selectAct<User, String>(
-///   selector: (userAct) => userAct.value.name,
-/// );
+/// final counter = context.watchJoker<int>(); // Watches for changes
+/// final anotherCounter = context.joker<int>(); // Reads without watching
 /// ```
 /// {@end-tool}
 class JokerRing<T> extends StatelessWidget {
@@ -97,11 +94,11 @@ extension JokerActContextExtension on BuildContext {
   ///
   /// This is a shortcut for `Provider.of<JokerAct<T>>(this, listen: true)`
   /// and will cause the widget to rebuild when the [JokerAct] notifies changes.
-  JokerAct<T> watchAct<T>() => watch<JokerAct<T>>();
+  JokerAct<T> watchJoker<T>() => watch<JokerAct<T>>();
 
   /// Retrieves the [JokerAct] of type [T] from the widget tree without listening.
   ///
   /// This is a shortcut for `Provider.of<JokerAct<T>>(this, listen: false)`
   /// and will NOT cause the widget to rebuild when the [JokerAct] notifies changes.
-  JokerAct<T> readAct<T>() => read<JokerAct<T>>();
+  JokerAct<T> joker<T>() => read<JokerAct<T>>();
 }
