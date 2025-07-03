@@ -2,7 +2,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
-import 'package:joker_state/src/state_management/core/joker.dart';
 
 void main() {
   group('Joker Core Functionality', () {

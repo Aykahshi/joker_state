@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
-import 'package:joker_state/src/state_management/joker_states.dart';
 
 // A helper class to represent a complex state object for testing selectors.
 class User {
