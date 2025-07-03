@@ -1,3 +1,9 @@
+## [4.2.0+2]
+* fix export missing issues
+
+## [4.2.0+1]
+* update README
+
 ## [4.2.0]
 **BREAKING CHANGES**
 * Refactored `RingCueMaster`, `Joker`, and `Presenter` to remove the `RxDart` dependency, now using Dart's native `StreamController.broadcast`.
