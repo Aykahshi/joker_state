@@ -1,3 +1,12 @@
+## [4.2.0]
+**BREAKING CHANGES**
+* Refactored `RingCueMaster`, `Joker`, and `Presenter` to remove the `RxDart` dependency, now using Dart's native `StreamController.broadcast`.
+* Provide a `JokerAct` abstract class for customizable usage.
+* Integrate widget APIs, add `JokerRehearse`.
+* Add provider package for context way to using Joker/Presenter.
+* Updated all docs to reflect the removal of `RxDart` and added examples for using `CueGate` with the event bus.
+* Updated documentation for `JokerRing` and `CircusRing` to clarify the use cases for context-based and context-less dependency injection.
+
 ## [4.1.0]
 * Make Joker support keepAlive flag again.
 * Make Joker support whisper/batch API again.

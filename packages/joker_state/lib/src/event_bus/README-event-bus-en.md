@@ -4,15 +4,13 @@
 
 Ring Cue Master is a lightweight, type-safe event bus system designed for Flutter applications, seamlessly integrating with CircusRing dependency injection. It enables different parts of an application to communicate without direct dependencies, following the publish-subscribe pattern.
 
-It provides a default implementation `RingCueMaster` based on RxDart's `PublishSubject`, ensuring efficient and responsive event handling.
-
 ## ✨ Features
 
 - 🔍 **Type-Safe Events**: Events are type-checked at compile-time.
 - 🚀 **Easy Integration**: Works out of the box with CircusRing dependency injection, with `RingCueMaster` as the default event bus implementation.
 - 🧩 **Decoupled Architecture**: Components can communicate without direct references to each other.
 - 🔄 **Multiple Event Buses**: Create isolated `RingCueMaster` instances for different domains.
-- 🎯 **RxDart-Powered**: Built on `PublishSubject` for powerful event stream handling.
+- 🎯 **Dart Stream-Powered**: Built on `StreamController.broadcast` for standard and powerful event stream handling.
 
 ## 🏁 Getting Started
 
@@ -104,7 +102,31 @@ Circus.onCue<UserLoggedInCue>((event) {
 Circus.cue(UserLoggedInCue('789', 'another_user'), tag: 'auth'); // Send on 'auth' bus
 ```
 
-### Manual Event Bus Management
+### Integrating with Timing Controls (`CueGate`)
+
+`CueGate` can be powerfully combined with `RingCueMaster` to control the frequency of events. For example, you can easily debounce user input before sending it over the event bus.
+
+```dart
+// 1. Define the event
+class SearchQueryChanged { final String query; SearchQueryChanged(this.query); }
+
+// 2. Create a debounce gate
+final searchGate = CueGate.debounce(delay: const Duration(milliseconds: 300));
+
+// 3. In the UI, trigger the gate on input change
+//    The gate ensures the event is only sent after the user stops typing.
+onChanged: (text) {
+  searchGate.trigger(() {
+    Circus.cue(SearchQueryChanged(text)); // Send debounced event
+  });
+}
+
+// 4. A listener (e.g., in a Presenter) receives the event at a controlled rate
+Circus.onCue<SearchQueryChanged>((event) {
+  print('Debounced search query: ${event.query}');
+  // Now perform the actual search operation
+});
+```
 
 ```dart
 // Get the default RingCueMaster instance

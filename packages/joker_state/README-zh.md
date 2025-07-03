@@ -2,32 +2,28 @@
 
 # 🃏 JokerState
 
-**⚠️ v4.0.0 重大變更提醒：** 
-- `CircusRing` 現在是獨立的 Package，雖在 JokerState 中仍然可用，但不再專為 Joker 提供整合擴展，請使用 [circus_ring](https://pub.dev/packages/circus_ring) 包。
-- `RingCueMaster` 現在藉助 `rx_dart`，提供更優秀的 Event bus 系統。
-- `JokerStage`, `JokerFrame` 建構子變為私有，請使用 `perform`, `focusOn` API。
-- 現在 `Joker`, `Presenter` 都基於 `RxInterface`，提供更靈活的狀態管理方式與更好的效能。
-- `RxInterface` 基於 `BehaviorSubject`，並在內部基於 `Timer`，提供更好的 autoDispose 處理。
-- `JokerPortal`, `JokerCast` 已棄用，請使用 CircusRing API 結合 `Presenter` 實現無 `context` 的狀態管理。
-- `JokerReveal` 已棄用，請使用 Dart 原生的語言特性來實現條件渲染。
-- `JokerTrap` 已棄用，請使用 `Presenter` 的 `onDone`，或 `StatefulWidget` 的 `dispose` 方法來管理控制器。
+**⚠️ 重大重構提醒：**
+- **不再依賴 RxDart**：本套件已完全重構，移除了對 `rxdart` 的依賴。
+- **基於 ChangeNotifier**：核心現在基於 Flutter 原生的 `ChangeNotifier` 構建，API 更簡單、輕量且行為可預測。
+- **簡化 API**：`Joker` 和 `Presenter` 現在共享一個共通的基底類別 `JokerAct`，簡化了整體架構。
+- **新的依賴注入方法**：透過 `BuildContext` 進行的依賴注入已得到簡化。使用 `context.joker<T>()` 讀取實例，使用 `context.watchJoker<T>()` 來監聽變更。
 
-JokerState 是一套基於 `rx_dart` 的輕量級 Flutter 響應式狀態管理工具，並整合了依賴注入 [circus_ring](https://pub.dev/packages/circus_ring)。
-只要用 `Joker`, `Presenter`, `CircusRing` API 就能靈活管理狀態，大量減少樣板程式碼。
+JokerState 是一套基於 `ChangeNotifier` 的輕量級 Flutter 響應式狀態管理工具，並整合了依賴注入功能。
+只要用 `Joker`、`Presenter` 和 UI 綁定小部件，就能靈活管理狀態，並大量減少樣板程式碼。
 
 [![pub package](https://img.shields.io/pub/v/joker_state.svg)](https://pub.dev/packages/joker_state)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 特色
 
-- 🧠 **響應式狀態管理**：自動重建小部件，執行副作用。
-- 💉 **依賴注入**：用 CircusRing API，簡單搞定依賴注入。
-- 🪄 **選擇性重建**：你可以細緻控制哪些狀態變動會觸發 UI 重建。
-- 🔄 **批次更新**：多個狀態變更可以合併成一次通知。
-- 🏗️ **Record 支援**：用 Dart Records 組合多個狀態。
-- 🧩 **模組化設計**：只導入你需要的功能，或整包一起用都行。
-- 📢 **事件總線**：RingCueMaster 提供類型安全的事件系統。
-- ⏱️ **時間控制**：防抖動、節流等時間控制工具。
+- 🧠 **響應式狀態管理**：由 `ChangeNotifier` 驅動，自動重建小部件並執行副作用。
+- 💉 **簡易的依賴注入**：輕鬆地將 `Joker` 或 `Presenter` 實例提供給小部件樹。
+- 🪄 **選擇性重建**：精細控制觸發 UI 更新的條件，以優化效能。
+- 🔄 **批次更新**：將多個狀態變更合併為單一次的 UI 通知。
+- 🏗️ **Record 支援**：使用 `JokerTroupe` 將多個狀態組合成一個視圖。
+- 🧩 **模組化設計**：狀態邏輯與 UI 小部件之間有清晰的分離。
+- 📢 **事件總線**：提供類型安全的事件系統，用於解耦通信。
+- ⏱️ **時間控制**：提供防抖動和節流工具，以管理頻繁事件。
 
 ## 快速開始
 
@@ -48,25 +44,25 @@ import 'package:joker_state/joker_state.dart';
 
 ### 🎭 Joker：局部響應式狀態容器
 
-`Joker<T>` 基於 `RxInterface` ，提供局部響應式狀態容器。它的生命週期主要靠監聽器和 `keepAlive` 參數來管理，同時提供 `whisper` API 用於手動控制， 以及 `batch` API 用於批次更新。
+`Joker<T>` 是一個基於 `ChangeNotifier` 的輕量級狀態容器，非常適合管理簡單的局部狀態。其生命週期由監聽器和 `keepAlive` 參數管理。
 
 ```dart
-// 建立一個 Joker，預設會自動通知
+// 建立一個 Joker (預設會自動通知)
 final counter = Joker<int>(0);
 
 // 更新狀態並通知所有監聽器
 counter.trick(1);
 
-// 用函數轉換更新
-counter.trickWith((current) => current + 1);
+// 或直接使用 setter
+counter.state = 2;
 
-// 或是更簡單的
-counter.state = 1;
+// 使用函數更新
+counter.trickWith((current) => current + 1);
 ```
 
-### ✨ Presenter
+### ✨ Presenter：帶有生命週期的狀態管理
 
-`Presenter<T>` 是 Joker 的進階版本，基於額外提供 `onInit`、`onReady`、`onDone` 生命週期掛勾，提供開發者更精細的操作並能輕鬆實現 BLoC、MVC、MVVM 模式。
+`Presenter<T>` 是 `Joker` 的進階版本。它包含了生命週期掛鉤 (`onInit`, `onReady`, `onDone`)，使其成為處理複雜業務邏輯和實現 BLoC 或 MVVM 等模式的理想選擇。
 
 ```dart
 class MyCounterPresenter extends Presenter<int> {
@@ -88,141 +84,131 @@ class MyCounterPresenter extends Presenter<int> {
 final myPresenter = MyCounterPresenter();
 myPresenter.increment();
 // dispose() 會自動呼叫 onDone()
-myPresenter.dispose(); 
+myPresenter.dispose();
 ```
 
-### 🎪 CircusRing：依賴注入
+### 🎪 JokerRing & CircusRing：依賴注入
 
-CircusRing 是一個輕量級的依賴容器，現已拆分為獨立的 [circus_ring](https://pub.dev/packages/circus_ring)，但在 JokerState 中仍然可用。
+#### 使用 `JokerRing` 進行基於 Context 的依賴注入
+使用 `JokerRing` 將 `Joker` 或 `Presenter` 提供給小部件樹。子孫小部件隨後可以使用 context 擴充方法來存取該實例。
 
+```dart
+// 1. 提供 Joker/Presenter
+JokerRing<int>(
+  act: myPresenter,
+  child: MyScreen(),
+);
+
+// 2. 在子孫小部件中存取它
+class MyScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    // 使用 watchJoker 來監聽變更並重建
+    final count = context.watchJoker<int>().value;
+
+    return Scaffold(
+      body: Text('Count: $count'),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // 使用 joker() 來獲取實例而不監聽
+          // 將其轉換為具體類型以存取其方法
+          final presenter = context.joker<int>() as MyCounterPresenter;
+          presenter.increment();
+        },
+      ),
+    );
+  }
+}
+```
+
+#### 使用 `CircusRing` 進行無 Context 的依賴注入
+當您需要在 Widget Tree 外部（例如在服務或另一個 `Presenter` 中）存取依賴項時，可以將 `CircusRing` 作為服務定位器使用。
+
+```dart
+// 1. 註冊依賴項（例如，在 main.dart 中）
+CircusRing.hire<ApiService>(singleton: ApiService());
+
+// 2. 在任何地方找到依賴項，無需 BuildContext
+class AuthPresenter extends Presenter<AuthState> {
+  final _apiService = CircusRing.find<ApiService>();
+
+  Future<void> login(String user, String pass) async {
+    final result = await _apiService.login(user, pass);
+    // ... 更新狀態
+  }
+}
+```
 
 ### 🎭 簡易的響應式 UI 整合
 
-JokerState 提供多種小部件，方便你把狀態和 UI 結合：
-
-#### 最簡單的使用方式
+JokerState 在任何 `JokerAct` (`Joker` 或 `Presenter`) 上提供了擴充方法，以實現無縫的 UI 整合。
 
 ```dart
-// 使用 Joker
-final userJoker = Joker<User>(...);
-userJoker.perform(
-  builder: (context, user) => Text('Name: ${user.name}'),
-)
+// 當狀態改變時重建一個小部件
+counterJoker.perform(
+  builder: (context, count) => Text('計數: $count'),
+);
 
-// 使用 Presenter
-final myPresenter = MyPresenter(...);
-myPresenter.perform(
-  builder: (context, state) => Text('State: $state'),
-)
-```
-
-更詳細的使用方式請見 [State Management](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/state_management/README-state-zh.md)。
-
-### 📢 RingCueMaster：事件總線系統
-
-用於元件間溝通的類型安全事件總線：
-
-```dart
-// 定義事件類型
-class UserLoggedIn extends Cue {
-  final User user;
-  UserLoggedIn(this.user);
-}
-
-// 訪問全局事件總線
-final cueMaster = Circus.ringMaster();
-
-// 監聽事件
-final subscription = Circus.onCue<UserLoggedIn>((event) {
-  print('用戶 ${event.user.name} 在 ${event.timestamp} 登入');
-});
-
-// 發送事件
-Circus.sendCue(UserLoggedIn(currentUser));
-```
-
-更詳細的使用方式請見 [Event Bus](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/event_bus/README-event-bus-zh.md)。
-
-### ⏱️ CueGate：時間控制
-
-使用防抖動和節流機制管理操作的時間：
-
-```dart
-// 創建一個防抖動閘門
-final debouncer = CueGate.debounce(delay: Duration(milliseconds: 300));
-
-// 在事件處理器中使用
-TextField(
-  onChanged: (value) {
-    debouncer.trigger(() => performSearch(value));
-  },
-),
-// 創建一個節流閘門
-final throttler = CueGate.throttle(interval: Duration(seconds: 1));
-
-// 限制 UI 更新
-scrollController.addListener(() {
-  throttler.trigger(() => updatePositionIndicator());
-});
-
-// 在 StatefulWidget 中，使用 mixin 自動清理
-class SearchView extends StatefulWidget {
-// ...
-}
-
-class _SearchViewState extends State<SearchView> with CueGateMixin {
-  void _handleSearchInput(String query) {
-    debounceTrigger(
-      () => _performSearch(query),
-      Duration(milliseconds: 300),
-    );
-  }
-
-  void _handleScroll() {
-    throttleTrigger(
-      () => _updateScrollPosition(),
-      Duration(milliseconds: 100),
-    );
-  }
-
-// 清理由 mixin 自動處理
-}
-```
-
-更詳細的使用方式請見 [Timing Controls](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/timing_control/README-gate-zh.md)。
-
-## 進階功能
-
-### 🔄 副作用
-
-監聽狀態變化並執行副作用：
-
-```dart
-final counter = Joker<int>(0);
-
-counter.effect(
-  child: Container(),
-  effect: (context, state) {
-    print('State changed: $state');
-  },
-  runOnInit: true,
-  effectWhen: (prev, val) => (prev!.value ~/ 5) != (val.value ~/ 5),
+// 僅在狀態的特定部分改變時才重建
+userJoker.focusOn<String>(
+  selector: (user) => user.name,
+  builder: (context, name) => Text('姓名: $name'),
 );
 ```
 
-## 附加資訊
+更詳細的用法請參閱 [State Management](https://github.com/Aykahshi/joker_state/blob/master/packages/joker_state/lib/src/state_management/README-state-zh.md)。
 
-JokerState 設計為輕量級、靈活且強大 - 在一個連貫的套件中提供響應式狀態管理和依賴注入。
+### 📢 事件總線 & ⏱️ 時間控制
 
-### 何時使用 JokerState
+本套件還包含一個強健的、類型安全的事件總線 (`RingCueMaster`) 和用於節流和防抖動的時間控制工具 (`CueGate`)。這些工具獨立於狀態管理核心，但能與之良好地整合。
 
-- 您想要一個比 BLoC 或其他複雜狀態解決方案更簡單的替代方案
-- 您需要響應式 UI 更新且樣板代碼最少
-- 您需要在必要時進行手動控制的靈活性
-- 您需要整合的依賴管理
-- 您偏好清晰、直接的狀態操作，而不是抽象概念
-- 您需要一個類型安全的事件總線用於解耦通信
-- 您需要與狀態管理良好配合的實用小部件
+**範例：使用 `CueGate` 和 `RingCueMaster` 對搜索查詢進行防抖動**
+
+```dart
+// 定義一個搜索事件
+class SearchQueryChanged {
+  final String query;
+  SearchQueryChanged(this.query);
+}
+
+// 創建一個防抖動控制器
+final searchGate = CueGate.debounce(delay: const Duration(milliseconds: 300));
+
+// 在你的 UI 中：
+TextField(
+  onChanged: (text) {
+    // 觸發控制器。只有在停止輸入 300 毫秒後，動作才會執行。
+    searchGate.trigger(() {
+      // 透過事件總線發送事件
+      Circus.cue(SearchQueryChanged(text));
+    });
+  },
+);
+
+// 在你的 Presenter 或其他服務中，監聽經過防抖動處理的事件：
+class SearchPresenter extends Presenter<List<String>> {
+  SearchPresenter() : super([]) {
+    // 監聽經過防抖動的搜索查詢
+    Circus.onCue<SearchQueryChanged>((event) {
+      _performSearch(event.query);
+    });
+  }
+
+  void _performSearch(String query) {
+    // ... 你的搜索邏輯
+  }
+}
+```
+
+更多詳細資訊，請參閱 `lib` 目錄中它們各自的 README 文件。
+
+## 何時使用 JokerState
+
+- 您想要一個比複雜狀態管理解決方案更簡單的替代方案。
+- 您需要以最少的樣板程式碼實現響應式 UI 更新。
+- 您希望同時擁有自動和手動狀態通知的靈活性。
+- 您需要一個簡單、整合的依賴注入解決方案。
+- 您偏好清晰、直接的狀態操作。
 
 ## 授權
 

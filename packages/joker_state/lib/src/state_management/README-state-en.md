@@ -1,232 +1,202 @@
-## 🎪 Basic Usage
+## 🃏 State Management with JokerState
 
-### Creating Joker or Presenter
+This document details the state management features of JokerState, which are now built on Flutter's `ChangeNotifier`.
 
-- JokerState provides a concise `Joker` container, allowing you to easily manage local variables much like Vue's `ref`.
-- `Presenter` is built on top of `BehaviorSubject` and includes three major lifecycle hooks: `onInit`, `onReady`, and `onDone`. These facilitate easy lifecycle management and straightforward implementation of architectures like Clean Architecture.
+### Creating a State Holder: Joker vs. Presenter
+
+- **`Joker<T>`**: A simple, lightweight state container, perfect for local state. It's analogous to a `ValueNotifier` but with more features.
+- **`Presenter<T>`**: An advanced state holder with a defined lifecycle (`onInit`, `onReady`, `onDone`). It's designed for complex business logic where you need to manage resources or perform setup/teardown operations.
+
+Both `Joker` and `Presenter` extend a common base class, `JokerAct<T>`.
 
 ```dart
-// Simplest counter state (Joker)
-final counterJoker = Joker<int>(0);
+// Simple counter state using Joker
+final counterJoker = Joker<int>(0, keepAlive: true);
 
-// Counter controller with lifecycle (Presenter)
+// Counter controller with lifecycle using Presenter
 class CounterPresenter extends Presenter<int> {
-  CounterPresenter({super.initialState = 0, super.keepAlive}); // Pass initialState and keepAlive to super
+  CounterPresenter() : super(0, keepAlive: true);
 
   void increment() => trickWith((s) => s + 1);
 
   @override
   void onInit() {
     print('Presenter initialized!');
-    super.onInit(); // It's good practice to call super.onInit()
+    super.onInit();
   }
 
   @override
   void onDone() {
     print('Presenter cleaned up!');
-    super.onDone(); // It's good practice to call super.onDone()
+    super.onDone();
   }
 }
 final counterPresenter = CounterPresenter();
+```
 
-// Joker uses a setter directly
-counterJoker.value = 1;
+### Updating State
 
-// Presenter uses trick
+State can be updated in several ways, depending on whether `autoNotify` is enabled (which it is by default).
+
+```dart
+// --- Automatic Notifications (autoNotify: true) ---
+
+// Direct assignment (Joker only)
+counterJoker.state = 1;
+
+// Using trick() - works for both Joker and Presenter
 counterPresenter.trick(1);
 
-// keepAlive option (for Presenter)
-final persistentPresenter = CounterPresenter(keepAlive: true);
+// Update with a function
+counterPresenter.trickWith((state) => state + 1);
 
-// autoNotify option (for Presenter)
-final manualPresenter = CounterPresenter(autoNotify: false);
-```
+// Async update
+await counterPresenter.trickAsync(fetchValue);
 
-### Using Joker/Presenter in Flutter
+// --- Manual Notifications (autoNotify: false) ---
+final manualJoker = Joker(0, autoNotify: false);
 
-```dart
-// Simplest way: perform()
-counterJoker.perform(
-  builder: (context, count) => Text('Count: $count'),
-);
-
-counterPresenter.perform(
-  builder: (context, count) => Text('Presenter Count: $count'),
-);
-
-// Use focusOn() to observe only part of the state
-userPresenter.focusOn<String>(
-  selector: (user) => user.name,
-  builder: (context, name) => Text('Name: $name'),
-);
-```
-
-## 🎪 Core Concepts
-
-### How to Update State
-
-`Presenter` provides various methods for updating state:
-
-```dart
-// Auto notification (default)
-counterPresenter.trick(42);                       // Direct assignment
-counterPresenter.trickWith((state) => state + 1); // Function transform
-await counterPresenter.trickAsync(fetchValue);    // Async update
-
-// Manual notification
-manualPresenter.whisper(42);                     // Change value silently
-manualPresenter.whisperWith((s) => s + 1);       // Silent transform
-manualPresenter.yell();                          // Notify when needed
+manualJoker.whisper(42);              // Change value silently
+manualJoker.whisperWith((s) => s + 1); // Silent transform
+manualJoker.yell();                   // Manually notify listeners
 ```
 
 ### Batch Updates
 
-Multiple state changes can be merged into a single notification:
+For manual notification mode, you can group multiple changes into a single update.
 
 ```dart
-// Assuming userJoker holds an object with copyWith, e.g., User class
-// For Presenter, you would typically handle this within the Presenter's methods
-// or use a similar batching mechanism if your state object supports it.
-// Joker's batch update:
+final userJoker = Joker<User>(User(name: 'initial'), autoNotify: false);
+
 userJoker.batch()
-  .apply((u) => u.copyWith(name: 'John Doe')) // Assuming User class has copyWith
+  .apply((u) => u.copyWith(name: 'John Doe'))
   .apply((u) => u.copyWith(age: 30))
-  .commit();  // Notifies listeners only once
+  .commit(); // Notifies listeners only once
 ```
 
-## 🌉 Widget Ecosystem
+## 🌉 UI Integration
 
-### Joker.perform / Presenter.perform
+### Dependency Injection with `JokerRing`
 
-Observe the entire state of `Joker` or `Presenter` to rebuild widgets:
+Provide a `Joker` or `Presenter` to the widget tree using `JokerRing`.
 
 ```dart
-// Using Joker extension
-userJoker.perform(
-  builder: (context, user) => Text('${user.name}: ${user.age}'),
-);
-
-// Using Presenter extension
-myPresenter.perform(
-   builder: (context, state) => Text('State: $state'),
+JokerRing<int>(
+  act: counterPresenter,
+  child: YourWidgetTree(),
 );
 ```
 
-### Joker.focusOn / Presenter.focusOn
+### Accessing State in Widgets
 
-Observe only part of the state to avoid unnecessary rebuilds:
+Use the `BuildContext` extensions to access the provided state holders.
+
+- `context.watchJoker<T>()`: Listens for changes and rebuilds the widget. Returns the `JokerAct<T>` instance.
+- `context.joker<T>()`: Reads the instance without listening. Useful for calling methods in event handlers like `onPressed`.
 
 ```dart
-// Using Joker extension
+// In a build method:
+
+// To display the value (rebuilds on change)
+final count = context.watchJoker<int>().value;
+Text('Count: $count');
+
+// To call a method (does not cause rebuilds)
+onPressed: () {
+  final presenter = context.joker<int>() as CounterPresenter;
+  presenter.increment();
+}
+```
+
+### Context-less Access with `CircusRing`
+
+For accessing dependencies from outside the widget tree (e.g., within a `Presenter` or a service layer), you can use `CircusRing` directly. This follows the Service Locator pattern.
+
+1.  **Hire (Register) a dependency**:
+    Typically done in your `main.dart` before the app runs.
+
+    ```dart
+    // Register a singleton instance of ApiService
+    CircusRing.hire<ApiService>(singleton: ApiService());
+    ```
+
+2.  **Find (Locate) a dependency**:
+    Access the instance anywhere in your app without `BuildContext`.
+
+    ```dart
+    class AuthPresenter extends Presenter<AuthState> {
+      // Find the dependency
+      final _apiService = CircusRing.find<ApiService>();
+
+      Future<void> login(String user, String pass) async {
+        final result = await _apiService.login(user, pass);
+        // ... update state
+      }
+    }
+    ```
+
+### Binding State to Widgets
+
+Use the convenient extension methods on any `JokerAct` instance to bind it to your UI.
+
+#### `perform()`
+Rebuilds the widget whenever the state changes.
+
+```dart
+counterJoker.perform(
+  builder: (context, count) => Text('Count: $count'),
+);
+```
+
+#### `focusOn()`
+Rebuilds the widget only when a selected part of the state changes. This is crucial for performance optimization.
+
+```dart
 userJoker.focusOn<String>(
   selector: (user) => user.name,
   builder: (context, name) => Text('Name: $name'),
 );
+```
 
-// Using Presenter extension
-userPresenter.focusOn<String>(
-  selector: (userProfile) => userProfile.name, // Assuming userProfile has a name property
-  builder: (context, name) => Text('Name: $name'),
+#### `watch()`
+Performs a side effect (like showing a `SnackBar` or navigating) in response to a state change, without rebuilding the child widget.
+
+```dart
+messageJoker.watch(
+  onStateChange: (context, message) {
+    if (message.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  },
+  child: YourPageContent(), // This child does not rebuild
 );
 ```
 
-### Presenter.focusOnMulti
-
-Observe multiple parts of the state to avoid unnecessary rebuilds:
+#### `rehearse()`
+A combination of `perform` and `watch`. It rebuilds the UI *and* performs a side effect from a single state stream.
 
 ```dart
-userPresenter.focusOnMulti(
-  selectors: [
-    (userProfile) => userProfile.name, 
-    (userProfile) => userProfile.age, 
-  ],
-  builder: (context, [name, age]) => Text('Name: $name, Age: $age'),
+counterJoker.rehearse(
+  builder: (context, count) => Text('Count: $count'),
+  onStateChange: (context, count) {
+    if (count % 10 == 0) {
+      print('Reached a multiple of 10!');
+    }
+  },
 );
 ```
 
-### JokerTroupe / PresenterTroupe
-
-Combine multiple `Joker`/`Presenter` states using Dart Records:
-
-```dart
-// Define combined state type
-typedef UserProfile = (String name, int age, bool isActive);
-
-// Using JokerTroupe for Jokers
-JokerTroupe<UserProfile>(
-  jokers: [nameJoker, ageJoker, activeJoker], // List of Jokers
-  converter: (values) => (
-    values[0] as String,
-    values[1] as int,
-    values[2] as bool,
-  ),
-  builder: (context, profile) {
-    final (name, age, active) = profile;
-    return ListTile(
-      title: Text(name),
-      subtitle: Text('Age: $age'),
-      trailing: Icon(active ? Icons.check : Icons.close),
-    );
-  },
-);
-
-// Using PresenterTroupe for Presenters
-PresenterTroupe<UserProfile>(
-  presenters: [namePresenter, agePresenter, activePresenter], // List of Presenters
-  converter: (values) => (
-    values[0] as String,
-    values[1] as int,
-    values[2] as bool,
-  ),
-  builder: (context, profile) {
-    final (name, age, active) = profile;
-    return ListTile(
-      title: Text(name),
-      subtitle: Text('Age: $age'),
-      trailing: Icon(active ? Icons.check : Icons.close),
-    );
-  },
-);
-
-// Using assemble extension for a list of Jokers
-[nameJoker, ageJoker, activeJoker].assemble<UserProfile>(
-  converter: (values) => (
-    values[0] as String,
-    values[1] as int,
-    values[2] as bool,
-  ),
-  builder: (context, profile) {
-    final (name, age, active) = profile; 
-    return ListTile(
-      title: Text(name),
-      subtitle: Text('Age: $age'),
-      trailing: Icon(active ? Icons.check : Icons.close),
-    );
-  },
-);
-
-// Note: An assemble extension for Presenters might also exist or could be added.
-// The example above is for Jokers based on the Chinese README.
-```
-
-## 🎭 Side Effects and Listeners
-
-You can react to state changes to perform side effects without rebuilding the UI, typically using a `Presenter`:
+#### `assemble()`
+Combines multiple `JokerAct` instances into a single builder using Dart Records. The widget rebuilds if any of the source `JokerAct`s change.
 
 ```dart
-// Listen to state changes to perform side effects with Presenter.effect
-// (Assuming 'presenter' is an instance of a Presenter and 'log' is available)
-presenter.effect(
-  child: Container(), // Child widget, often not directly dependent on this effect
-  effect: (context, state) { // stateSnapshot contains the current state
-    print('effect:${state.value}');
-    // Perform side effects here, e.g., show a snackbar, navigate, etc.
-  },
-  runOnInit: false, // Whether to run the effect when the widget is first built
-  effectWhen: (prev, curr) {
-    // Condition to run the effect
-    // Example: run effect only if value divided by 5 changes category
-    return (prev.value ~/ 5) != (curr.value ~/ 5);
+typedef UserProfile = (String name, int age);
+
+[nameJoker, ageJoker].assemble<UserProfile>(
+  converter: (values) => (values[0] as String, values[1] as int),
+  builder: (context, profile) {
+    final (name, age) = profile;
+    return Text('$name is $age years old.');
   },
 );
 ```

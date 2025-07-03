@@ -1,207 +1,202 @@
-## 🎪 基本用法
+## 🃏 使用 JokerState 進行狀態管理
 
-### 建立 Joker 或 Presenter
-- JokerState 提供了簡潔的 `Joker` 容器，並實作了 `Listenable` 接口，讓你可以在 Flutter 中輕鬆使用。
-- `Presenter`。建立在 `RxInterface` 之上，並加入了 `onInit`、`onReady`、`onDone` 這三大生命週期掛勾，讓你能輕鬆管理生命週期，也能簡單的實現 `Clean Architecture` 等架構。
+本文件詳細介紹了 JokerState 的狀態管理功能，其核心現已基於 Flutter 的 `ChangeNotifier` 構建。
+
+### 建立狀態持有者：Joker vs. Presenter
+
+- **`Joker<T>`**：一個簡單、輕量的狀態容器，非常適合局部狀態。您可以將它視為功能更豐富的 `ValueNotifier`。
+- **`Presenter<T>`**：一個具有明確生命週期（`onInit`、`onReady`、`onDone`）的進階狀態持有者。它專為複雜的業務邏輯設計，在這些場景中您需要管理資源或執行設定/清理操作。
+
+`Joker` 和 `Presenter` 都繼承自一個共通的基底類別 `JokerAct<T>`。
 
 ```dart
-// 最簡單的計數器狀態 (Joker)
-final counterJoker = Joker<int>(0);
+// 使用 Joker 建立簡單的計數器狀態
+final counterJoker = Joker<int>(0, keepAlive: true);
 
-// 帶有生命週期的計數器控制器 (Presenter)
+// 使用 Presenter 建立帶有生命週期的計數器控制器
 class CounterPresenter extends Presenter<int> {
-  CounterPresenter() : super(0);
+  CounterPresenter() : super(0, keepAlive: true);
+
   void increment() => trickWith((s) => s + 1);
-  @override void onInit() { print('Presenter 初始化!'); }
-  @override void onDone() { print('Presenter 清理完畢!'); }
+
+  @override
+  void onInit() {
+    print('Presenter 初始化完畢！');
+    super.onInit();
+  }
+
+  @override
+  void onDone() {
+    print('Presenter 清理完畢！');
+    super.onDone();
+  }
 }
 final counterPresenter = CounterPresenter();
+```
 
-// Joker直接使用 setter
+### 更新狀態
+
+狀態可以透過多種方式更新，取決於 `autoNotify` 是否啟用（預設為啟用）。
+
+```dart
+// --- 自動通知 (autoNotify: true) ---
+
+// 直接賦值 (僅限 Joker)
 counterJoker.state = 1;
 
-// Presenter使用 trick
+// 使用 trick() - 對 Joker 和 Presenter 都有效
 counterPresenter.trick(1);
 
-// keepAlive 選項
-final persistentPresenter = CounterPresenter(keepAlive: true);
+// 使用函數更新
+counterPresenter.trickWith((state) => state + 1);
 
-// autoNotify 選項
-final manualPresenter = CounterPresenter(autoNotify: false);
-```
+// 非同步更新
+await counterPresenter.trickAsync(fetchValue);
 
-### 在 Flutter 裡用 Joker/Presenter
+// --- 手動通知 (autoNotify: false) ---
+final manualJoker = Joker(0, autoNotify: false);
 
-```dart
-// 最簡單的方式: perform()
-counterJoker.perform(
-  builder: (context, count) => Text('計數: $count'),
-);
-
-counterPresenter.perform(
-  builder: (context, count) => Text('Presenter 計數: $count'),
-);
-
-// 用 focusOn() 只觀察狀態的一部分
-userPresenter.focusOn<String>(
-  selector: (user) => user.name,
-  builder: (context, name) => Text('姓名: $name'),
-);
-```
-
-## 🎪 核心概念
-
-### 狀態怎麼改
-
-Presenter 提供多種方法讓你更新狀態：
-
-```dart
-// 自動通知（預設）
-counterPresenter.trick(42);                       // 直接賦值
-counterPresenter.trickWith((state) => state + 1); // 用函數轉換
-await counterPresenter.trickAsync(fetchValue);    // 非同步更新
-
-// 手動通知
-manualPresenter.whisper(42);                     // 只改值不通知
-manualPresenter.whisperWith((s) => s + 1);       // 靜默轉換
-manualPresenter.yell();                          // 需要時再通知
+manualJoker.whisper(42);              // 靜默地更改值
+manualJoker.whisperWith((s) => s + 1); // 靜默地轉換
+manualJoker.yell();                   // 手動通知監聽器
 ```
 
 ### 批次更新
 
-多個狀態變更可以合併成一次通知：
+對於手動通知模式，您可以將多個變更分組為單一更新。
 
 ```dart
+final userJoker = Joker<User>(User(name: 'initial'), autoNotify: false);
+
 userJoker.batch()
-  .apply((u) => u.copyWith(name: '張三'))
+  .apply((u) => u.copyWith(name: 'John Doe'))
   .apply((u) => u.copyWith(age: 30))
-  .commit();  // 只通知一次監聽器
+  .commit(); // 只通知監聽器一次
 ```
 
-## 🌉 小部件生態系統
+## 🌉 UI 整合
 
-### Joker.perform / Presenter.perform
+### 使用 `JokerRing` 進行依賴注入
 
-觀察 Joker 或 Presenter 的整個狀態來重建小部件：
-
-```dart
-// 使用 Joker 擴充方法
-userJoker.perform(
-  builder: (context, user) => Text('${user.name}: ${user.age}'),
-)
-// 使用 Presenter 擴充方法
-myPresenter.perform(
-   builder: (context, state) => Text('狀態: $state'),
-)
-```
-
-### Joker.focusOn / Presenter.focusOn
-
-只觀察狀態的某一部分，避免不必要的重建：
+使用 `JokerRing` 將 `Joker` 或 `Presenter` 提供給小部件樹。
 
 ```dart
-// 使用 Joker 擴充方法
-userJoker.focusOn<String>(
-  selector: (user) => user.name,
-  builder: (context, name) => Text('姓名: $name'),
-)
-// 使用 Presenter 擴充方法
-userPresenter.focusOn<String>(
-  selector: (userProfile) => userProfile.name,
-  builder: (context, name) => Text('姓名: $name'),
-)
-```
-
-### Presenter.focusOnMulti
-
-觀察多個狀態的多個部分，避免不必要的重建：
-
-```dart
-userPresenter.focusOnMulti(
-  selectors: [
-    (userProfile) => userProfile.name, 
-    (userProfile) => userProfile.age, 
-  ],
-  builder: (context, [name, age]) => Text('Name: $name, Age: $age'),
+JokerRing<int>(
+  act: counterPresenter,
+  child: YourWidgetTree(),
 );
 ```
 
-### JokerTroupe / PresenterTroupe
+### 在小部件中存取狀態
 
-用 Dart Records 把多個 Joker/Presenter 狀態組合在一起：
+使用 `BuildContext` 的擴充方法來存取已提供的狀態持有者。
+
+- `context.watchJoker<T>()`：監聽變更並重建小部件。返回 `JokerAct<T>` 實例。
+- `context.joker<T>()`：讀取實例而不進行監聽。適用於在 `onPressed` 等事件處理器中呼叫方法。
 
 ```dart
-// 定義組合狀態型別
-typedef UserProfile = (String name, int age, bool isActive);
+// 在 build 方法中：
 
-JokerTroupe<UserProfile>(
-  jokers: [nameJoker, ageJoker, activeJoker],
-  converter: (values) => (
-    values[0] as String,
-    values[1] as int,
-    values[2] as bool,
-  ),
-  builder: (context, profile) {
-    final (name, age, active) = profile;
-    return ListTile(
-      title: Text(name),
-      subtitle: Text('年齡: $age'),
-      trailing: Icon(active ? Icons.check : Icons.close),
-    );
-  },
-)
+// 顯示數值（當數值變更時會重建）
+final count = context.watchJoker<int>().value;
+Text('計數: $count');
 
-PresenterTroupe<UserProfile>(
-  jokers: [nameJoker, ageJoker, activeJoker],
-  converter: (values) => (
-    values[0] as String,
-    values[1] as int,
-    values[2] as bool,
-  ),
-  builder: (context, profile) {
-    final (name, age, active) = profile;
-    return ListTile(
-      title: Text(name),
-      subtitle: Text('年齡: $age'),
-      trailing: Icon(active ? Icons.check : Icons.close),
-    );
-  },
-)
-
-// 使用擴充方法
-[nameJoker, ageJoker, activeJoker].assemble<UserProfile>(
-  converter: (values) => (
-    values[0] as String,
-    values[1] as int,
-    values[2] as bool,
-  ),
-  builder: (context, profile) {
-    final (name, age, active) = profile;
-    return ListTile(
-      title: Text(name),
-      subtitle: Text('年齡: $age'),
-      trailing: Icon(active ? Icons.check : Icons.close),
-    );
-  },
-)
+// 呼叫方法（不會導致重建）
+onPressed: () {
+  final presenter = context.joker<int>() as CounterPresenter;
+  presenter.increment();
+}
 ```
 
-## 🎭 副作用與監聽
+### 使用 `CircusRing` 進行無上下文存取
 
-不重建 UI 也能監聽狀態變化：
+當您需要在 Widget Tree 外部（例如在 `Presenter` 或服務層中）存取依賴項時，可以直接使用 `CircusRing`。這遵循了服務定位器（Service Locator）模式。
+
+1.  **Hire (註冊) 依賴項**：
+    通常在您的 `main.dart` 中，於應用程式運行前完成。
+
+    ```dart
+    // 註冊一個 ApiService 的單例實例
+    CircusRing.hire<ApiService>(singleton: ApiService());
+    ```
+
+2.  **Find (定位) 依賴項**：
+    在應用程式的任何地方存取該實例，無需 `BuildContext`。
+
+    ```dart
+    class AuthPresenter extends Presenter<AuthState> {
+      // 找到依賴項
+      final _apiService = CircusRing.find<ApiService>();
+
+      Future<void> login(String user, String pass) async {
+        final result = await _apiService.login(user, pass);
+        // ... 更新狀態
+      }
+    }
+    ```
+
+### 將狀態綁定到小部件
+
+在任何 `JokerAct` 實例上使用方便的擴充方法，將其綁定到您的 UI。
+
+#### `perform()`
+每當狀態變更時重建小部件。
 
 ```dart
-// 監聽狀態變化執行副作用
-presenter.effect(
-  child: Container(), // 子小部件
-  effect: (context, state) { // 當狀態變化時執行的副作用
-    print('effect:${state.value}');
-    // 例如：顯示 snackbar，導航等
+counterJoker.perform(
+  builder: (context, count) => Text('計數: $count'),
+);
+```
+
+#### `focusOn()`
+僅當狀態的選定部分變更時才重建小部件。這對於效能優化至關重要。
+
+```dart
+userJoker.focusOn<String>(
+  selector: (user) => user.name,
+  builder: (context, name) => Text('姓名: $name'),
+);
+```
+
+#### `watch()`
+響應狀態變更以執行副作用（例如顯示 `SnackBar` 或導航），而無需重建子小部件。
+
+```dart
+messageJoker.watch(
+  onStateChange: (context, message) {
+    if (message.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
   },
-  runOnInit: false, // 是否在小部件首次構建時運行效果
-  effectWhen: (prev, curr) {
-    // 是否在狀態變化時運行效果
-    return (prev.value ~/ 5) != (curr.value ~/ 5);
+  child: YourPageContent(), // 這個 child 不會重建
+);
+```
+
+#### `rehearse()`
+`perform` 和 `watch` 的結合體。它會從單一狀態流中重建 UI *並* 執行副作用。
+
+```dart
+counterJoker.rehearse(
+  builder: (context, count) => Text('計數: $count'),
+  onStateChange: (context, count) {
+    if (count % 10 == 0) {
+      print('達到 10 的倍數！');
+    }
+  },
+);
+```
+
+#### `assemble()`
+使用 Dart Records 將多個 `JokerAct` 實例合併到單一的 builder 中。如果任何來源的 `JokerAct` 發生變更，該小部件將會重建。
+
+```dart
+typedef UserProfile = (String name, int age);
+
+[nameJoker, ageJoker].assemble<UserProfile>(
+  converter: (values) => (values[0] as String, values[1] as int),
+  builder: (context, profile) {
+    final (name, age) = profile;
+    return Text('$name 的年齡是 $age 歲。');
   },
 );
 ```
