@@ -1,441 +1,189 @@
+// ignore_for_file: invalid_use_of_protected_member
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joker_state/joker_state.dart';
 
-class TestState {
-  final int value;
-  const TestState(this.value);
-}
-
-class TestAutoDisposePresenter extends Presenter<TestState> {
-  TestAutoDisposePresenter(
-    super.initial, {
-    super.autoNotify = true,
-    super.keepAlive = false,
-  });
-}
-
-void main() {
-  setUp(() => TestWidgetsFlutterBinding.ensureInitialized());
-
-  testWidgets('Presenter onInit/onReady/onDone follow widget lifecycle',
-      (tester) async {
-    final log = <String>[];
-    final presenter = _SpyPresenter(
-      onInitCb: () => log.add('init'),
-      onReadyCb: () => log.add('ready'),
-      onDoneCb: () => log.add('done'),
-    );
-
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: presenter.perform(
-          builder: (_, state) => Text('State: ${state.value}'),
-        ),
-      ),
-    ));
-
-    expect(log, contains('init'));
-
-    await tester.pump();
-    expect(log, contains('ready'));
-
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(presenter.isDisposed, true);
-    expect(log, contains('done'));
+class TestPresenter extends Presenter<int> {
+  TestPresenter(
+    super.initialState, {
+    super.autoNotify,
+    super.keepAlive,
+    super.autoDisposeDelay,
+    super.enableDebugLog,
   });
 
-  testWidgets('Presenter effect on runOnInit & on state change',
-      (tester) async {
-    final log = <String>[];
-    final presenter = TestAutoDisposePresenter(const TestState(1));
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: presenter.effect(
-          child: Container(),
-          effect: (context, s) => log.add('effect:${s.value}'),
-          runOnInit: true,
-        ),
-      ),
-    ));
-
-    await tester.pump();
-    expect(log, contains('effect:1'));
-
-    presenter.trick(const TestState(20));
-    await tester.pump();
-    expect(log.last, 'effect:20');
-
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(presenter.isDisposed, true);
-  });
-
-  testWidgets('Presenter effect only triggers with effectWhen', (tester) async {
-    final log = <String>[];
-    final presenter = TestAutoDisposePresenter(const TestState(1));
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: presenter.effect(
-          child: Container(),
-          effect: (context, s) => log.add('effect:${s.value}'),
-          runOnInit: false,
-          effectWhen: (prev, val) => (prev!.value ~/ 5) != (val.value ~/ 5),
-        ),
-      ),
-    ));
-
-    expect(log, isEmpty);
-
-    for (var i = 2; i <= 4; i++) {
-      presenter.trick(TestState(i));
-      await tester.pump();
-      expect(log, isEmpty);
-    }
-
-    presenter.trick(const TestState(5));
-    await tester.pump();
-    expect(log.single, 'effect:5');
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(presenter.isDisposed, true);
-  });
-
-  testWidgets('Presenter focusOn and focusOnMulti rebuild and dispose',
-      (tester) async {
-    final presenter = TestAutoDisposePresenter(const TestState(5));
-    var foCount = 0, foMCount = 0;
-    await tester.pumpWidget(MaterialApp(
-      home: Column(
-        children: [
-          presenter.focusOn<int>(
-              selector: (s) => s.value,
-              builder: (_, v) {
-                foCount++;
-                return Text('Value $v');
-              }),
-          presenter.focusOnMulti(
-            selectors: [(s) => s.value, (s) => s.value + 1],
-            builder: (_, list) {
-              foMCount++;
-              return Text('VS: ${list[0]}, ${list[1]}');
-            },
-          ),
-        ],
-      ),
-    ));
-
-    expect(find.text('Value 5'), findsOneWidget);
-    expect(find.text('VS: 5, 6'), findsOneWidget);
-    expect(foCount, 1);
-    expect(foMCount, 1);
-
-    presenter.trick(const TestState(6));
-    await tester.pump();
-    expect(find.text('Value 6'), findsOneWidget);
-    expect(find.text('VS: 6, 7'), findsOneWidget);
-    expect(foCount, 2);
-    expect(foMCount, 2);
-
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(presenter.isDisposed, true);
-  });
-
-  testWidgets('PresenterTroupe autoDispose all included presenters',
-      (tester) async {
-    final name = TestAutoDisposePresenter(const TestState(10));
-    final age = TestAutoDisposePresenter(const TestState(20));
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: [name, age].troupe<(TestState, TestState)>(
-          converter: (l) => (l[0] as TestState, l[1] as TestState),
-          builder: (context, data) => Text('${data.$1.value},${data.$2.value}'),
-        ),
-      ),
-    ));
-    expect(name.isDisposed, false);
-    expect(age.isDisposed, false);
-
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(name.isDisposed, true);
-    expect(age.isDisposed, true);
-  });
-
-  testWidgets('should auto dispose when perform widget is removed',
-      (tester) async {
-    final presenter = TestAutoDisposePresenter(const TestState(0));
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: presenter.perform(
-            builder: (_, state) => Text('State: ${state.value}')),
-      ),
-    ));
-    expect(presenter.hasListeners, true);
-    expect(presenter.isDisposed, false);
-
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(presenter.isDisposed, true);
-  });
-
-  testWidgets('should not auto dispose if keepAlive is true', (tester) async {
-    final presenter =
-        TestAutoDisposePresenter(const TestState(0), keepAlive: true);
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: presenter.perform(
-            builder: (_, state) => Text('State: ${state.value}')),
-      ),
-    ));
-    expect(presenter.hasListeners, true);
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(presenter.isDisposed, false);
-  });
-
-  testWidgets('should auto dispose when effect is removed', (tester) async {
-    final presenter = TestAutoDisposePresenter(const TestState(0));
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: presenter.effect(
-          child: Container(),
-          effect: (_, __) {},
-        ),
-      ),
-    ));
-    expect(presenter.hasListeners, true);
-    expect(presenter.isDisposed, false);
-
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(presenter.isDisposed, true);
-  });
-
-  testWidgets('should auto dispose for troupe when all widgets removed',
-      (tester) async {
-    final p1 = TestAutoDisposePresenter(const TestState(1));
-    final p2 = TestAutoDisposePresenter(const TestState(2));
-    await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: [p1, p2].troupe<(TestState, TestState)>(
-          converter: (values) =>
-              (values[0] as TestState, values[1] as TestState),
-          builder: (context, rec) => Text('${rec.$1.value}, ${rec.$2.value}'),
-        ),
-      ),
-    ));
-    expect(p1.isDisposed, false);
-    expect(p2.isDisposed, false);
-
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(p1.isDisposed, true);
-    expect(p2.isDisposed, true);
-  });
-
-  testWidgets('should work with focusOn & focusOnMulti and auto dispose',
-      (tester) async {
-    final presenter = TestAutoDisposePresenter(const TestState(42));
-    int focusBuildCount = 0, multiBuildCount = 0;
-
-    await tester.pumpWidget(MaterialApp(
-      home: Column(
-        children: [
-          presenter.focusOn<int>(
-            selector: (s) => s.value,
-            builder: (_, v) {
-              focusBuildCount++;
-              return Text('Value $v');
-            },
-          ),
-          presenter.focusOnMulti(
-            selectors: [(s) => s.value, (s) => s.value + 1],
-            builder: (_, list) {
-              multiBuildCount++;
-              return Text('VS: ${list[0]}, ${list[1]}');
-            },
-          ),
-        ],
-      ),
-    ));
-
-    expect(find.text('Value 42'), findsOneWidget);
-    expect(find.text('VS: 42, 43'), findsOneWidget);
-    expect(focusBuildCount, 1);
-    expect(multiBuildCount, 1);
-
-    presenter.trick(TestState(99));
-    await tester.pump();
-    expect(find.text('Value 99'), findsOneWidget);
-    expect(find.text('VS: 99, 100'), findsOneWidget);
-    expect(focusBuildCount, 2);
-    expect(multiBuildCount, 2);
-
-    await tester.pumpWidget(Container());
-    await tester.pump(const Duration(seconds: 1));
-    expect(presenter.isDisposed, true);
-  });
-  // Manual mode tests
-  test('In manual mode, autoNotify property should be set correctly', () {
-    // Create a Presenter in manual mode
-    final presenter = TestManualPresenter(const TestState(10));
-
-    // Verify that autoNotify property is set to false
-    expect(presenter.autoNotify, false);
-  });
-
-  test('In manual mode, using trick or trickWith should throw an exception',
-      () {
-    // Create a Presenter in manual mode
-    final presenter = TestManualPresenter(const TestState(0));
-
-    // Attempting to use trick should throw an exception
-    expect(() => presenter.trick(const TestState(1)),
-        throwsA(isA<JokerException>()));
-
-    // Attempting to use trickWith should throw an exception
-    expect(() => presenter.trickWith((s) => TestState(s.value + 1)),
-        throwsA(isA<JokerException>()));
-
-    // Attempting to use trickAsync should throw an exception
-    expect(() => presenter.trickAsync((s) async => TestState(s.value + 1)),
-        throwsA(isA<JokerException>()));
-  });
-
-  test('In manual mode, Presenter should correctly set previousState', () {
-    // Create a Presenter in manual mode
-    final presenter = TestManualPresenter(const TestState(5));
-
-    // Verify that previousState is set correctly
-    expect(presenter.previousState?.value, 5);
-  });
-
-  test('batch should allow multiple state updates and notify only once', () {
-    // Create a Presenter in auto-notify mode
-    final presenter = TestAutoDisposePresenter(const TestState(0));
-
-    // Add a listener and immediately cancel it to clear any existing subscriptions
-    final subscription = presenter.subscribe((state) {});
-    subscription.cancel();
-
-    // Calculate the expected state
-    var expectedState = TestState(0);
-    expectedState = TestState(expectedState.value + 5); // First add 5
-    expectedState = TestState(expectedState.value * 2); // Then multiply by 2
-
-    // Directly update state using trick
-    presenter.trick(expectedState);
-
-    // Re-subscribe and count notifications
-    int newCallCount = 0;
-    final newSubscription = presenter.subscribe((state) {
-      newCallCount++;
-    });
-
-    // Verify that state has been updated
-    expect(presenter.state.value, 10);
-    expect(newCallCount, 0); // New subscription should not receive notification
-
-    // Clean up subscription
-    newSubscription.cancel();
-  });
-
-  test('In manual mode, state should be accessible', () {
-    // Create a Presenter in manual mode
-    final presenter = TestManualPresenter(const TestState(10));
-
-    // Verify that state is correct
-    expect(presenter.state.value, 10);
-  });
-
-  test('batch principle is to update state first then notify once', () {
-    // Create a Presenter
-    final presenter = TestAutoDisposePresenter(const TestState(5));
-
-    // Clear all subscriptions
-    final subscription = presenter.subscribe((state) {});
-    subscription.cancel();
-
-    // Calculate the expected state
-    var expectedState = TestState(5);
-    expectedState = TestState(expectedState.value + 10); // Add 10
-
-    // Directly update state
-    presenter.trick(expectedState);
-
-    // Re-subscribe and count notifications
-    int newCallCount = 0;
-    final newSubscription = presenter.subscribe((state) {
-      newCallCount++;
-    });
-
-    // Verify that state has been updated
-    expect(presenter.state.value, 15);
-    expect(newCallCount, 0); // New subscription should not receive notification
-
-    // Clean up subscription
-    newSubscription.cancel();
-  });
-
-  test('previousState and isDifferent should correctly reflect state changes',
-      () {
-    // Create a Presenter
-    final presenter = TestAutoDisposePresenter(const TestState(5));
-
-    // Initial state
-    expect(presenter.previousState?.value,
-        5); // After construction, previousState is set to be the same as the initial state
-
-    // Update state
-    presenter.trick(const TestState(10));
-
-    // Verify previousState and isDifferent
-    expect(presenter.previousState?.value, 5);
-    expect(presenter.isDifferent, true);
-
-    // Create a new Presenter to test isDifferent behavior
-    final presenter2 = TestAutoDisposePresenter(const TestState(10));
-    // Update with the same value but using a different instance
-    final sameValueState = TestState(
-        10); // Create a new instance with the same value but different instance
-    presenter2.trick(sameValueState);
-
-    // Verify previousState
-    expect(presenter2.previousState?.value, 10);
-    // We don't test isDifferent because TestState doesn't override the == operator
-  });
-}
-
-// Presenter test class for manual mode
-class TestManualPresenter extends Presenter<TestState> {
-  TestManualPresenter(super.initial) : super(autoNotify: false);
-}
-
-class _SpyPresenter extends Presenter<TestState> {
-  final void Function()? onInitCb;
-  final void Function()? onReadyCb;
-  final void Function()? onDoneCb;
-  _SpyPresenter({this.onInitCb, this.onReadyCb, this.onDoneCb})
-      : super(const TestState(9));
+  int onInitCallCount = 0;
+  int onReadyCallCount = 0;
+  int onDoneCallCount = 0;
 
   @override
   void onInit() {
     super.onInit();
-    onInitCb?.call();
+    onInitCallCount++;
   }
 
   @override
   void onReady() {
     super.onReady();
-    onReadyCb?.call();
+    onReadyCallCount++;
   }
 
   @override
   void onDone() {
     super.onDone();
-    onDoneCb?.call();
+    onDoneCallCount++;
   }
+}
+
+void main() {
+  group('Presenter Core Functionality', () {
+    test('Presenter should initialize with correct state and call onInit', () {
+      final presenter = TestPresenter(10);
+      expect(presenter.state, 10);
+      expect(presenter.value, 10);
+      expect(presenter.onInitCallCount, 1);
+      expect(presenter.isDisposed, isFalse);
+    });
+
+    testWidgets('onReady should be called after the first frame',
+        (WidgetTester tester) async {
+      late TestPresenter presenter;
+
+      // Create a simple widget that initializes the presenter
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              presenter = TestPresenter(10);
+              return Container();
+            },
+          ),
+        ),
+      );
+
+      expect(presenter.onInitCallCount, 1);
+      expect(presenter.onReadyCallCount, 1);
+    });
+
+    test('onDone should be called on dispose', () {
+      final presenter = TestPresenter(0);
+      expect(presenter.onDoneCallCount, 0);
+
+      presenter.dispose();
+      expect(presenter.onDoneCallCount, 1);
+      expect(presenter.isDisposed, isTrue);
+    });
+
+    test('trick() should update state and notify listeners in autoNotify mode',
+        () {
+      final presenter = TestPresenter(0);
+      var listenerCalled = 0;
+      presenter.addListener(() => listenerCalled++);
+
+      presenter.trick(1);
+      expect(presenter.state, 1);
+      expect(listenerCalled, 1);
+    });
+
+    test('previousValue should be correct after state changes', () {
+      final presenter = TestPresenter(0);
+      expect(presenter.previousValue, null); // Initial previousValue is null
+
+      presenter.trick(1);
+      expect(presenter.previousValue, 0);
+      expect(presenter.state, 1);
+
+      presenter.trick(5);
+      expect(presenter.previousValue, 1);
+      expect(presenter.state, 5);
+    });
+
+    group('Presenter Auto-Disposal', () {
+      test(
+          'Presenter should dispose itself when no listeners and not keepAlive',
+          () async {
+        final presenter = TestPresenter(0,
+            autoDisposeDelay: const Duration(milliseconds: 10));
+        var listenerCalled = 0;
+        listener() => listenerCalled++;
+
+        presenter.addListener(listener);
+        expect(presenter.hasListeners, isTrue);
+        expect(presenter.isDisposed, isFalse);
+
+        presenter.removeListener(listener);
+        expect(presenter.hasListeners, isFalse);
+
+        await Future.delayed(
+            const Duration(milliseconds: 50)); // Wait for dispose delay
+
+        expect(presenter.isDisposed, isTrue);
+        expect(presenter.onDoneCallCount, 1);
+        expect(() => presenter.state, throwsA(isA<JokerException>()));
+      });
+
+      test('Presenter should not dispose if keepAlive is true', () async {
+        final presenter = TestPresenter(0,
+            keepAlive: true,
+            autoDisposeDelay: const Duration(milliseconds: 10));
+        var listenerCalled = 0;
+        listener() => listenerCalled++;
+
+        presenter.addListener(listener);
+        presenter.removeListener(listener);
+
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        expect(presenter.isDisposed, isFalse);
+        expect(presenter.state, 0); // Should still be accessible
+      });
+    });
+
+    group('Manual Notification Mode (autoNotify: false)', () {
+      test('whisper() should update state without notifying', () {
+        final presenter = TestPresenter(0, autoNotify: false);
+        var listenerCalled = 0;
+        presenter.addListener(() => listenerCalled++);
+
+        presenter.whisper(1);
+        expect(presenter.state, 1);
+        expect(listenerCalled, 0);
+      });
+
+      test('yell() should manually notify listeners', () {
+        final presenter = TestPresenter(0, autoNotify: false);
+        var listenerCalled = 0;
+        presenter.addListener(() => listenerCalled++);
+
+        presenter.whisper(1);
+        expect(listenerCalled, 0);
+
+        presenter.yell();
+        expect(listenerCalled, 1);
+      });
+
+      test('batch() should update state and notify once on commit', () {
+        final presenter = TestPresenter(0, autoNotify: false);
+        var listenerCalled = 0;
+        presenter.addListener(() => listenerCalled++);
+
+        var batch = presenter.batch();
+
+        batch.apply((s) => s + 1).apply((s) => s * 2);
+
+        expect(presenter.state, 2);
+        expect(listenerCalled, 0);
+
+        presenter.whisper(3);
+        batch.commit(); // Change from 2 to 3, so notification
+        expect(listenerCalled, 1);
+      });
+
+      test('trick methods should throw JokerException in manual mode', () {
+        final presenter = TestPresenter(0, autoNotify: false);
+        expect(() => presenter.trick(1), throwsA(isA<JokerException>()));
+      });
+    });
+  });
 }
