@@ -1,3 +1,6 @@
+## [4.2.0+3]
+* fix format analysis issue
+
 ## [4.2.0+2]
 * fix export missing issues
 

@@ -17,11 +17,14 @@ import 'dart:collection';
 /// - It correctly handles cycles in the object graph.
 bool isDeeplyEqual(dynamic a, dynamic b) {
   // Use a Set to keep track of visited pairs to detect cycles.
-  final visited = HashSet<List<dynamic>>(hashCode: (p) => identityHashCode(p[0]) ^ identityHashCode(p[1]), equals: (p1, p2) => identical(p1[0], p2[0]) && identical(p1[1], p2[1]));
+  final visited = HashSet<List<dynamic>>(
+      hashCode: (p) => identityHashCode(p[0]) ^ identityHashCode(p[1]),
+      equals: (p1, p2) => identical(p1[0], p2[0]) && identical(p1[1], p2[1]));
   return _isDeeplyEqualRecursive(a, b, visited);
 }
 
-bool _isDeeplyEqualRecursive(dynamic a, dynamic b, HashSet<List<dynamic>> visited) {
+bool _isDeeplyEqualRecursive(
+    dynamic a, dynamic b, HashSet<List<dynamic>> visited) {
   if (identical(a, b)) return true;
 
   // If this pair has been visited, we have a cycle.
@@ -43,7 +46,8 @@ bool _isDeeplyEqualRecursive(dynamic a, dynamic b, HashSet<List<dynamic>> visite
     if (a is Map) {
       if (b is! Map || a.length != b.length) return false;
       for (final key in a.keys) {
-        if (!b.containsKey(key) || !_isDeeplyEqualRecursive(a[key], b[key], visited)) {
+        if (!b.containsKey(key) ||
+            !_isDeeplyEqualRecursive(a[key], b[key], visited)) {
           return false;
         }
       }
@@ -54,7 +58,9 @@ bool _isDeeplyEqualRecursive(dynamic a, dynamic b, HashSet<List<dynamic>> visite
       if (b is! Set || a.length != b.length) return false;
       final bCopy = Set.of(b); // Create a mutable copy.
       for (final valA in a) {
-        final found = bCopy.firstWhere((valB) => _isDeeplyEqualRecursive(valA, valB, visited), orElse: () => null);
+        final found = bCopy.firstWhere(
+            (valB) => _isDeeplyEqualRecursive(valA, valB, visited),
+            orElse: () => null);
         if (found != null) {
           bCopy.remove(found);
         } else {
