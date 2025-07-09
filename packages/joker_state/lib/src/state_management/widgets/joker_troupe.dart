@@ -9,7 +9,8 @@ typedef JokerTroupeBuilder<T extends Record> = Widget Function(
 );
 
 /// A function that converts a list of dynamic state values into a strongly-typed [Record].
-typedef JokerTroupeConverter<T extends Record> = T Function(List<dynamic> states);
+typedef JokerTroupeConverter<T extends Record> = T Function(
+    List<dynamic> states);
 
 /// A widget that combines multiple [JokerAct] instances into a single UI representation.
 ///
@@ -159,4 +160,3 @@ class _JokerTroupeState<T extends Record> extends State<JokerTroupe<T>> {
     return widget.builder(context, typedStates);
   }
 }
-

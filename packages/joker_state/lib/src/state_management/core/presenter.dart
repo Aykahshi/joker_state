@@ -18,7 +18,7 @@ final _engine = WidgetsFlutterBinding.ensureInitialized();
 ///
 /// It supports both automatic and manual notification modes, batch updates,
 /// and automatic disposal.
-class Presenter<T> extends JokerAct<T> {
+abstract class Presenter<T> extends JokerAct<T> {
   /// Creates a new [Presenter] instance.
   ///
   /// - [initialState]: The initial state of the Presenter.
@@ -100,10 +100,9 @@ class Presenter<T> extends JokerAct<T> {
   T get state => value;
 
   /// Sets the state. If in [autoNotify] mode, notifies listeners.
-  @override
-  set value(T newValue) {
+  set state(T newValue) {
     _previousState = value;
-    super.value = newValue;
+    value = newValue;
   }
 
   /// Updates the value and notifies listeners.

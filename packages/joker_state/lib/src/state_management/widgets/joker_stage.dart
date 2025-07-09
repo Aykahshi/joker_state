@@ -77,5 +77,3 @@ class JokerStage<T> extends StatelessWidget {
     );
   }
 }
-
-

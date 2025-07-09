@@ -3,7 +3,8 @@ import 'package:flutter/widgets.dart';
 import '../foundation/joker_act.dart';
 
 /// A builder that constructs a widget based on the [Joker]'s state.
-typedef JokerRehearseBuilder<T> = Widget Function(BuildContext context, T state);
+typedef JokerRehearseBuilder<T> = Widget Function(
+    BuildContext context, T state);
 
 /// A callback to perform a side effect in response to a state change.
 typedef JokerRehearseCallback<T> = void Function(BuildContext context, T state);
@@ -144,12 +145,14 @@ class _JokerRehearseState<T> extends State<JokerRehearse<T>> {
     if (!mounted) return;
 
     // Handle the side effect (watch).
-    if (widget.watchWhen?.call(widget.act.previousValue, widget.act.value) ?? true) {
+    if (widget.watchWhen?.call(widget.act.previousValue, widget.act.value) ??
+        true) {
       widget.onStateChange(context, widget.act.value);
     }
 
     // Handle the UI rebuild (perform).
-    if (widget.performWhen?.call(widget.act.previousValue, widget.act.value) ?? true) {
+    if (widget.performWhen?.call(widget.act.previousValue, widget.act.value) ??
+        true) {
       setState(() {});
     }
   }
@@ -159,5 +162,3 @@ class _JokerRehearseState<T> extends State<JokerRehearse<T>> {
     return widget.builder(context, widget.act.value);
   }
 }
-
-

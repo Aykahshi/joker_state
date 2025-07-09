@@ -131,5 +131,3 @@ class _JokerWatchState<T> extends State<JokerWatch<T>> {
   @override
   Widget build(BuildContext context) => widget.child;
 }
-
-

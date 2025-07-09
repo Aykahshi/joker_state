@@ -124,5 +124,3 @@ class _JokerFrameState<T, S> extends State<JokerFrame<T, S>> {
     return widget.builder(context, _selected);
   }
 }
-
-
