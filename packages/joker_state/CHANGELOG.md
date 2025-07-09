@@ -1,3 +1,7 @@
+## [4.2.0+4]
+* fix format analysis issue
+* make Presenter being abstract, and adjusting setter
+
 ## [4.2.0+3]
 * fix format analysis issue
 
